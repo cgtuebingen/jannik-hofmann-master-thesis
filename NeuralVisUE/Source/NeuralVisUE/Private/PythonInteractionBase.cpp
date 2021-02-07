@@ -13,7 +13,7 @@ using namespace std;
 
 FString UPythonInteractionBase::HelloUnreal(int a, int b)
 {
-	int foo = a + b;
+	int foo = a + b;/**/
 	return (FString::Printf(TEXT("Hello Unreal. I calculated %d + %d = %d for you. Am I artificially intelligent yet?"), a, b, foo));
 	//INeuralInteractionClient::Get().LoadClient();
 }
