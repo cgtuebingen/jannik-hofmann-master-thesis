@@ -5,6 +5,7 @@
 
 # USED LIBRARIES
 import re
+import os
 
 
 # Returns a simple or complicated ansi foreground text color code as str for console formatting
@@ -133,3 +134,9 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 
 	# Return the formatted text, followed by a reset signal for default future output
 	return colorcode + text + RESET
+
+def clearScreen():
+	if os.name == 'nt': # windows
+		os.system('cls')
+	else: # os.name == 'posix' # linux or mac
+		os.system('clear')

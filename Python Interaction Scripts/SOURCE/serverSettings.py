@@ -42,6 +42,8 @@ LOGFILE_PATH = R"\..\logs"
 # Append logfile name. This should contain some unique datetime-identifier and be easily sortable.
 LOGFILE_PATH +=	R"\session " + datetime.now().strftime("on %Y-%m-%d at %H %M") + ".txt"
 
+#LOGFILE_PATH = None# This deactivates logging entirely. Not recommended.
+
 # Desired level of debugging verbosity in console and debug. The higher you go the more verbose
 # debug info gets printed. 11 = all debug, 0 = only warnings and errors, -1 = ignore mild warnings,
 # -9 = ignore all warnings, -10 = ignore mild errors, -19 = don't print any non-critical errors.
@@ -127,11 +129,15 @@ def checkSettings():
 		msg = "SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER should be at least 0.1"
 		loggingFunctions.warn(msg, 8)
 
-	assert(type(DEFAULT_LOAD_NN_PATH) is str) and (type(LOGFILE_PATH) is str)
-	if (DEFAULT_LOAD_NN_PATH.startswith(("\\", "/"))):
-		DEFAULT_LOAD_NN_PATH = centralController.SCRIPT_PATH() + DEFAULT_LOAD_NN_PATH
-	if (LOGFILE_PATH.startswith(("\\", "/"))):
-		LOGFILE_PATH = centralController.SCRIPT_PATH() + LOGFILE_PATH
+	if (LOGFILE_PATH is None or LOGFILE_PATH == ""):
+		msg = "No valid logpath given in settings. Logging will be disabled. This is not recommended"
+		loggingFunctions.warn(msg, 4)
+	else:
+		assert(type(DEFAULT_LOAD_NN_PATH) is str) and (type(LOGFILE_PATH) is str)
+		if (DEFAULT_LOAD_NN_PATH.startswith(("\\", "/"))):
+			DEFAULT_LOAD_NN_PATH = centralController.SCRIPT_PATH() + DEFAULT_LOAD_NN_PATH
+		if (LOGFILE_PATH.startswith(("\\", "/"))):
+			LOGFILE_PATH = centralController.SCRIPT_PATH() + LOGFILE_PATH
 
 	# Use this to check whether you left out any variables in the "global" definition above:
 	#print(locals())

@@ -23,7 +23,10 @@ lastlogwrite = None
 # returns whether the text could be successfully appended
 def log(text):
 	# abort if no logfile path or path couldn't be accessed previously
-	if (setting.LOGFILE_PATH == "ERROR" and setting.LOGFILE_PATH == ""):
+	if (setting.LOGFILE_PATH is None or
+		setting.LOGFILE_PATH == "ERROR" or
+		setting.LOGFILE_PATH == ""):
+		
 		return False
 
 	# removing escape characters that look pretty in console but ugly in textfiles

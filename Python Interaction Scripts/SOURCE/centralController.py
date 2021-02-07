@@ -24,11 +24,15 @@ import ast
 import serverSettings as setting
 import websocketServer as server
 import loggingFunctions
+import beautifulDebug
 
 
 # so other modules can access the current script location
 def SCRIPT_PATH():
     return os.path.dirname(os.path.realpath(__file__))
+
+# Clearing screen for the start of this new session
+beautifulDebug.clearScreen()
 
 # verify user settings and check for warnings / recommendations
 setting.checkSettings()

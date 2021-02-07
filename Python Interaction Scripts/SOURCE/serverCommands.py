@@ -344,7 +344,7 @@ class Request:
 	async def displayhelp(self, helpString = None, **kwargs):
 		# Note: In main section, structure of all commandList values was automatically changed to
 		# (function, verbose_command_with_spaces, explanation, details_about_usage)
-		if (await self.checkParams(warnuser=False)):
+		if (await self.checkParams(warnUser=False)):
 			if (helpString is None):
 				helpString = await self.getParam()
 
@@ -532,12 +532,9 @@ class Request:
 	commandList["verbosity"] = commandAlias("set verbosity")
 
 
-	async def clearScreenInSeconds(self, seconds):
-		await asyncio.sleep(seconds)
-		if os.name == 'nt': # windows
-			os.system('cls')
-		else: # os.name == 'posix' # linux or mac
-			os.system('clear')
+	async def clearScreenInSeconds(self, waitSeconds=0):
+		await asyncio.sleep(waitSeconds)
+		beautifulDebug.clearScreen()
 
 
 	async def cls(self, **kwargs):
@@ -638,7 +635,7 @@ class Request:
 
 
 	async def serverIP(self, **kwargs):
-		if (await self.checkParams(warnuser=False)):
+		if (await self.checkParams(warnUser=False)):
 			param = await self.getParam(1, str)
 			if param.lower() == "port":
 				return await self.serverIPPort(warnParameters = False)
@@ -706,7 +703,7 @@ class Request:
 
 
 	async def sendfiletest(self, **kwargs):
-		if not await self.checkParams(warnuser=False):
+		if not await self.checkParams(warnUser=False):
 			await self.senddebug(1, f"No filepath specified for sendfile test. Sending log file.")
 			path = setting.LOGFILE_PATH
 		else:
@@ -719,7 +716,7 @@ class Request:
 
 	async def sendstruct(self, **kwargs):
 		struct = (1, 'text', 5.234, (1, 'more', 3, ()), ('b', 'a', 'c'), None, {"hi": 1, "there": 2})
-		if (await self.checkParams(warnuser=False)):
+		if (await self.checkParams(warnUser=False)):
 			if (setting.ALLOW_REMOTE_CODE_EXECUTION):
 				try:
 					struct = eval(await self.getParam())
@@ -814,9 +811,27 @@ class Request:
 					await self.senddebug(-4, f"List of prepared commands was successfully cleared.")
 			else:
 				preparedCommands.append(param)
-				await self.senddebug(-4, f'Command "{param}" was added to the list of prepared commands. Use "prepare" to review the list or "load" to execute commands from it.')
+				await self.senddebug(-4, f'Command "{param}" was added to the list of prepared ' +
+					'commands. Use "prepare" to review the list or "load" to execute commands from it.')
 	commandList["prepare"] = (prepareCommand, "Prepares a command to be executed later",
-		'The argument passed a string (containing spaces) will be stored and can be executed by the load command. This is useful for injecting commands into the program pipeline from other clients, e.g. for debugging.\nWarning: This command depends on execution order and might lead to unexpected results when multiple prepare and load commands are executed in the wrong order. Take care when using this in parallel with multiple asynchronously threaded clients.\nFirst in, first out system for multiple commands prepared consecutively\nWithout parameters, it will return a list of the currently prepared commands.\nUse "prepare clear" or "prepare reset" to clear the list from any loaded commands.\nWith chained commands ' + ('(currently enabled)' if setting.AMPERSAND_CHAINS_COMMANDS else '(currently disabled)') + ', a single & will first prepare the command and then execute anything behind it. A double ampersand will be converted into a prepared chained command, that executes its contents consecutively. To use a ampersand in a string within those commands, escape it as &&&&.\nExample: "prepare echo alone & prepare echo and&&&&and & prepare echo one&&echo two & echo successfully prepared &&-chained commands" will prepare "echo alone", then prepare "echo and&&and" (which just prints out "and&and"), then prepare the double command "echo one & echo two" and finally print out "successfully prepared &-chained commands"')
+		'The argument passed a string (containing spaces) will be stored and can be executed by ' +
+		'the load command. This is useful for injecting commands into the program pipeline from ' +
+		'other clients, e.g. for debugging.\nWarning: This command depends on execution order ' +
+		'and might lead to unexpected results when multiple prepare and load commands are ' +
+		'executed in the wrong order. Take care when using this in parallel with multiple ' +
+		'asynchronously threaded clients.\nFirst in, first out system for multiple commands ' +
+		'prepared consecutively when loaded.\nWithout parameters, it will return a list of the ' +
+		'currently prepared commands.\nUse "prepare clear" or "prepare reset" to clear the list ' +
+		'from any loaded commands.\nWith chained commands ' +
+		('(currently enabled)' if setting.AMPERSAND_CHAINS_COMMANDS else '(currently disabled)') +
+		', a single & will first prepare the command and then execute anything behind it. A ' +
+		'double ampersand will be converted into a prepared chained command, that executes its ' +
+		'contents consecutively. To use a ampersand in a string within those commands, escape ' +
+		'it as &&&&.\nExample: "prepare echo alone & prepare echo and&&&&and & prepare echo ' +
+		'one&&echo two & echo successfully prepared &&-chained commands" will prepare "echo ' +
+		'alone", then prepare "echo and&&and" (which just prints out "and&and"), then prepare ' +
+		'the double command "echo one & echo two" and finally print out "successfully prepared ' +
+		'&-chained commands"')
 	
 
 	async def loadCommand(self, *, loadedCommand = None, **kwargs):
@@ -841,7 +856,7 @@ class Request:
 	SUPPRESSED_WARNING_LEVEL = 19
 	async def checkScriptVersion(self, **kwargs):
 		await self.checkParams(1, 2)
-		if (not await self.checkParams(warnuser=False)):
+		if (not await self.checkParams(warnUser=False)):
 			await self.send(("SERVER SCRIPT VERSION",  server.PYTHON_INTERACTION_SCRIPT_VERSION))
 			return
 		criticalWarning = True
@@ -974,7 +989,7 @@ class Request:
 
 	# NEURAL NETWORK INTERACTION
 	async def loadnn(self, **kwargs):
-		if not await self.checkParams(warnuser=False):
+		if not await self.checkParams(warnUser=False):
 			path = setting.DEFAULT_LOAD_NN_PATH
 			await self.senddebug(5, f"No custom path for the neural network was specified. " +
 			"Using default path specified in python server script:\n" + path)
