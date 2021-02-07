@@ -1,0 +1,24 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0",
+	"FriendlyName": "Neural Network Interaction Client",
+	"Description": "Interacts with a python websocket server to request and process data from neural networks",
+	"Category": "Other",
+	"CreatedBy": "Jannik Hofmann",
+	"CreatedByURL": "",
+	"DocsURL": "",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+  "Modules": [
+    {
+      "Name": "NeuralInteractionClient",
+      "Type": "Runtime",
+      "LoadingPhase": "Default"
+    }
+  ]
+}
