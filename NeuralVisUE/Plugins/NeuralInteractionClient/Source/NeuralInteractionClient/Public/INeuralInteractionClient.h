@@ -22,4 +22,6 @@ public:
 	{
 		return FModuleManager::Get().IsModuleLoaded("NeuralInteractionClient");
 	}
+
+	virtual int LoadClient(FString command) = 0;
 };

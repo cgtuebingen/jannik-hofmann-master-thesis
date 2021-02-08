@@ -578,6 +578,9 @@ int FNeuralInteractionClient::LoadClient(FString command) {
 	//text = _strdup("console");
 	text = TCHAR_TO_ANSI(*command);
 	connect_to_websocket_server(text, host, port, false);
+
+	int returnValue = 1;
+	return returnValue;
 }
 
 void FNeuralInteractionClient::StartupModule()
@@ -586,7 +589,7 @@ void FNeuralInteractionClient::StartupModule()
 	//UE_LOG(NeuralInteractionClient, Log, TEXT("Sarting up\n"));
 	UE_LOG(NeuralInteractionClient, Log, TEXT("Starting module FNeuralInteractionClient."));
 
-	FNeuralInteractionClient::LoadClient("echo Loaded by StartupModule");
+	FNeuralInteractionClient::LoadClient(FString(TEXT("echo Loaded by StartupModule")));
 	//LoadClient();
 }
 
