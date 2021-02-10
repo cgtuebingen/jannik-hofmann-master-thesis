@@ -240,7 +240,7 @@ def startServer():
 	triesLeft = setting.TIMES_TO_RETRY_ESTABLISHING_SERVER
 	while (triesLeft > 0):
 		triesLeft -= 1
-
+		
 		errorMsg = None
 		try:
 			# Specify the server function and address
@@ -255,7 +255,7 @@ def startServer():
 
 			# asyncio: listen forever for new websocket client connections to this server
 			asyncio.get_event_loop().run_forever()
-		
+			
 		except OSError:
 			# OSError means probably that the server couldn't bind to the specified address
 			errorMsg = beautifulDebug.special(5, 3, 0) + \
