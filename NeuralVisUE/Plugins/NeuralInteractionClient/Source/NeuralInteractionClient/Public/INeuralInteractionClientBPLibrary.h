@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "CoreMinimal.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "INeuralInteractionClientBPLibrary.generated.h"
 
@@ -27,6 +28,12 @@ class UNeuralInteractionClientBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_UCLASS_BODY()
 
-	UFUNCTION(BlueprintCallable, meta = (DisplayName = "Execute Sample function", Keywords = "NeuralInteractionClient sample test testing"), Category = "NeuralInteractionClientTesting")
-	static float NeuralInteractionClientSampleFunction(float Param);
+	/*UFUNCTION(BlueprintCallable, meta = (DisplayName = "Neural Interaction Client", Keywords = "NeuralInteractionClient sample test testing"), Category = "NeuralInteractionClientTesting")
+	static float NeuralInteractionClientSampleFunction(float Param);*/
+	
+	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
+	static FString HelloUnreal(int a, int b);
+
+	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
+	static FString ExecuteCommand(FString command);
 };
