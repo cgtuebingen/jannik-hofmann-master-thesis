@@ -517,6 +517,49 @@ int connect_to_websocket_server(
 	}
 }
 
+int connect_to_websocket_serverAdvanced(
+	const FReadResponse& Callback,
+	char* text = _strdup("help"),
+	char* host = _strdup("localhost"),
+	char* port = _strdup("80"),
+	bool interactive = false
+) {
+	//std::cout << "\n\nConnecting to execute command " << text << "\n";
+	//print("\n\nConnecting to execute command " + text);
+
+	std::string arguments;
+	while (true) {
+		// The io_context is required for all I/O
+		net::io_context ioc;
+		// Launch the asynchronous operation
+		std::make_shared<session>(ioc)->run(host, port, text);
+
+		Callback.Execute(TEXT("Delegate was just called from inside connect_websocket_server."));
+
+		// Run the I/O service. The call will return when
+		// the socket is closed.
+		ioc.run();
+		
+		if (!interactive)
+			return EXIT_SUCCESS;
+
+		// Do it all again with user input
+		/*std::cout << "\nClient inactive>";
+		getline(std::cin, arguments);
+		text = &arguments[0];*/
+		print("Waiting for new user input.\n");
+		//text = "console";
+		text = "help";
+
+		// If user doesn't specify input, terminate interactive loop
+		/*if (arguments.length() == 0)
+			return EXIT_SUCCESS;*/
+		/*bool QUIT = true;
+		if (QUIT == true)
+			return EXIT_SUCCESS;*/
+	}
+}
+
 int execute_commands_simultaneously(
 	char** commands,
 	int numberofcommands,
@@ -596,9 +639,7 @@ int FNeuralInteractionClient::LoadClientAdvanced(FString command, const FReadRes
 	port = _strdup("80");
 	//text = _strdup("console");
 	text = TCHAR_TO_ANSI(*command);
-	connect_to_websocket_server(text, host, port, false);
-
-	Callback.Execute(TEXT("Delegate was just called from inside LoadClientAdvanced."));
+	connect_to_websocket_serverAdvanced(Callback, text, host, port, false);
 
 	int returnValue = 1;
 	return returnValue;
