@@ -286,8 +286,12 @@ public:
 		debug("on read called");
 		boost::ignore_unused(bytes_transferred);
 
-		if (ec)
+		if (ec) {
+			if (ec.value() == 1 && sessionCallbacksCompletelySet) {
+				sessionCallbackEndOfConnection.Execute(UTF8_TO_TCHAR(text_.c_str()));
+			}
 			return fail(ec, "read");
+		}
 
 		std::string response;
 		unpackmsgpack();
@@ -369,6 +373,24 @@ public:
 			if (sessionCallbackSet) {
 				visitor.setCallbackFunction(sessionCallback);
 			}
+			if (sessionCallbacksCompletelySet) {
+				visitor.setCallbackFunctionsCompletely(
+					sessionCallbackEndOfConnection,
+					sessionCallbackEndOfReponse,
+					sessionCallbackParseError,
+					sessionCallbackStartOrEndOfMap,
+					sessionCallbackStartOrEndOfNestedArray,
+					sessionCallbackFoundAtomNil,
+					sessionCallbackFoundAtomString,
+					sessionCallbackFoundAtomBinary,
+					sessionCallbackFoundAtomExternal,
+					sessionCallbackFoundAtomBoolean,
+					sessionCallbackFoundAtomInteger,
+					sessionCallbackFoundAtomInteger64,
+					sessionCallbackFoundAtomFloat
+				);
+				visitor.setOriginalCommand(text_);
+			}
 			msgpack::parse(response.data(), response.size(), visitor);
 			//std::cout << std::endl;
 			print("\n");
@@ -394,12 +416,14 @@ public:
 		bool processing_map_value = false;
 		std::string printThisAfterNextWhitespace = "";
 		std::string firstString = "";
+		FString FfirstString = "";
 		int tmpArrayLength;
 		int tmpX, tmpY, tmpZ, tmpCount;
 		bool tmpReading = false;
 		std::string tmpStr = "";
 		FReadResponse visitorCallback;
 		bool visitorCallbackSet = false;
+		FString originalCommand = "";
 
 		FEndOfConnection visitorCallbackEndOfConnection;
 		FEndOfReponse visitorCallbackEndOfReponse;
@@ -450,6 +474,10 @@ public:
 			visitorCallbackFoundAtomInteger64 = CallbackFoundAtomInteger64;
 			visitorCallbackFoundAtomFloat = CallbackFoundAtomFloat;
 			visitorCallbacksCompletelySet = true;
+		}
+
+		void setOriginalCommand(std::string command) {
+			originalCommand = UTF8_TO_TCHAR(command.c_str());
 		}
 
 		void debugvisitor(std::string debugmsg, bool closeArray = false) {
@@ -565,6 +593,10 @@ public:
 				debugvisitor("\033[91mtrue");
 			else
 				debugvisitor("\033[91mfalse");
+			/*if (visitorCallbacksCompletelySet) {
+				FString origCommand(text_.c_str())
+				visitorCallbackFoundAtomBoolean.Execute(origCommand, v);
+			}*/
 			return true;
 		}
 		bool visit_positive_integer(uint64_t v) {
@@ -594,9 +626,10 @@ public:
 		}
 		bool visit_str(const char* v, uint32_t size) {
 			debugvisitor("\"\033[95m" + std::string(v, size) + "\033[0m\"");
-			if (firstString == "" && depth == 1)
+			if (firstString == "" && depth == 1) {
 				firstString = std::string(v, size);
-			else if (firstString == "TF STRUCTURE") {
+				FfirstString = UTF8_TO_TCHAR(firstString.c_str());
+			} else if (firstString == "TF STRUCTURE") {
 				if (depth == 3) {
 					if (tmpStr == "")
 						tmpStr = std::string(v, size);
@@ -605,6 +638,10 @@ public:
 			if (visitorCallbackSet) {
 				FString output(v);
 				visitorCallback.Execute(output);
+			}
+			if (visitorCallbacksCompletelySet) {
+				FString output(v);
+				visitorCallbackFoundAtomString.Execute(originalCommand, FfirstString, output, output);
 			}
 			return true;
 		}
