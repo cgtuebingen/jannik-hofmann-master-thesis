@@ -106,6 +106,12 @@
 /NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/BoostLibrary/boost_1_75_0
 !/NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/MsgPack/msgpack_3_3_0_cpp
 
-# Exlucing boost builds
+# Exluding boost builds
 /NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/BoostLibrary/boost_1_75_0/bin.v2
 /NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/BoostLibrary/boost_1_75_0/stage
+
+# Excluding vscode project files
+NeuralVisUE/.ignore
+NeuralVisUE/debug.log
+*.vscode
+*.code-workspace

@@ -9,11 +9,6 @@ UNeuralInteractionClientBPLibrary::UNeuralInteractionClientBPLibrary(const FObje
 
 }
 
-/*float UNeuralInteractionClientBPLibrary::NeuralInteractionClientSampleFunction(float Param)
-{
-	return -1;
-}*/
-
 FString UNeuralInteractionClientBPLibrary::HelloUnreal(int a, int b)
 {
 	int foo = a + b;
@@ -28,9 +23,10 @@ FString UNeuralInteractionClientBPLibrary::ExecuteCommand(FString command)
 	return (command.Append(" was just executed."));
 }
 
-/*FString UNeuralInteractionClientBPLibrary::ExecuteCommandAdvanced(FString command, void (*processing)(FString))
+FString UNeuralInteractionClientBPLibrary::ExecuteCommandAdvanced(FString command, const FReadResponse& Callback)
 {
 	std::system(TCHAR_TO_ANSI(*command));
-	return (command.Append(" was executed."));
+	INeuralInteractionClient::Get().LoadClient(command);
+	Callback.Execute(TEXT("Delegate was just called."));
+	return (command.Append(" was just executed."));
 }
-*/

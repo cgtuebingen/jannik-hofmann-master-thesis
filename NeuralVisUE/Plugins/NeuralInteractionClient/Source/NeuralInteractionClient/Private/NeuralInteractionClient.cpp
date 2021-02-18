@@ -1,4 +1,6 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
+// Code adapted from
+// https://www.boost.org/doc/libs/1_75_0/libs/beast/example/websocket/client/async/websocket_client_async.cpp
 
 #include "INeuralInteractionClient.h"
 #include "CoreMinimal.h"

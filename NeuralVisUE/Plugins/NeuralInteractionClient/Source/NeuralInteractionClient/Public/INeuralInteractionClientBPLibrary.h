@@ -23,17 +23,20 @@
 *	For more info on custom blueprint nodes visit documentation:
 *	https://wiki.unrealengine.com/Custom_Blueprint_Node_Creation
 */
+
+UDELEGATE(BlueprintAuthorityOnly)
+DECLARE_DYNAMIC_DELEGATE_OneParam(FReadResponse, FString, test);
 UCLASS()
 class UNeuralInteractionClientBPLibrary : public UBlueprintFunctionLibrary
 {
 	GENERATED_UCLASS_BODY()
 
-	/*UFUNCTION(BlueprintCallable, meta = (DisplayName = "Neural Interaction Client", Keywords = "NeuralInteractionClient sample test testing"), Category = "NeuralInteractionClientTesting")
-	static float NeuralInteractionClientSampleFunction(float Param);*/
-	
 	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
 	static FString HelloUnreal(int a, int b);
 
 	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
 	static FString ExecuteCommand(FString command);
+
+	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
+	static FString ExecuteCommandAdvanced(FString command, const FReadResponse& Callback);
 };
