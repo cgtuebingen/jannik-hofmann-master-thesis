@@ -96,6 +96,30 @@ public:
 				shared_from_this()));
 	}
 
+	// Start the asynchronous operation
+	void
+		runAdvanced(
+			const FReadResponse& Callback,
+			char const* host,
+			char const* port,
+			char const* text)
+	{
+		debug("run called");
+		// Save these for later
+		host_ = host;
+		text_ = text;
+
+		Callback.Execute(TEXT("Delegate was just called from inside runadvanced."));
+
+		// Look up the domain name
+		resolver_.async_resolve(
+			host,
+			port,
+			beast::bind_front_handler(
+				&session::on_resolve,
+				shared_from_this()));
+	}
+
 	void
 		on_resolve(
 			beast::error_code ec,
@@ -532,9 +556,7 @@ int connect_to_websocket_serverAdvanced(
 		// The io_context is required for all I/O
 		net::io_context ioc;
 		// Launch the asynchronous operation
-		std::make_shared<session>(ioc)->run(host, port, text);
-
-		Callback.Execute(TEXT("Delegate was just called from inside connect_websocket_server."));
+		std::make_shared<session>(ioc)->runAdvanced(Callback, host, port, text);
 
 		// Run the I/O service. The call will return when
 		// the socket is closed.
