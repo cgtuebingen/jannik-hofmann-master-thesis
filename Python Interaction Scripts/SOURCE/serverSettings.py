@@ -53,7 +53,7 @@ DESIRED_VERBOSITY = 11
 # Prints colored output in the console. Nevertheless, ansi color codes will be emitted from the log
 PRINT_COLOR_ANSI_CODES = True
 # Respond with color-formatted debug and status strings to the client.
-RESPOND_WITH_COLOR_ANSI_CODES = True
+RESPOND_WITH_COLOR_ANSI_CODES = False
 
 # Append new timestamp in the logfile if last log entry is older than ___ seconds:
 LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S = 1

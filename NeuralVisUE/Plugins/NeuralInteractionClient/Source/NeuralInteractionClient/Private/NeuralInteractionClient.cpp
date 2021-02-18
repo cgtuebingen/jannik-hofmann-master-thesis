@@ -66,6 +66,7 @@ class session : public std::enable_shared_from_this<session>
 	std::string host_;
 	std::string text_;
 	FReadResponse sessionCallback;
+	bool sessionCallbackSet = false;
 
 public:
 	// Resolver and socket require an io_context
@@ -110,8 +111,9 @@ public:
 		host_ = host;
 		text_ = text;
 		sessionCallback = Callback;
+		sessionCallbackSet = true;
 
-		sessionCallback.Execute(TEXT("Delegate was just called from sessionCallback."));
+		//sessionCallback.Execute(TEXT("Delegate was just called from sessionCallback."));
 
 		// Look up the domain name
 		resolver_.async_resolve(
@@ -301,6 +303,9 @@ public:
 		// apply visitor, unpack everything
 		{
 			msgpack_visitor visitor;
+			if (sessionCallbackSet) {
+				visitor.setCallbackFunction(sessionCallback);
+			}
 			msgpack::parse(response.data(), response.size(), visitor);
 			//std::cout << std::endl;
 			print("\n");
@@ -330,6 +335,13 @@ public:
 		int tmpX, tmpY, tmpZ, tmpCount;
 		bool tmpReading = false;
 		std::string tmpStr = "";
+		FReadResponse visitorCallback;
+		bool visitorCallbackSet = false;
+
+		void setCallbackFunction(const FReadResponse& Callback) {
+			visitorCallback = Callback;
+			visitorCallbackSet = true;
+		}
 
 		void debugvisitor(std::string debugmsg, bool closeArray = false) {
 			debugmsg += "\033[0m";
@@ -480,6 +492,10 @@ public:
 					if (tmpStr == "")
 						tmpStr = std::string(v, size);
 				}
+			}
+			if (visitorCallbackSet) {
+				FString output(v);
+				visitorCallback.Execute(output);
 			}
 			return true;
 		}
