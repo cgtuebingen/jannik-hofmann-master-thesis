@@ -65,6 +65,7 @@ class session : public std::enable_shared_from_this<session>
 	beast::flat_buffer buffer_;
 	std::string host_;
 	std::string text_;
+	FReadResponse sessionCallback;
 
 public:
 	// Resolver and socket require an io_context
@@ -108,8 +109,9 @@ public:
 		// Save these for later
 		host_ = host;
 		text_ = text;
+		sessionCallback = Callback;
 
-		Callback.Execute(TEXT("Delegate was just called from inside runadvanced."));
+		sessionCallback.Execute(TEXT("Delegate was just called from sessionCallback."));
 
 		// Look up the domain name
 		resolver_.async_resolve(
