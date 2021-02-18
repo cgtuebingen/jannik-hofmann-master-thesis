@@ -562,6 +562,7 @@ public:
 	virtual void ShutdownModule() override;
 
 	int LoadClient(FString command);
+	int LoadClientAdvanced(FString command, const FReadResponse& Callback);
 
 private:
 	;
@@ -580,6 +581,24 @@ int FNeuralInteractionClient::LoadClient(FString command) {
 	//text = _strdup("console");
 	text = TCHAR_TO_ANSI(*command);
 	connect_to_websocket_server(text, host, port, false);
+
+	int returnValue = 1;
+	return returnValue;
+}
+
+//int FNeuralInteractionClient::LoadClient() {
+int FNeuralInteractionClient::LoadClientAdvanced(FString command, const FReadResponse& Callback) {
+	UE_LOG(NeuralInteractionClient, Log, TEXT("Loading client."));
+	char* host;
+	char* port;
+	char* text;
+	host = _strdup("localhost");
+	port = _strdup("80");
+	//text = _strdup("console");
+	text = TCHAR_TO_ANSI(*command);
+	connect_to_websocket_server(text, host, port, false);
+
+	Callback.Execute(TEXT("Delegate was just called from inside LoadClientAdvanced."));
 
 	int returnValue = 1;
 	return returnValue;

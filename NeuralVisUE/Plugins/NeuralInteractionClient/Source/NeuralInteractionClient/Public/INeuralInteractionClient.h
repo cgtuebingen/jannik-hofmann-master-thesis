@@ -4,6 +4,7 @@
 
 #include "Modules/ModuleInterface.h"
 #include "Modules/ModuleManager.h"
+#include "INeuralInteractionClientBPLibrary.h"
 
 class INeuralInteractionClient : public IModuleInterface
 {
@@ -24,4 +25,6 @@ public:
 	}
 
 	virtual int LoadClient(FString command) = 0;
+
+	virtual int LoadClientAdvanced(FString command, const FReadResponse& Callback) = 0;
 };

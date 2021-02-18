@@ -26,7 +26,7 @@ FString UNeuralInteractionClientBPLibrary::ExecuteCommand(FString command)
 FString UNeuralInteractionClientBPLibrary::ExecuteCommandAdvanced(FString command, const FReadResponse& Callback)
 {
 	std::system(TCHAR_TO_ANSI(*command));
-	INeuralInteractionClient::Get().LoadClient(command);
-	Callback.Execute(TEXT("Delegate was just called."));
+	INeuralInteractionClient::Get().LoadClientAdvanced(command, Callback);
+	//Callback.Execute(TEXT("Delegate was just called."));
 	return (command.Append(" was just executed."));
 }
