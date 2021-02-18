@@ -31,7 +31,7 @@ namespace UnrealBuildTool.Rules
             PublicDependencyModuleNames.AddRange(new string[] {
                 "Core",
                 "External",
-                "NeuralInteractionClient",
+                //"NeuralInteractionClient",
                 // ... add private dependencies that you statically link with here ...
             });
             PrivateDependencyModuleNames.AddRange(new string[] {
