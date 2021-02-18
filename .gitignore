@@ -115,3 +115,7 @@ NeuralVisUE/.ignore
 NeuralVisUE/debug.log
 *.vscode
 *.code-workspace
+
+# Excluding ahk and bat files
+/NeuralVisUE/*.bat
+/NeuralVisUE/*.ahk
