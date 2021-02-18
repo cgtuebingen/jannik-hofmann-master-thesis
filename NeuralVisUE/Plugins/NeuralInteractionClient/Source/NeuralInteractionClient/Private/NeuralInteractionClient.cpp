@@ -67,6 +67,20 @@ class session : public std::enable_shared_from_this<session>
 	std::string text_;
 	FReadResponse sessionCallback;
 	bool sessionCallbackSet = false;
+	FEndOfConnection sessionCallbackEndOfConnection;
+	FEndOfReponse sessionCallbackEndOfReponse;
+	FParseError sessionCallbackParseError;
+	FStartOrEndOfMap sessionCallbackStartOrEndOfMap;
+	FStartOrEndOfNestedArray sessionCallbackStartOrEndOfNestedArray;
+	FFoundAtomNil sessionCallbackFoundAtomNil;
+	FFoundAtomString sessionCallbackFoundAtomString;
+	FFoundAtomBinary sessionCallbackFoundAtomBinary;
+	FFoundAtomExternal sessionCallbackFoundAtomExternal;
+	FFoundAtomBoolean sessionCallbackFoundAtomBoolean;
+	FFoundAtomInteger sessionCallbackFoundAtomInteger;
+	FFoundAtomInteger64 sessionCallbackFoundAtomInteger64;
+	FFoundAtomFloat sessionCallbackFoundAtomFloat;
+	bool sessionCallbacksCompletelySet = false;
 
 public:
 	// Resolver and socket require an io_context
@@ -114,6 +128,55 @@ public:
 		sessionCallbackSet = true;
 
 		//sessionCallback.Execute(TEXT("Delegate was just called from sessionCallback."));
+
+		// Look up the domain name
+		resolver_.async_resolve(
+			host,
+			port,
+			beast::bind_front_handler(
+				&session::on_resolve,
+				shared_from_this()));
+	}
+
+	// Start the asynchronous operation
+	void
+		runWithAllDelegates(
+			const FEndOfConnection& CallbackEndOfConnection,
+			const FEndOfReponse& CallbackEndOfReponse,
+			const FParseError& CallbackParseError,
+			const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+			const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+			const FFoundAtomNil& CallbackFoundAtomNil,
+			const FFoundAtomString& CallbackFoundAtomString,
+			const FFoundAtomBinary& CallbackFoundAtomBinary,
+			const FFoundAtomExternal& CallbackFoundAtomExternal,
+			const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+			const FFoundAtomInteger& CallbackFoundAtomInteger,
+			const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+			const FFoundAtomFloat& CallbackFoundAtomFloat,
+			char const* host,
+			char const* port,
+			char const* text)
+	{
+		debug("run called");
+		// Save these for later
+		host_ = host;
+		text_ = text;
+		
+		sessionCallbackEndOfConnection = CallbackEndOfConnection;
+		sessionCallbackEndOfReponse = CallbackEndOfReponse;
+		sessionCallbackParseError = CallbackParseError;
+		sessionCallbackStartOrEndOfMap = CallbackStartOrEndOfMap;
+		sessionCallbackStartOrEndOfNestedArray = CallbackStartOrEndOfNestedArray;
+		sessionCallbackFoundAtomNil = CallbackFoundAtomNil;
+		sessionCallbackFoundAtomString = CallbackFoundAtomString;
+		sessionCallbackFoundAtomBinary = CallbackFoundAtomBinary;
+		sessionCallbackFoundAtomExternal = CallbackFoundAtomExternal;
+		sessionCallbackFoundAtomBoolean = CallbackFoundAtomBoolean;
+		sessionCallbackFoundAtomInteger = CallbackFoundAtomInteger;
+		sessionCallbackFoundAtomInteger64 = CallbackFoundAtomInteger64;
+		sessionCallbackFoundAtomFloat = CallbackFoundAtomFloat;
+		sessionCallbacksCompletelySet = true;
 
 		// Look up the domain name
 		resolver_.async_resolve(
@@ -338,9 +401,55 @@ public:
 		FReadResponse visitorCallback;
 		bool visitorCallbackSet = false;
 
+		FEndOfConnection visitorCallbackEndOfConnection;
+		FEndOfReponse visitorCallbackEndOfReponse;
+		FParseError visitorCallbackParseError;
+		FStartOrEndOfMap visitorCallbackStartOrEndOfMap;
+		FStartOrEndOfNestedArray visitorCallbackStartOrEndOfNestedArray;
+		FFoundAtomNil visitorCallbackFoundAtomNil;
+		FFoundAtomString visitorCallbackFoundAtomString;
+		FFoundAtomBinary visitorCallbackFoundAtomBinary;
+		FFoundAtomExternal visitorCallbackFoundAtomExternal;
+		FFoundAtomBoolean visitorCallbackFoundAtomBoolean;
+		FFoundAtomInteger visitorCallbackFoundAtomInteger;
+		FFoundAtomInteger64 visitorCallbackFoundAtomInteger64;
+		FFoundAtomFloat visitorCallbackFoundAtomFloat;
+		bool visitorCallbacksCompletelySet = false;
+
 		void setCallbackFunction(const FReadResponse& Callback) {
 			visitorCallback = Callback;
 			visitorCallbackSet = true;
+		}
+
+		void setCallbackFunctionsCompletely(
+			const FEndOfConnection& CallbackEndOfConnection,
+			const FEndOfReponse& CallbackEndOfReponse,
+			const FParseError& CallbackParseError,
+			const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+			const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+			const FFoundAtomNil& CallbackFoundAtomNil,
+			const FFoundAtomString& CallbackFoundAtomString,
+			const FFoundAtomBinary& CallbackFoundAtomBinary,
+			const FFoundAtomExternal& CallbackFoundAtomExternal,
+			const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+			const FFoundAtomInteger& CallbackFoundAtomInteger,
+			const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+			const FFoundAtomFloat& CallbackFoundAtomFloat
+		) {
+			visitorCallbackEndOfConnection = CallbackEndOfConnection;
+			visitorCallbackEndOfReponse = CallbackEndOfReponse;
+			visitorCallbackParseError = CallbackParseError;
+			visitorCallbackStartOrEndOfMap = CallbackStartOrEndOfMap;
+			visitorCallbackStartOrEndOfNestedArray = CallbackStartOrEndOfNestedArray;
+			visitorCallbackFoundAtomNil = CallbackFoundAtomNil;
+			visitorCallbackFoundAtomString = CallbackFoundAtomString;
+			visitorCallbackFoundAtomBinary = CallbackFoundAtomBinary;
+			visitorCallbackFoundAtomExternal = CallbackFoundAtomExternal;
+			visitorCallbackFoundAtomBoolean = CallbackFoundAtomBoolean;
+			visitorCallbackFoundAtomInteger = CallbackFoundAtomInteger;
+			visitorCallbackFoundAtomInteger64 = CallbackFoundAtomInteger64;
+			visitorCallbackFoundAtomFloat = CallbackFoundAtomFloat;
+			visitorCallbacksCompletelySet = true;
 		}
 
 		void debugvisitor(std::string debugmsg, bool closeArray = false) {
@@ -600,6 +709,73 @@ int connect_to_websocket_serverAdvanced(
 	}
 }
 
+int connect_to_websocket_serverWithAllDelegates(
+	const FEndOfConnection& CallbackEndOfConnection,
+	const FEndOfReponse& CallbackEndOfReponse,
+	const FParseError& CallbackParseError,
+	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+	const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+	const FFoundAtomNil& CallbackFoundAtomNil,
+	const FFoundAtomString& CallbackFoundAtomString,
+	const FFoundAtomBinary& CallbackFoundAtomBinary,
+	const FFoundAtomExternal& CallbackFoundAtomExternal,
+	const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+	const FFoundAtomInteger& CallbackFoundAtomInteger,
+	const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+	const FFoundAtomFloat& CallbackFoundAtomFloat,
+	char* text = _strdup("help"),
+	char* host = _strdup("localhost"),
+	char* port = _strdup("80"),
+	bool interactive = false
+) {
+	//std::cout << "\n\nConnecting to execute command " << text << "\n";
+	//print("\n\nConnecting to execute command " + text);
+
+	std::string arguments;
+	while (true) {
+		// The io_context is required for all I/O
+		net::io_context ioc;
+		// Launch the asynchronous operation
+		std::make_shared<session>(ioc)->runWithAllDelegates(
+			CallbackEndOfConnection,
+			CallbackEndOfReponse,
+			CallbackParseError,
+			CallbackStartOrEndOfMap,
+			CallbackStartOrEndOfNestedArray,
+			CallbackFoundAtomNil,
+			CallbackFoundAtomString,
+			CallbackFoundAtomBinary,
+			CallbackFoundAtomExternal,
+			CallbackFoundAtomBoolean,
+			CallbackFoundAtomInteger,
+			CallbackFoundAtomInteger64,
+			CallbackFoundAtomFloat,
+			host, port, text);
+
+		// Run the I/O service. The call will return when
+		// the socket is closed.
+		ioc.run();
+		
+		if (!interactive)
+			return EXIT_SUCCESS;
+
+		// Do it all again with user input
+		/*std::cout << "\nClient inactive>";
+		getline(std::cin, arguments);
+		text = &arguments[0];*/
+		print("Waiting for new user input.\n");
+		//text = "console";
+		text = "help";
+
+		// If user doesn't specify input, terminate interactive loop
+		/*if (arguments.length() == 0)
+			return EXIT_SUCCESS;*/
+		/*bool QUIT = true;
+		if (QUIT == true)
+			return EXIT_SUCCESS;*/
+	}
+}
+
 int execute_commands_simultaneously(
 	char** commands,
 	int numberofcommands,
@@ -646,6 +822,21 @@ public:
 
 	int LoadClient(FString command);
 	int LoadClientAdvanced(FString command, const FReadResponse& Callback);
+	int LoadClientWithAllDelegates(FString command,
+		const FEndOfConnection& CallbackEndOfConnection,
+		const FEndOfReponse& CallbackEndOfReponse,
+		const FParseError& CallbackParseError,
+		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+		const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+		const FFoundAtomNil& CallbackFoundAtomNil,
+		const FFoundAtomString& CallbackFoundAtomString,
+		const FFoundAtomBinary& CallbackFoundAtomBinary,
+		const FFoundAtomExternal& CallbackFoundAtomExternal,
+		const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+		const FFoundAtomInteger& CallbackFoundAtomInteger,
+		const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+		const FFoundAtomFloat& CallbackFoundAtomFloat
+	);
 
 private:
 	;
@@ -670,8 +861,52 @@ int FNeuralInteractionClient::LoadClient(FString command) {
 }
 
 //int FNeuralInteractionClient::LoadClient() {
+int FNeuralInteractionClient::LoadClientWithAllDelegates(FString command,
+	const FEndOfConnection& CallbackEndOfConnection,
+	const FEndOfReponse& CallbackEndOfReponse,
+	const FParseError& CallbackParseError,
+	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+	const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+	const FFoundAtomNil& CallbackFoundAtomNil,
+	const FFoundAtomString& CallbackFoundAtomString,
+	const FFoundAtomBinary& CallbackFoundAtomBinary,
+	const FFoundAtomExternal& CallbackFoundAtomExternal,
+	const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+	const FFoundAtomInteger& CallbackFoundAtomInteger,
+	const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+	const FFoundAtomFloat& CallbackFoundAtomFloat
+) {
+	UE_LOG(NeuralInteractionClient, Log, TEXT("Loading full delegate client."));
+	char* host;
+	char* port;
+	char* text;
+	host = _strdup("localhost");
+	port = _strdup("80");
+	//text = _strdup("console");
+	text = TCHAR_TO_ANSI(*command);
+	connect_to_websocket_serverWithAllDelegates(
+		CallbackEndOfConnection,
+		CallbackEndOfReponse,
+		CallbackParseError,
+		CallbackStartOrEndOfMap,
+		CallbackStartOrEndOfNestedArray,
+		CallbackFoundAtomNil,
+		CallbackFoundAtomString,
+		CallbackFoundAtomBinary,
+		CallbackFoundAtomExternal,
+		CallbackFoundAtomBoolean,
+		CallbackFoundAtomInteger,
+		CallbackFoundAtomInteger64,
+		CallbackFoundAtomFloat,
+		text, host, port, false);
+
+	int returnValue = 1;
+	return returnValue;
+}
+
+//int FNeuralInteractionClient::LoadClient() {
 int FNeuralInteractionClient::LoadClientAdvanced(FString command, const FReadResponse& Callback) {
-	UE_LOG(NeuralInteractionClient, Log, TEXT("Loading client."));
+	UE_LOG(NeuralInteractionClient, Log, TEXT("Loading advanced client."));
 	char* host;
 	char* port;
 	char* text;

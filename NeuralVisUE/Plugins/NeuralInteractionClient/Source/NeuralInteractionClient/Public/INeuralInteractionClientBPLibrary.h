@@ -26,6 +26,22 @@
 
 UDELEGATE(BlueprintAuthorityOnly)
 DECLARE_DYNAMIC_DELEGATE_OneParam(FReadResponse, FString, test);
+
+DECLARE_DYNAMIC_DELEGATE_OneParam(FEndOfConnection, FString, originalCommand);
+DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfReponse, FString, originalCommand, FString, firstString);
+DECLARE_DYNAMIC_DELEGATE_ThreeParams(FParseError, FString, originalCommand, FString, firstString, bool, dueToInsufficientBytes);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfMap, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfNestedArray, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
+
+DECLARE_DYNAMIC_DELEGATE_ThreeParams(FFoundAtomNil, FString, originalCommand, FString, firstString, FString, arrayPosition);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomString, FString, originalCommand, FString, firstString, FString, arrayPosition, FString, content);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomBinary, FString, originalCommand, FString, firstString, FString, arrayPosition, FString, content);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomExternal, FString, originalCommand, FString, firstString, FString, arrayPosition, FString, content);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomBoolean, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, content);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomInteger, FString, originalCommand, FString, firstString, FString, arrayPosition, int32, content);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomInteger64, FString, originalCommand, FString, firstString, FString, arrayPosition, int64, content);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomFloat, FString, originalCommand, FString, firstString, FString, arrayPosition, float, content);
+
 UCLASS()
 class UNeuralInteractionClientBPLibrary : public UBlueprintFunctionLibrary
 {
@@ -39,4 +55,21 @@ class UNeuralInteractionClientBPLibrary : public UBlueprintFunctionLibrary
 
 	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
 	static FString ExecuteCommandAdvanced(FString command, const FReadResponse& Callback);
+
+	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
+	static FString ExecuteCommandWithAllDelegates(FString command,
+		const FEndOfConnection& CallbackEndOfConnection,
+		const FEndOfReponse& CallbackEndOfReponse,
+		const FParseError& CallbackParseError,
+		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+		const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+		const FFoundAtomNil& CallbackFoundAtomNil,
+		const FFoundAtomString& CallbackFoundAtomString,
+		const FFoundAtomBinary& CallbackFoundAtomBinary,
+		const FFoundAtomExternal& CallbackFoundAtomExternal,
+		const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+		const FFoundAtomInteger& CallbackFoundAtomInteger,
+		const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+		const FFoundAtomFloat& CallbackFoundAtomFloat
+	);
 };

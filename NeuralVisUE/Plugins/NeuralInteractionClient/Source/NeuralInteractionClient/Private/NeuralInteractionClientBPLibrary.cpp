@@ -30,3 +30,39 @@ FString UNeuralInteractionClientBPLibrary::ExecuteCommandAdvanced(FString comman
 	//Callback.Execute(TEXT("Delegate was just called."));
 	return (command.Append(" was just executed."));
 }
+
+FString UNeuralInteractionClientBPLibrary::ExecuteCommandWithAllDelegates(FString command,
+	const FEndOfConnection& CallbackEndOfConnection,
+	const FEndOfReponse& CallbackEndOfReponse,
+	const FParseError& CallbackParseError,
+	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+	const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+	const FFoundAtomNil& CallbackFoundAtomNil,
+	const FFoundAtomString& CallbackFoundAtomString,
+	const FFoundAtomBinary& CallbackFoundAtomBinary,
+	const FFoundAtomExternal& CallbackFoundAtomExternal,
+	const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+	const FFoundAtomInteger& CallbackFoundAtomInteger,
+	const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+	const FFoundAtomFloat& CallbackFoundAtomFloat
+)
+{
+	std::system(TCHAR_TO_ANSI(*command));
+	INeuralInteractionClient::Get().LoadClientWithAllDelegates(command,
+		CallbackEndOfConnection,
+		CallbackEndOfReponse,
+		CallbackParseError,
+		CallbackStartOrEndOfMap,
+		CallbackStartOrEndOfNestedArray,
+		CallbackFoundAtomNil,
+		CallbackFoundAtomString,
+		CallbackFoundAtomBinary,
+		CallbackFoundAtomExternal,
+		CallbackFoundAtomBoolean,
+		CallbackFoundAtomInteger,
+		CallbackFoundAtomInteger64,
+		CallbackFoundAtomFloat
+	);
+	//Callback.Execute(TEXT("Delegate was just called."));
+	return (command.Append(" was just executed."));
+}

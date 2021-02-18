@@ -27,4 +27,20 @@ public:
 	virtual int LoadClient(FString command) = 0;
 
 	virtual int LoadClientAdvanced(FString command, const FReadResponse& Callback) = 0;
+
+	virtual int LoadClientWithAllDelegates(FString command,
+		const FEndOfConnection& CallbackEndOfConnection,
+		const FEndOfReponse& CallbackEndOfReponse,
+		const FParseError& CallbackParseError,
+		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
+		const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+		const FFoundAtomNil& CallbackFoundAtomNil,
+		const FFoundAtomString& CallbackFoundAtomString,
+		const FFoundAtomBinary& CallbackFoundAtomBinary,
+		const FFoundAtomExternal& CallbackFoundAtomExternal,
+		const FFoundAtomBoolean& CallbackFoundAtomBoolean,
+		const FFoundAtomInteger& CallbackFoundAtomInteger,
+		const FFoundAtomInteger64& CallbackFoundAtomInteger64,
+		const FFoundAtomFloat& CallbackFoundAtomFloat
+	) = 0;
 };
