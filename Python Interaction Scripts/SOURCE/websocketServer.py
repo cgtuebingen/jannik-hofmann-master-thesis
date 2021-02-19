@@ -31,7 +31,7 @@ async def interactiveServer	(websocket, path, *, initialCommand=None, debugDisco
 	# Create a new command instance for this client connection and store the websocket connection,
 	# as well as the command string
 	commandInstance = serverCommands.Request(websocket, initialCommand)
-
+	
 	# Default function for commands if it can't be matched
 	COMMAND_NOT_FOUND_FUNCTION = serverCommands.Request.commandNotFound
 

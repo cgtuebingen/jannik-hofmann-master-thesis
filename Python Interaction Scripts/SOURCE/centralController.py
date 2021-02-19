@@ -25,6 +25,7 @@ import serverSettings as setting
 import websocketServer as server
 import loggingFunctions
 import beautifulDebug
+import serverCommands
 
 
 # so other modules can access the current script location
@@ -39,6 +40,9 @@ if __name__ == '__main__':
 
     # verify user settings and check for warnings / recommendations
     setting.checkSettings()
+
+    # initialize command list
+    serverCommands.Request(None, None)
 
     # run websocket server with specified settings
     server.startServer()

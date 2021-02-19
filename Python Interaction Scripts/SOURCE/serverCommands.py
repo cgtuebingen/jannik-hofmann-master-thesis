@@ -84,6 +84,25 @@ class Request:
 				commandList[key] = (functionRef,) + oldCommand[1:]
 			commandListInitialized = True
 
+			ignoreSameBeginningInTheseKeys = {
+				"py": ["python"],
+				"eval": ["evaluate"],
+				"serverip": ["serveripport"],
+			}
+
+			for key in list(commandList.keys()):
+				clashingCommands = [matches for matches in list(commandList.keys()) if matches.startswith(key) and matches != key]
+				if (len(clashingCommands) > 0):
+					if not(ignoreSameBeginningInTheseKeys.get(key, []) == clashingCommands):
+						if (len(clashingCommands) == 1):
+							warnText = f'Unexpected command clash! Command "{key}" starts in the same way as command "{clashingCommands[0]}"'
+						else:
+							joinedCommands = '"' + '", "'.join(clashingCommands) + '"'
+							warnText = f'Unexpected command clash! Command "{key}" starts in the same way as these commands: {joinedCommands}'
+						warnText += "\nPlease make sure that the commands are recognized correctly when the user adds spaces inbetween."
+						loggingFunctions.warn(warnText, 2)
+
+
 	# Use this function to define command aliases for the same commands
 	# originalCommand should be of type str
 	def commandAlias(originalCommand):
@@ -1026,7 +1045,7 @@ class Request:
 			await self.sendstatus(15, f"ERROR loading Neural Network from script {path}:\n" +
 				traceback.format_exc())
 			return False
-	commandList["load nn"] = (loadnn, "Loads a neural network at the given path",
+	commandList["nn load"] = (loadnn, "Loads a neural network at the given path",
 		"Parameters as string specify the location of the python script on the server. " +
 		"This script is then imported and loaded by python")
 
@@ -1036,7 +1055,7 @@ class Request:
 		await self.send(hasattr(tfNetwork, 'loaded') and tfNetwork.loaded)
 		if not(hasattr(tfNetwork, 'loaded')):
 			return False
-	commandList["is nn loaded"] = (isnnloaded, "Checks if a neural network has been loaded and " +
+	commandList["nn is loaded"] = (isnnloaded, "Checks if any neural network has been loaded and " +
 		"initialized successfully", "Returns a boolean, can be used for assertion to chain commands")
 
 
