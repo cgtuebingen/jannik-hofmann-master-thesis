@@ -110,13 +110,20 @@ class Request:
 			f'Same as the "{originalCommand}" command',
 			f'Type "help {originalCommand}" for more information', originalCommand)
 
+	# This functions checks any structure if it contains integer numbers outside of the int64-range
+	# If so, it returns False, otherwise True. The structure can contain any combination of data-
+	# types, including nested lists, tuples and dictionaries.
 	def numbersInRangeOfInt64(self, data):
 		if type(data) is list and len(data) == 0:
 			return True
 		elif type(data) is list and len(data) == 1:
 			return self.numbersInRangeOfInt64(data[0])
 		elif type(data) is list:
-			return self.numbersInRangeOfInt64(data[0]) and self.numbersInRangeOfInt64(data[1:])
+			return all(self.numbersInRangeOfInt64(element) for element in data)
+		elif type(data) is tuple:
+			return self.numbersInRangeOfInt64(list(data))
+		elif type(data) is dict:
+			return self.numbersInRangeOfInt64(list(data.keys())) and self.numbersInRangeOfInt64(list(data.values()))
 		elif type(data) is int:
 			return data >= -(2**63) and data <= 2**63-1
 		else:
