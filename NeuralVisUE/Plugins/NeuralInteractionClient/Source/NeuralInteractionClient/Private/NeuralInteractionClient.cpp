@@ -71,7 +71,7 @@ class session : public std::enable_shared_from_this<session>
 	FEndOfReponse sessionCallbackEndOfReponse;
 	FParseError sessionCallbackParseError;
 	FStartOrEndOfMap sessionCallbackStartOrEndOfMap;
-	FStartOrEndOfNestedArray sessionCallbackStartOrEndOfNestedArray;
+	FStartOrEndOfArray sessionCallbackStartOrEndOfArray;
 	FFoundAtomNil sessionCallbackFoundAtomNil;
 	FFoundAtomString sessionCallbackFoundAtomString;
 	FFoundAtomBinary sessionCallbackFoundAtomBinary;
@@ -145,7 +145,7 @@ public:
 			const FEndOfReponse& CallbackEndOfReponse,
 			const FParseError& CallbackParseError,
 			const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-			const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+			const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 			const FFoundAtomNil& CallbackFoundAtomNil,
 			const FFoundAtomString& CallbackFoundAtomString,
 			const FFoundAtomBinary& CallbackFoundAtomBinary,
@@ -167,7 +167,7 @@ public:
 		sessionCallbackEndOfReponse = CallbackEndOfReponse;
 		sessionCallbackParseError = CallbackParseError;
 		sessionCallbackStartOrEndOfMap = CallbackStartOrEndOfMap;
-		sessionCallbackStartOrEndOfNestedArray = CallbackStartOrEndOfNestedArray;
+		sessionCallbackStartOrEndOfArray = CallbackStartOrEndOfArray;
 		sessionCallbackFoundAtomNil = CallbackFoundAtomNil;
 		sessionCallbackFoundAtomString = CallbackFoundAtomString;
 		sessionCallbackFoundAtomBinary = CallbackFoundAtomBinary;
@@ -391,7 +391,7 @@ public:
 					sessionCallbackEndOfReponse,
 					sessionCallbackParseError,
 					sessionCallbackStartOrEndOfMap,
-					sessionCallbackStartOrEndOfNestedArray,
+					sessionCallbackStartOrEndOfArray,
 					sessionCallbackFoundAtomNil,
 					sessionCallbackFoundAtomString,
 					sessionCallbackFoundAtomBinary,
@@ -446,7 +446,7 @@ public:
 		FEndOfReponse visitorCallbackEndOfReponse;
 		FParseError visitorCallbackParseError;
 		FStartOrEndOfMap visitorCallbackStartOrEndOfMap;
-		FStartOrEndOfNestedArray visitorCallbackStartOrEndOfNestedArray;
+		FStartOrEndOfArray visitorCallbackStartOrEndOfArray;
 		FFoundAtomNil visitorCallbackFoundAtomNil;
 		FFoundAtomString visitorCallbackFoundAtomString;
 		FFoundAtomBinary visitorCallbackFoundAtomBinary;
@@ -467,7 +467,7 @@ public:
 			const FEndOfReponse& CallbackEndOfReponse,
 			const FParseError& CallbackParseError,
 			const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-			const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+			const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 			const FFoundAtomNil& CallbackFoundAtomNil,
 			const FFoundAtomString& CallbackFoundAtomString,
 			const FFoundAtomBinary& CallbackFoundAtomBinary,
@@ -481,7 +481,7 @@ public:
 			visitorCallbackEndOfReponse = CallbackEndOfReponse;
 			visitorCallbackParseError = CallbackParseError;
 			visitorCallbackStartOrEndOfMap = CallbackStartOrEndOfMap;
-			visitorCallbackStartOrEndOfNestedArray = CallbackStartOrEndOfNestedArray;
+			visitorCallbackStartOrEndOfArray = CallbackStartOrEndOfArray;
 			visitorCallbackFoundAtomNil = CallbackFoundAtomNil;
 			visitorCallbackFoundAtomString = CallbackFoundAtomString;
 			visitorCallbackFoundAtomBinary = CallbackFoundAtomBinary;
@@ -857,7 +857,7 @@ int connect_to_websocket_serverWithAllDelegates(
 	const FEndOfReponse& CallbackEndOfReponse,
 	const FParseError& CallbackParseError,
 	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-	const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+	const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 	const FFoundAtomNil& CallbackFoundAtomNil,
 	const FFoundAtomString& CallbackFoundAtomString,
 	const FFoundAtomBinary& CallbackFoundAtomBinary,
@@ -884,7 +884,7 @@ int connect_to_websocket_serverWithAllDelegates(
 			CallbackEndOfReponse,
 			CallbackParseError,
 			CallbackStartOrEndOfMap,
-			CallbackStartOrEndOfNestedArray,
+			CallbackStartOrEndOfArray,
 			CallbackFoundAtomNil,
 			CallbackFoundAtomString,
 			CallbackFoundAtomBinary,
@@ -970,7 +970,7 @@ public:
 		const FEndOfReponse& CallbackEndOfReponse,
 		const FParseError& CallbackParseError,
 		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-		const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+		const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 		const FFoundAtomNil& CallbackFoundAtomNil,
 		const FFoundAtomString& CallbackFoundAtomString,
 		const FFoundAtomBinary& CallbackFoundAtomBinary,
@@ -1009,7 +1009,7 @@ int FNeuralInteractionClient::LoadClientWithAllDelegates(FString command,
 	const FEndOfReponse& CallbackEndOfReponse,
 	const FParseError& CallbackParseError,
 	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-	const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+	const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 	const FFoundAtomNil& CallbackFoundAtomNil,
 	const FFoundAtomString& CallbackFoundAtomString,
 	const FFoundAtomBinary& CallbackFoundAtomBinary,
@@ -1032,7 +1032,7 @@ int FNeuralInteractionClient::LoadClientWithAllDelegates(FString command,
 		CallbackEndOfReponse,
 		CallbackParseError,
 		CallbackStartOrEndOfMap,
-		CallbackStartOrEndOfNestedArray,
+		CallbackStartOrEndOfArray,
 		CallbackFoundAtomNil,
 		CallbackFoundAtomString,
 		CallbackFoundAtomBinary,

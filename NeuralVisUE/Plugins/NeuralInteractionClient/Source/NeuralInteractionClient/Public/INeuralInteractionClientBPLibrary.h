@@ -31,7 +31,7 @@ DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfConnection, FString, originalCommand, b
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfReponse, FString, originalCommand, FString, firstString);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FParseError, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, dueToInsufficientBytes);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfMap, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
-DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfNestedArray, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfArray, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
 
 DECLARE_DYNAMIC_DELEGATE_ThreeParams(FFoundAtomNil, FString, originalCommand, FString, firstString, FString, arrayPosition);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FFoundAtomString, FString, originalCommand, FString, firstString, FString, arrayPosition, FString, content);
@@ -62,7 +62,7 @@ class UNeuralInteractionClientBPLibrary : public UBlueprintFunctionLibrary
 		const FEndOfReponse& CallbackEndOfReponse,
 		const FParseError& CallbackParseError,
 		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-		const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+		const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 		const FFoundAtomNil& CallbackFoundAtomNil,
 		const FFoundAtomString& CallbackFoundAtomString,
 		const FFoundAtomBinary& CallbackFoundAtomBinary,

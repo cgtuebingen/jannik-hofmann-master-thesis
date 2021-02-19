@@ -33,7 +33,7 @@ public:
 		const FEndOfReponse& CallbackEndOfReponse,
 		const FParseError& CallbackParseError,
 		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
-		const FStartOrEndOfNestedArray& CallbackStartOrEndOfNestedArray,
+		const FStartOrEndOfArray& CallbackStartOrEndOfArray,
 		const FFoundAtomNil& CallbackFoundAtomNil,
 		const FFoundAtomString& CallbackFoundAtomString,
 		const FFoundAtomBinary& CallbackFoundAtomBinary,
