@@ -204,6 +204,8 @@ class Request:
 				struct = struct[1:]
 		if (setting.RESPOND_WITH_COLOR_ANSI_CODES):
 			struct = beautifulDebug.formatLevel(level, struct, False, self.command)
+		else:
+			struct = beautifulDebug.removeAnsiEscapeCharacters(struct)
 		
 		struct = ("STATUS", level, struct)
 		sentSuccessfully = await self.send(struct, False)
@@ -233,6 +235,8 @@ class Request:
 					struct = struct[1:]
 			if (setting.RESPOND_WITH_COLOR_ANSI_CODES):
 				struct = beautifulDebug.formatLevel(level, struct, True, self.command)
+			else:
+				struct = beautifulDebug.removeAnsiEscapeCharacters(struct)
 			
 			struct = ("DEBUG", level, struct)
 			sentSuccessfully = await self.send(struct, False)

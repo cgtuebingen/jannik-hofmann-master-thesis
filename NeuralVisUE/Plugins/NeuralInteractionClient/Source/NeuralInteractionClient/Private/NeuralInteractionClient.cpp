@@ -404,6 +404,9 @@ public:
 				visitor.setOriginalCommand(text_);
 			}
 			msgpack::parse(response.data(), response.size(), visitor);
+			/*if (sessionCallbacksCompletelySet) {
+				sessionCallbackEndOfReponse.Execute(originalCommand, FfirstString);
+			}*/
 			//std::cout << std::endl;
 			print("\n");
 		}
@@ -436,6 +439,8 @@ public:
 		FReadResponse visitorCallback;
 		bool visitorCallbackSet = false;
 		FString originalCommand = "";
+		std::string arrayPosition = "";
+		FString FarrayPosition = "";
 
 		FEndOfConnection visitorCallbackEndOfConnection;
 		FEndOfReponse visitorCallbackEndOfReponse;
@@ -492,6 +497,48 @@ public:
 			originalCommand = UTF8_TO_TCHAR(command.c_str());
 		}
 
+		void enterArray() {
+			if (arrayPosition == "") {
+				arrayPosition = "-1";
+			}
+			else {
+				arrayPosition += ".-1";
+			}
+			FarrayPosition = UTF8_TO_TCHAR(arrayPosition.c_str());
+			//std::cout << "                      Enter: " << arrayPosition;
+			depth++;
+		}
+		void leaveArray() {
+			if (arrayPosition.find(".") == std::string::npos) {
+				arrayPosition = "";
+			}
+			else {
+				arrayPosition.erase(arrayPosition.rfind("."));
+			}
+			FarrayPosition = UTF8_TO_TCHAR(arrayPosition.c_str());
+			//std::cout << "                      Leave: " << arrayPosition;
+			depth--;
+		}
+		void incrementArrayPosition() {
+			if (arrayPosition.find(".") == std::string::npos) {
+				int value = atoi(arrayPosition.c_str());
+				value++;
+				arrayPosition = std::to_string(value);
+			}
+			else {
+				int dotpos = arrayPosition.find_last_of(".");
+				std::string parentArrayPos = arrayPosition.substr(0, dotpos);
+				int value = atoi(arrayPosition.substr(dotpos+1).c_str());
+				value++;
+				arrayPosition = parentArrayPos + "." + std::to_string(value);
+			}
+			FarrayPosition = UTF8_TO_TCHAR(arrayPosition.c_str());
+			//std::cout << "                      Incr.: " << arrayPosition;
+		}
+		void debugPrintArrayPosition() {
+			//std::cout << " \033[90m" << "(" << arrayPosition << ")\033[0m";
+		}
+
 		void debugvisitor(std::string debugmsg, bool closeArray = false) {
 			debugmsg += "\033[0m";
 			//return; // to disable debug output
@@ -525,10 +572,14 @@ public:
 			debugstr += "values";
 			debugvisitor(debugstr);*/
 			debugvisitor("\033[94mmap");
-			depth++;
+			debugPrintArrayPosition();
+			enterArray();
 			return true;
 		}
 		bool start_map_key() {
+			incrementArrayPosition();
+			enterArray();
+			incrementArrayPosition();
 			processing_map_key = true;
 			//debugvisitor("start map key.");
 			//debugvisitor("map key: ");
@@ -540,6 +591,7 @@ public:
 			return true;
 		}
 		bool start_map_value() {
+			incrementArrayPosition();
 			processing_map_value = true;
 			startWithNewLine = false;
 			//debugvisitor("start map value.");
@@ -548,10 +600,11 @@ public:
 		bool end_map_value() {
 			processing_map_value = false;
 			//debugvisitor("end map value.");
+			leaveArray();
 			return true;
 		}
 		bool end_map() {
-			depth--;
+			leaveArray();
 			//debugvisitor("end map.");
 			return true;
 		}
@@ -559,6 +612,7 @@ public:
 		bool start_array(uint32_t size) {
 			debugvisitor("\033[94marray (size " + std::to_string(size) + ")" +
 				(showArrayBrackets ? indent + "[" : ""));
+			debugPrintArrayPosition();
 			if (firstString == "TF STRUCTURE") {
 				if (depth == 1) { // initializations
 					tmpArrayLength = size; // storing number of layers
@@ -566,11 +620,12 @@ public:
 					tmpX = 0; tmpY = 0; tmpZ = 0;
 				}
 			}
-			depth++;
+			enterArray();
 			return true;
 		}
 		bool start_array_item() {
 			//debugvisitor("start array item.");
+			incrementArrayPosition();
 			//printThisAfterNextWhitespace = "\b\b- ";
 			return true;
 		}
@@ -591,13 +646,17 @@ public:
 					tmpCount++;
 				}
 			}
-			depth--;
+			leaveArray();
 			debugvisitor("\033[94m]", true);
 			return true;
 		}
 
 		bool visit_nil() {
 			debugvisitor("\033[35mnil.");
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackFoundAtomNil.Execute(originalCommand, FfirstString, FarrayPosition);
+			}
 			return true;
 		}
 		bool visit_boolean(bool v) {
@@ -605,10 +664,10 @@ public:
 				debugvisitor("\033[91mtrue");
 			else
 				debugvisitor("\033[91mfalse");
-			/*if (visitorCallbacksCompletelySet) {
-				FString origCommand(text_.c_str())
-				visitorCallbackFoundAtomBoolean.Execute(origCommand, v);
-			}*/
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackFoundAtomBoolean.Execute(originalCommand, FfirstString, FarrayPosition, v);
+			}
 			return true;
 		}
 		bool visit_positive_integer(uint64_t v) {
@@ -622,18 +681,34 @@ public:
 					else ;//print("Too many dimensions! Value " + std::string(v) + " of layer " + std::string(tmpCount) + " cannot be visualized!");
 				}
 			}
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackFoundAtomInteger64.Execute(originalCommand, FfirstString, FarrayPosition, v);
+			}
 			return true;
 		}
 		bool visit_negative_integer(int64_t v) {
 			debugvisitor("neg int: \033[96m" + std::to_string(v));
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackFoundAtomInteger64.Execute(originalCommand, FfirstString, FarrayPosition, v);
+			}
 			return true;
 		}
 		bool visit_float32(float v) {
 			debugvisitor("float: \033[92m" + std::to_string(v));
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackFoundAtomFloat.Execute(originalCommand, FfirstString, FarrayPosition, v);
+			}
 			return true;
 		}
 		bool visit_float64(double v) {
 			debugvisitor("double: \033[92m" + std::to_string(v));
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackFoundAtomFloat.Execute(originalCommand, FfirstString, FarrayPosition, v);
+			}
 			return true;
 		}
 		bool visit_str(const char* v, uint32_t size) {
@@ -647,32 +722,51 @@ public:
 						tmpStr = std::string(v, size);
 				}
 			}
+			debugPrintArrayPosition();
 			if (visitorCallbackSet) {
 				FString output(v);
 				visitorCallback.Execute(output);
 			}
 			if (visitorCallbacksCompletelySet) {
-				FString output(v);
-				visitorCallbackFoundAtomString.Execute(originalCommand, FfirstString, output, output);
+				FString output(size, v);
+				visitorCallbackFoundAtomString.Execute(originalCommand, FfirstString, FarrayPosition, output);
 			}
 			return true;
 		}
 		bool visit_bin(const char* data, uint32_t size) {
 			std::string sdata(data, size);
 			debugvisitor("binary: \033[93m" + sdata);
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				FString output(size, data);
+				visitorCallbackFoundAtomBinary.Execute(originalCommand, FfirstString, FarrayPosition, output);
+			}
 			return true;
 		}
 		bool visit_ext(const char* data, uint32_t size) {
 			std::string sdata(data, size);
 			debugvisitor("ext: \033[33m" + sdata);
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				FString output(size, data);
+				visitorCallbackFoundAtomExternal.Execute(originalCommand, FfirstString, FarrayPosition, output);
+			}
 			return true;
 		}
 
 		void parse_error(size_t x, size_t y) {
 			debugvisitor("\033[31m\033[7mPARSE ERROR!");
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackParseError.Execute(originalCommand, FfirstString, FarrayPosition, false);
+			}
 		}
 		void insufficient_bytes(size_t x, size_t y) {
 			debugvisitor("\033[31m\033[7mINSUFFICIENT BYTES!");
+			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackParseError.Execute(originalCommand, FfirstString, FarrayPosition, true);
+			}
 		}
 	};
 };

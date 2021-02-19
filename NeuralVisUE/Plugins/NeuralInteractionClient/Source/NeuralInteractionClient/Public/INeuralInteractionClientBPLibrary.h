@@ -29,7 +29,7 @@ DECLARE_DYNAMIC_DELEGATE_OneParam(FReadResponse, FString, test);
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfConnection, FString, originalCommand, bool, forciblyClosed);
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfReponse, FString, originalCommand, FString, firstString);
-DECLARE_DYNAMIC_DELEGATE_ThreeParams(FParseError, FString, originalCommand, FString, firstString, bool, dueToInsufficientBytes);
+DECLARE_DYNAMIC_DELEGATE_FourParams(FParseError, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, dueToInsufficientBytes);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfMap, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfNestedArray, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
 
