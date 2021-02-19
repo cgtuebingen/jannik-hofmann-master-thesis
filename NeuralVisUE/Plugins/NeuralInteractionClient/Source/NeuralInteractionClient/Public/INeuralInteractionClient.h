@@ -30,7 +30,7 @@ public:
 
 	virtual int LoadClientWithAllDelegates(FString command,
 		const FEndOfConnection& CallbackEndOfConnection,
-		const FEndOfReponse& CallbackEndOfReponse,
+		const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 		const FParseError& CallbackParseError,
 		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 		const FStartOrEndOfArray& CallbackStartOrEndOfArray,

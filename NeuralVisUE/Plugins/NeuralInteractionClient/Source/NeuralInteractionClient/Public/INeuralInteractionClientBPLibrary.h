@@ -28,7 +28,7 @@ UDELEGATE(BlueprintAuthorityOnly)
 DECLARE_DYNAMIC_DELEGATE_OneParam(FReadResponse, FString, test);
 
 DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfConnection, FString, originalCommand, bool, forciblyClosed);
-DECLARE_DYNAMIC_DELEGATE_TwoParams(FEndOfReponse, FString, originalCommand, FString, firstString);
+DECLARE_DYNAMIC_DELEGATE_ThreeParams(FStartOrEndOfResponse, FString, originalCommand, FString, firstString, bool, endFlag);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FParseError, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, dueToInsufficientBytes);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfMap, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
 DECLARE_DYNAMIC_DELEGATE_FourParams(FStartOrEndOfArray, FString, originalCommand, FString, firstString, FString, arrayPosition, bool, endFlag);
@@ -59,7 +59,7 @@ class UNeuralInteractionClientBPLibrary : public UBlueprintFunctionLibrary
 	UFUNCTION(BlueprintCallable, Category = "Neural Interaction Client")
 	static FString ExecuteCommandWithAllDelegates(FString command,
 		const FEndOfConnection& CallbackEndOfConnection,
-		const FEndOfReponse& CallbackEndOfReponse,
+		const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 		const FParseError& CallbackParseError,
 		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 		const FStartOrEndOfArray& CallbackStartOrEndOfArray,

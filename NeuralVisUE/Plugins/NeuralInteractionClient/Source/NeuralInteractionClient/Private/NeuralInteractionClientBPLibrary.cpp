@@ -33,7 +33,7 @@ FString UNeuralInteractionClientBPLibrary::ExecuteCommandAdvanced(FString comman
 
 FString UNeuralInteractionClientBPLibrary::ExecuteCommandWithAllDelegates(FString command,
 	const FEndOfConnection& CallbackEndOfConnection,
-	const FEndOfReponse& CallbackEndOfReponse,
+	const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 	const FParseError& CallbackParseError,
 	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 	const FStartOrEndOfArray& CallbackStartOrEndOfArray,
@@ -50,7 +50,7 @@ FString UNeuralInteractionClientBPLibrary::ExecuteCommandWithAllDelegates(FStrin
 	std::system(TCHAR_TO_ANSI(*command));
 	INeuralInteractionClient::Get().LoadClientWithAllDelegates(command,
 		CallbackEndOfConnection,
-		CallbackEndOfReponse,
+		CallbackStartOrEndOfResponse,
 		CallbackParseError,
 		CallbackStartOrEndOfMap,
 		CallbackStartOrEndOfArray,

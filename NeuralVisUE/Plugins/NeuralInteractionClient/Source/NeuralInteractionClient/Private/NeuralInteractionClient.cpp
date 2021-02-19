@@ -68,7 +68,7 @@ class session : public std::enable_shared_from_this<session>
 	FReadResponse sessionCallback;
 	bool sessionCallbackSet = false;
 	FEndOfConnection sessionCallbackEndOfConnection;
-	FEndOfReponse sessionCallbackEndOfReponse;
+	FStartOrEndOfResponse sessionCallbackStartOrEndOfResponse;
 	FParseError sessionCallbackParseError;
 	FStartOrEndOfMap sessionCallbackStartOrEndOfMap;
 	FStartOrEndOfArray sessionCallbackStartOrEndOfArray;
@@ -142,7 +142,7 @@ public:
 	void
 		runWithAllDelegates(
 			const FEndOfConnection& CallbackEndOfConnection,
-			const FEndOfReponse& CallbackEndOfReponse,
+			const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 			const FParseError& CallbackParseError,
 			const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 			const FStartOrEndOfArray& CallbackStartOrEndOfArray,
@@ -164,7 +164,7 @@ public:
 		text_ = text;
 		
 		sessionCallbackEndOfConnection = CallbackEndOfConnection;
-		sessionCallbackEndOfReponse = CallbackEndOfReponse;
+		sessionCallbackStartOrEndOfResponse = CallbackStartOrEndOfResponse;
 		sessionCallbackParseError = CallbackParseError;
 		sessionCallbackStartOrEndOfMap = CallbackStartOrEndOfMap;
 		sessionCallbackStartOrEndOfArray = CallbackStartOrEndOfArray;
@@ -388,7 +388,7 @@ public:
 			if (sessionCallbacksCompletelySet) {
 				visitor.setCallbackFunctionsCompletely(
 					sessionCallbackEndOfConnection,
-					sessionCallbackEndOfReponse,
+					sessionCallbackStartOrEndOfResponse,
 					sessionCallbackParseError,
 					sessionCallbackStartOrEndOfMap,
 					sessionCallbackStartOrEndOfArray,
@@ -403,10 +403,16 @@ public:
 				);
 				visitor.setOriginalCommand(text_);
 			}
+
+			if (sessionCallbacksCompletelySet) {
+				sessionCallbackStartOrEndOfResponse.Execute(visitor.originalCommand, FString(""), false);
+			}
+
 			msgpack::parse(response.data(), response.size(), visitor);
-			/*if (sessionCallbacksCompletelySet) {
-				sessionCallbackEndOfReponse.Execute(originalCommand, FfirstString);
-			}*/
+
+			if (sessionCallbacksCompletelySet) {
+				sessionCallbackStartOrEndOfResponse.Execute(visitor.originalCommand, visitor.FfirstString, true);
+			}
 			//std::cout << std::endl;
 			print("\n");
 		}
@@ -443,7 +449,7 @@ public:
 		FString FarrayPosition = "";
 
 		FEndOfConnection visitorCallbackEndOfConnection;
-		FEndOfReponse visitorCallbackEndOfReponse;
+		FStartOrEndOfResponse visitorCallbackStartOrEndOfResponse;
 		FParseError visitorCallbackParseError;
 		FStartOrEndOfMap visitorCallbackStartOrEndOfMap;
 		FStartOrEndOfArray visitorCallbackStartOrEndOfArray;
@@ -464,7 +470,7 @@ public:
 
 		void setCallbackFunctionsCompletely(
 			const FEndOfConnection& CallbackEndOfConnection,
-			const FEndOfReponse& CallbackEndOfReponse,
+			const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 			const FParseError& CallbackParseError,
 			const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 			const FStartOrEndOfArray& CallbackStartOrEndOfArray,
@@ -478,7 +484,7 @@ public:
 			const FFoundAtomFloat& CallbackFoundAtomFloat
 		) {
 			visitorCallbackEndOfConnection = CallbackEndOfConnection;
-			visitorCallbackEndOfReponse = CallbackEndOfReponse;
+			visitorCallbackStartOrEndOfResponse = CallbackStartOrEndOfResponse;
 			visitorCallbackParseError = CallbackParseError;
 			visitorCallbackStartOrEndOfMap = CallbackStartOrEndOfMap;
 			visitorCallbackStartOrEndOfArray = CallbackStartOrEndOfArray;
@@ -573,6 +579,9 @@ public:
 			debugvisitor(debugstr);*/
 			debugvisitor("\033[94mmap");
 			debugPrintArrayPosition();
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackStartOrEndOfMap.Execute(originalCommand, FfirstString, FarrayPosition, false);
+			}
 			enterArray();
 			return true;
 		}
@@ -606,6 +615,9 @@ public:
 		bool end_map() {
 			leaveArray();
 			//debugvisitor("end map.");
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackStartOrEndOfMap.Execute(originalCommand, FfirstString, FarrayPosition, true);
+			}
 			return true;
 		}
 
@@ -619,6 +631,9 @@ public:
 					tmpCount = 0;
 					tmpX = 0; tmpY = 0; tmpZ = 0;
 				}
+			}
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackStartOrEndOfArray.Execute(originalCommand, FfirstString, FarrayPosition, false);
 			}
 			enterArray();
 			return true;
@@ -648,6 +663,9 @@ public:
 			}
 			leaveArray();
 			debugvisitor("\033[94m]", true);
+			if (visitorCallbacksCompletelySet) {
+				visitorCallbackStartOrEndOfArray.Execute(originalCommand, FfirstString, FarrayPosition, true);
+			}
 			return true;
 		}
 
@@ -683,7 +701,11 @@ public:
 			}
 			debugPrintArrayPosition();
 			if (visitorCallbacksCompletelySet) {
-				visitorCallbackFoundAtomInteger64.Execute(originalCommand, FfirstString, FarrayPosition, v);
+				if (v-INT_MIN <= (uint64_t)INT_MAX-INT_MIN) {
+					visitorCallbackFoundAtomInteger.Execute(originalCommand, FfirstString, FarrayPosition, v);
+				} else {
+					visitorCallbackFoundAtomInteger64.Execute(originalCommand, FfirstString, FarrayPosition, v);
+				}
 			}
 			return true;
 		}
@@ -691,7 +713,11 @@ public:
 			debugvisitor("neg int: \033[96m" + std::to_string(v));
 			debugPrintArrayPosition();
 			if (visitorCallbacksCompletelySet) {
-				visitorCallbackFoundAtomInteger64.Execute(originalCommand, FfirstString, FarrayPosition, v);
+				if (v >= INT_MIN && v <= INT_MAX) {
+					visitorCallbackFoundAtomInteger.Execute(originalCommand, FfirstString, FarrayPosition, v);
+				} else {
+					visitorCallbackFoundAtomInteger64.Execute(originalCommand, FfirstString, FarrayPosition, v);
+				}
 			}
 			return true;
 		}
@@ -713,7 +739,7 @@ public:
 		}
 		bool visit_str(const char* v, uint32_t size) {
 			debugvisitor("\"\033[95m" + std::string(v, size) + "\033[0m\"");
-			if (firstString == "" && depth == 1) {
+			if (firstString == "" && depth == 1 && arrayPosition == "0") {
 				firstString = std::string(v, size);
 				FfirstString = UTF8_TO_TCHAR(firstString.c_str());
 			} else if (firstString == "TF STRUCTURE") {
@@ -854,7 +880,7 @@ int connect_to_websocket_serverAdvanced(
 
 int connect_to_websocket_serverWithAllDelegates(
 	const FEndOfConnection& CallbackEndOfConnection,
-	const FEndOfReponse& CallbackEndOfReponse,
+	const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 	const FParseError& CallbackParseError,
 	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 	const FStartOrEndOfArray& CallbackStartOrEndOfArray,
@@ -881,7 +907,7 @@ int connect_to_websocket_serverWithAllDelegates(
 		// Launch the asynchronous operation
 		std::make_shared<session>(ioc)->runWithAllDelegates(
 			CallbackEndOfConnection,
-			CallbackEndOfReponse,
+			CallbackStartOrEndOfResponse,
 			CallbackParseError,
 			CallbackStartOrEndOfMap,
 			CallbackStartOrEndOfArray,
@@ -967,7 +993,7 @@ public:
 	int LoadClientAdvanced(FString command, const FReadResponse& Callback);
 	int LoadClientWithAllDelegates(FString command,
 		const FEndOfConnection& CallbackEndOfConnection,
-		const FEndOfReponse& CallbackEndOfReponse,
+		const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 		const FParseError& CallbackParseError,
 		const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 		const FStartOrEndOfArray& CallbackStartOrEndOfArray,
@@ -1006,7 +1032,7 @@ int FNeuralInteractionClient::LoadClient(FString command) {
 //int FNeuralInteractionClient::LoadClient() {
 int FNeuralInteractionClient::LoadClientWithAllDelegates(FString command,
 	const FEndOfConnection& CallbackEndOfConnection,
-	const FEndOfReponse& CallbackEndOfReponse,
+	const FStartOrEndOfResponse& CallbackStartOrEndOfResponse,
 	const FParseError& CallbackParseError,
 	const FStartOrEndOfMap& CallbackStartOrEndOfMap,
 	const FStartOrEndOfArray& CallbackStartOrEndOfArray,
@@ -1029,7 +1055,7 @@ int FNeuralInteractionClient::LoadClientWithAllDelegates(FString command,
 	text = TCHAR_TO_ANSI(*command);
 	connect_to_websocket_serverWithAllDelegates(
 		CallbackEndOfConnection,
-		CallbackEndOfReponse,
+		CallbackStartOrEndOfResponse,
 		CallbackParseError,
 		CallbackStartOrEndOfMap,
 		CallbackStartOrEndOfArray,
