@@ -119,3 +119,7 @@ NeuralVisUE/debug.log
 # Excluding ahk and bat files
 /NeuralVisUE/*.bat
 /NeuralVisUE/*.ahk
+
+# Including level blueprints
+!/NeuralVisUE/Content
+/NeuralVisUE/Content/StarterContent
