@@ -287,8 +287,17 @@ public:
 		boost::ignore_unused(bytes_transferred);
 
 		if (ec) {
-			if (ec.value() == 1 && sessionCallbacksCompletelySet) {
-				sessionCallbackEndOfConnection.Execute(UTF8_TO_TCHAR(text_.c_str()));
+			if (sessionCallbacksCompletelySet) {
+				if (ec.value() == 1) {
+					// The WebSocket stream was gracefully closed at both endpoints
+					sessionCallbackEndOfConnection.Execute(UTF8_TO_TCHAR(text_.c_str()), false);
+				} else if (ec.value() == 10054) {
+					// An existing connection was forcibly closed by the remote host
+					sessionCallbackEndOfConnection.Execute(UTF8_TO_TCHAR(text_.c_str()), true);
+				} else {
+					// Any other unidentified error
+					sessionCallbackEndOfConnection.Execute(UTF8_TO_TCHAR(text_.c_str()), true);
+				}
 			}
 			return fail(ec, "read");
 		}
@@ -331,6 +340,9 @@ public:
 			return fail(ec, "close");
 
 		// If we get here then the connection is closed gracefully
+		if (sessionCallbacksCompletelySet) {
+			sessionCallbackEndOfConnection.Execute(UTF8_TO_TCHAR(text_.c_str()), false);
+		}
 
 		// The make_printable() function helps print a ConstBufferSequence
 		//std::cout << beast::make_printable(buffer_.data()) << std::endl;
