@@ -110,10 +110,34 @@ class Request:
 			f'Same as the "{originalCommand}" command',
 			f'Type "help {originalCommand}" for more information', originalCommand)
 
+	def numbersInRangeOfInt64(self, data):
+		if type(data) is list and len(data) == 0:
+			return True
+		elif type(data) is list and len(data) == 1:
+			return self.numbersInRangeOfInt64(data[0])
+		elif type(data) is list:
+			return self.numbersInRangeOfInt64(data[0]) and self.numbersInRangeOfInt64(data[1:])
+		elif type(data) is int:
+			return data >= -(2**63) and data <= 2**63-1
+		else:
+			return True
+
 	# Sends the specified message to the websocket client and prints it in console
 	# utilizing messagepack and projects data specification.
 	# Returns a boolean that signals whether the message was small enough to be sent properly
 	async def send(self, data, printhere=True):
+		# check for ints that are too large
+		if not self.numbersInRangeOfInt64(data):
+			# message contains numbers outside of int64 range
+			# Will prevent message from being sent in order to prevent undefined results
+			# Caution when changing this debug message! The content of this message should stay
+			# below a length of 256 to avoid this message being cut off by the message size checks below
+			await self.senddebug(14, f"Error sending message! This message contains numbers outside of " +
+				f"the int64 range! Please convert them to float before sending these values!\n" +
+				f"Beginning of the message " +
+				f"you were trying to send: {str(data)[0:min(256, setting.MAX_MESSAGE_SIZE-248)]}...")
+			return False
+
 		message_size_too_large = False
 		if (len(str(data)) > setting.MAX_MESSAGE_SIZE):
 			# nope, too large to even try packing it. might cause buffer overflow otherwise
@@ -139,7 +163,7 @@ class Request:
 				f"Content has to be shortened before being sent.\nBeginning of the message " +
 				f"you were trying to send: {str(data)[0:min(256, setting.MAX_MESSAGE_SIZE-246)]}...")
 			return False
-
+	
 	# Sends the file specified by path over binary data via msgpack to the websocket client
 	# Optionally sends the already specified data and path is only used as the filename
 	# File cannot be larger than MAX_MESSAGE_SIZE
