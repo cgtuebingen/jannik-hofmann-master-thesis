@@ -20,4 +20,7 @@ class NEURALVISUE_API IMultithreaded
 public:
 	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent, Category = "Multithreaded")
 		void MultithreadedFunction();
+		
+	UFUNCTION(BlueprintCallable, BlueprintImplementableEvent, Category = "Multithreaded")
+		void MultithreadedFunctionCommand(const FString& command);
 };

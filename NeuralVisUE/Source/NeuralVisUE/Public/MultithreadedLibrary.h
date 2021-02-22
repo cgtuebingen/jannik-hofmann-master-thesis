@@ -19,6 +19,20 @@ public:
 	}
 };
 
+class MultithreadedCommandTask : public FNonAbandonableTask {
+public:
+	MultithreadedCommandTask(UObject* object, FString command) { this->object = object; this->command = command; }
+	UObject* object;
+	FString command;
+	FORCEINLINE TStatId GetStatId() const {
+		RETURN_QUICK_DECLARE_CYCLE_STAT(MultithreadedTask, STATGROUP_ThreadPoolAsyncTasks);
+	}
+	void DoWork()
+	{
+		IMultithreaded::Execute_MultithreadedFunctionCommand(object, command);
+	}
+};
+
 UCLASS()
 class NEURALVISUE_API UMultithreadedLibrary : public UBlueprintFunctionLibrary {
 	//Here you can see my project was named "My project" when this class was created in the unreal editor. 
@@ -28,5 +42,10 @@ public:
 	UFUNCTION(BlueprintCallable)
 		static void CallMultithreadedFunction(UObject* object) {
 		(new FAutoDeleteAsyncTask<MultithreadedTask>(object))->StartBackgroundTask();
+	}
+	
+	UFUNCTION(BlueprintCallable)
+		static void CallMultithreadedFunctionCommand(UObject* object, FString command) {
+		(new FAutoDeleteAsyncTask<MultithreadedCommandTask>(object, command))->StartBackgroundTask();
 	}
 };
