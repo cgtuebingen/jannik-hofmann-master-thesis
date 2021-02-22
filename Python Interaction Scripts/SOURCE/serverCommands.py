@@ -371,7 +371,18 @@ class Request:
 
 		try:
 			# trying to cast the command parameter string to desired type
-			result = castToType(self.command.split()[position])
+			paramValue = self.command.split()[position]
+			if type(defaultOrType) is bool or defaultOrType is bool:
+				if paramValue in setting.POSITIVE_PARAMETERS:
+					result = True
+				elif paramValue in setting.NEGATIVE_PARAMETERS:
+					result = False
+				elif type(defaultOrType) is bool:
+					result = defaultOrType
+				else:
+					result = False
+			else:
+				result = castToType(paramValue)
 			return result
 		except:
 			if (type(defaultOrType) is type or raiseException):
@@ -1125,6 +1136,8 @@ class Request:
 
 	async def tf_getstructure(self, **kwargs):
 		if not await self.checkTf(): return False
+		await self.checkParams(0, 1)
+		convertToShapeInstructions = await self.getParam(1, False)
 		try:
 			structure = []
 			global nn_module
@@ -1181,7 +1194,22 @@ class Request:
 						f"and cannot be parsed! Integrity of the architecture data cannot be guaranteed.")
 				tfNetwork.layerCount = layerCount
 			if (tfNetwork.validstructure):
-				await self.send(("TF STRUCTURE", tfNetwork.layers))
+				if not convertToShapeInstructions:
+					await self.send(("TF STRUCTURE", tfNetwork.layers))
+				else:
+					pos = [0, 0, 0] # center position of each cube
+					for layer in tfNetwork.layers:
+						xyz = [] # size of each cube
+						for dim in layer[2]:
+							if dim is not None and dim > 0 and len(xyz) < 3:
+								xyz.append(dim)
+						while (len(xyz) < 3):
+							xyz = [1] + xyz
+						pos[2] += xyz[2]/2
+						coordinates = [float(i) for i in pos + xyz]
+						await self.send(("SPAWN CUBOID", coordinates))
+						await asyncio.sleep(0.5)
+						pos[2] += xyz[2]/2 + 1000
 			else:
 				await self.sendstatus(17, f"Tensorflow network structure does not adhere to expected " +
 					f"format!\nReceived structure: {structure[2]}\nExpected structure: Layer (type)\t" +
