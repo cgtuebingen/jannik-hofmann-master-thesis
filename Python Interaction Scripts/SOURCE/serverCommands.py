@@ -1208,7 +1208,7 @@ class Request:
 						pos[2] += xyz[2]/2
 						coordinates = [float(i) for i in pos + xyz]
 						await self.send(("SPAWN CUBOID", coordinates))
-						await asyncio.sleep(0.5)
+						await asyncio.sleep(0.2)
 						pos[2] += xyz[2]/2 + 1000
 			else:
 				await self.sendstatus(17, f"Tensorflow network structure does not adhere to expected " +
