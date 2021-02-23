@@ -1054,6 +1054,11 @@ class Request:
 
 	# NEURAL NETWORK INTERACTION
 	async def loadnn(self, **kwargs):
+		global nnSuccessfullyLoaded
+		if nnSuccessfullyLoaded:
+			await self.senddebug(13, f'The server has already loaded another network. It is ' +
+			'recommended to use "server reset" before loading another network, to avoid ' +
+			'undefined behaviour!')
 		if not await self.checkParams(warnUser=False):
 			path = setting.DEFAULT_LOAD_NN_PATH
 			await self.senddebug(5, f"No custom path for the neural network was specified. " +
@@ -1086,7 +1091,6 @@ class Request:
 				tfNetwork.loaded = True
 			await self.sendstatus(-30, f"Neural network at {path} has been successfully loaded and " +
 				"executed.")
-			global nnSuccessfullyLoaded
 			nnSuccessfullyLoaded = True
 		except:
 			await self.sendstatus(15, f"ERROR loading Neural Network from script {path}:\n" +
@@ -1144,13 +1148,21 @@ class Request:
 		try:
 			structure = []
 			global nn_module
-			nn_module.model.summary(print_fn=lambda x: structure.append(x))
+			nn_module.model.summary(print_fn=lambda x: structure.append(x), line_length=500)
 		except:
 			await self.sendstatus(16, f"Couldn't retrieve tensorflow structure!\n" +
 				traceback.format_exc())
 			return False
 		try:
-			await self.senddebug(-8, "Structure of the network:\n" + "\n".join(structure))
+			readableStructure = "\n".join(structure)
+			readableStructure = re.sub(r" +", " ", readableStructure)
+			lineLength = max([len(
+				re.sub(r"\-\-+", "", re.sub(r"\=\=+", "", re.sub(r"\_\_+", "", re.sub(r" +", " ", line))))
+			) for line in structure])
+			readableStructure = re.sub(r"\-\-+", "-" * lineLength, readableStructure)
+			readableStructure = re.sub(r"\=\=+", "=" * lineLength, readableStructure)
+			readableStructure = re.sub(r"\_\_+", "_" * lineLength, readableStructure)
+			await self.senddebug(-8, "Structure of the network:\n" + readableStructure)
 			global tfNetwork
 			tfNetwork.validstructure = False
 			tfNetwork.layers = []
@@ -1161,6 +1173,9 @@ class Request:
 					assert mainstructure == 0
 					tfNetwork.modelname = line.replace("Model: ", "").replace('"', '')
 				elif (re.fullmatch("Layer \\(type\\) *Output Shape *Param \\# *", line) is not None):
+					assert mainstructure == 0
+					tfNetwork.validstructure = True
+				elif (re.fullmatch("Layer \\(type\\) *Output Shape *Param \\# *Connected to *", line) is not None):
 					assert mainstructure == 0
 					tfNetwork.validstructure = True
 				elif (line.startswith("Total param")):
@@ -1176,9 +1191,9 @@ class Request:
 					mainstructure += 1
 				elif (re.fullmatch("\\_*", line) is not None):
 					pass
-				elif (re.fullmatch("[a-z0-9\\_]* \\([A-Za-z0-9 ]*\\)   *" +
-					"\\[?\\((None|[0-9]*|\\, )*\\)\\]?   *[0-9]* *", line) is not None):
-
+				elif (re.fullmatch(r"[a-z0-9\_]* \([A-Za-z0-9 ]*\)   *" +
+					r"\[?\((None|[0-9]*|\, )*\)\]?   *[0-9]* *", line) is not None):
+					# Layer (type)      Output      Shape      Param #
 					assert mainstructure == 1
 					line = re.sub("   *", "\n", line).strip()
 					layertype, shape, params = line.split("\n")
@@ -1192,6 +1207,29 @@ class Request:
 					layer = layername, ltype, shape, params
 					tfNetwork.layers.append(layer)
 					layerCount += 1
+				elif (re.fullmatch(r"[a-z0-9\_]* \([A-Za-z0-9 ]*\)?   *" +
+					r"\[?\((None|[0-9]*|\, )*\)\]?   *[0-9]*   *[a-z0-9\_]*(\[0\])* *", line) is not None):
+					# Layer (type)      Output      Shape      Param #      Connected to
+					assert mainstructure == 1
+					line = re.sub("   *", "\n", line).strip()
+					layertype, shape, params, connectedTo = line.split("\n")
+					layername, ltype = layertype.split("(")
+					layername = layername.strip()
+					ltype = ltype.replace(")", "")
+					if (shape.startswith("[") and shape.endswith("]")):
+						shape = shape[1:-1]
+					shape = ast.literal_eval(shape)
+					params = int(params)
+					while(connectedTo.endswith("[0]")):
+						connectedTo = connectedTo[:-3]
+					layer = layername, ltype, shape, params, [connectedTo]
+					tfNetwork.layers.append(layer)
+					layerCount += 1
+				elif (re.fullmatch(r"   *[a-z0-9\_]*(\[0\])* *", line) is not None):
+					connectedTo = line.strip()
+					while(connectedTo.endswith("[0]")):
+						connectedTo = connectedTo[:-3]
+					tfNetwork.layers[-1][4].append(connectedTo)
 				else:
 					await self.senddebug(14, f'Line "{line}" in tf network structure is unexpected ' + \
 						f"and cannot be parsed! Integrity of the architecture data cannot be guaranteed.")
@@ -1216,7 +1254,8 @@ class Request:
 			else:
 				await self.sendstatus(17, f"Tensorflow network structure does not adhere to expected " +
 					f"format!\nReceived structure: {structure[2]}\nExpected structure: Layer (type)\t" +
-					f"Output Shape\tParam #")
+					f"Output Shape\tParam #\nAlternative expected structure: Layer (type)\t" +
+					f"Output Shape\tParam #\tConnected to")
 				return False
 		except:
 			await self.sendstatus(17, f"Couldn't parse tensorflow structure!\n" +

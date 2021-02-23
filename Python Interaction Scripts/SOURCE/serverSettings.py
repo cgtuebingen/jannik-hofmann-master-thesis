@@ -34,7 +34,10 @@ ALLOW_REMOTE_CODE_EXECUTION = True
 # Available neural networks that can be loaded via keywords
 # Start with a \ or / to indicate a path relative to the location of the centralController.py script
 # Path will then be automatically converted to absolute in checkSettings()-functions
-AVAILABLE_NN_PATHS = {"vgg16": R"\..\..\First tests\VGGNet16 Tensorflow\vgg16experimentation.py"}
+AVAILABLE_NN_PATHS = {
+	"vgg16": R"\..\..\First tests\VGGNet16 Tensorflow\vgg16experimentation.py",
+	"resnet": R"\..\..\First tests\ResNet50 Tensorflow\resnet.py",
+}
 
 # default location of DNN python file. Will be loaded if "loadnn" is received without attributes
 # You can use a key of AVAILABLE_NN_PATHS here.
