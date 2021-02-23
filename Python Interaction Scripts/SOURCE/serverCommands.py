@@ -1060,6 +1060,7 @@ class Request:
 			"Using default path specified in python server script:\n" + path)
 		else:
 			path = await self.getParam()
+			path = setting.AVAILABLE_NN_PATHS.get(path, path)
 		
 		try:
 			await self.sendstatus(-10, f"Neural network at {path} is being loaded. This might " +
@@ -1093,7 +1094,9 @@ class Request:
 			return False
 	commandList["nn load"] = (loadnn, "Loads a neural network at the given path",
 		"Parameters as string specify the location of the python script on the server. " +
-		"This script is then imported and loaded by python")
+		"This script is then imported and loaded by python.\n" +
+		"Use a keyword as parameter to load one of the networks specified in server settings.\n" +
+		'Available keywords are: "' + '", "'.join(setting.AVAILABLE_NN_PATHS.keys()) + '"')
 
 
 	async def isnnloaded(self, **kwargs):

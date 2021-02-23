@@ -5,6 +5,7 @@
 
 # USED LIBRARIES
 import os
+import types
 from datetime import datetime
 
 # LOCAL IMPORTS
@@ -30,10 +31,16 @@ EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE = False
 # Automatically disabled by checkSettings() over unencrypted internet connections outside of localhost
 ALLOW_REMOTE_CODE_EXECUTION = True
 
-# default location of DNN python file. Will be loaded if "loadnn" is received without attributes
+# Available neural networks that can be loaded via keywords
 # Start with a \ or / to indicate a path relative to the location of the centralController.py script
 # Path will then be automatically converted to absolute in checkSettings()-functions
-DEFAULT_LOAD_NN_PATH = R"\..\..\First tests\VGGNet16 Tensorflow\vgg16experimentation.py"
+AVAILABLE_NN_PATHS = {"vgg16": R"\..\..\First tests\VGGNet16 Tensorflow\vgg16experimentation.py"}
+
+# default location of DNN python file. Will be loaded if "loadnn" is received without attributes
+# You can use a key of AVAILABLE_NN_PATHS here.
+# Start with a \ or / to indicate a path relative to the location of the centralController.py script
+# Path will then be automatically converted to absolute in checkSettings()-functions
+DEFAULT_LOAD_NN_PATH = "vgg16"
 
 # Where is the log file located?
 # Start with a \ or / to indicate a path relative to the location of the centralController.py script
@@ -73,7 +80,7 @@ def checkSettings():
 	global SERVER_IP, SERVER_PORT, MAX_MESSAGE_SIZE, TIMES_TO_RETRY_ESTABLISHING_SERVER, \
 	SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER, AMPERSAND_CHAINS_COMMANDS, \
 	EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE, ALLOW_REMOTE_CODE_EXECUTION, \
-	DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
+	AVAILABLE_NN_PATHS, DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
 	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, \
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS
 	
@@ -129,15 +136,48 @@ def checkSettings():
 		msg = "SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER should be at least 0.1"
 		loggingFunctions.warn(msg, 8)
 
+	# Adds the server script path to a given path if it starts with / or \
+	def addServerScriptPath(filepath: str):
+		if (filepath.startswith(("\\", "/"))):
+			return centralController.SCRIPT_PATH() + filepath
+		else:
+			return filepath
+
 	if (LOGFILE_PATH is None or LOGFILE_PATH == ""):
 		msg = "No valid logpath given in settings. Logging will be disabled. This is not recommended"
 		loggingFunctions.warn(msg, 4)
 	else:
-		assert(type(DEFAULT_LOAD_NN_PATH) is str) and (type(LOGFILE_PATH) is str)
-		if (DEFAULT_LOAD_NN_PATH.startswith(("\\", "/"))):
-			DEFAULT_LOAD_NN_PATH = centralController.SCRIPT_PATH() + DEFAULT_LOAD_NN_PATH
-		if (LOGFILE_PATH.startswith(("\\", "/"))):
-			LOGFILE_PATH = centralController.SCRIPT_PATH() + LOGFILE_PATH
+		assert(type(LOGFILE_PATH) is str)
+		LOGFILE_PATH = addServerScriptPath(LOGFILE_PATH)
+	
+	AVAILABLE_NN_PATHS = {keyword:addServerScriptPath(path) for (keyword, path) in AVAILABLE_NN_PATHS.items()}
 
-	# Use this to check whether you left out any variables in the "global" definition above:
-	#print(locals())
+	assert(type(DEFAULT_LOAD_NN_PATH) is str)
+	if (DEFAULT_LOAD_NN_PATH not in AVAILABLE_NN_PATHS.keys()):
+		addServerScriptPath(DEFAULT_LOAD_NN_PATH)
+
+
+
+	# ----- ADD NEW SETTINGS CHECKS ABOVE THIS LINE
+
+	# Checking whether any local variables should've been global references to settings.
+	# This ensures that this function really changes the settings
+	# instead of creating local variables in its function context.
+	localVariables = {varname for varname, value in locals().items() if
+		varname not in [] and # you could add variable names as strings in this array to
+		# override the warning. NOT RECOMMENDED!
+		type(value) not in [types.BuiltinFunctionType, types.ModuleType, types.FunctionType] and
+		varname[0] != '_' and
+		varname in globals().keys()
+	}
+	if (len(localVariables) > 0):
+		msg = f"Namespace problem found in settings check!\n" + \
+		f"The variable{'s' if len(localVariables) > 1 else ''} " + \
+		f"{', '.join(localVariables)} in settings check is treated as a local variable! " + \
+		"Please add it to the list of global variables at the beginning of the " + \
+		"checkSettings-function in the serverSettings-file. Otherwise, checks and changes " + \
+		"to the settings are not applied properly.\n(This error can can be avoided by " + \
+		"renaming the local variable in the checkSettings-function)"
+		#loggingFunctions.warn(msg, 18)
+		raise NameError(msg)
+	# PLEASE DO NOT ADD ANY SETTINGS CHECKS BELOW THIS LINE
