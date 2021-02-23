@@ -32,6 +32,7 @@ import websocketServer as server
 import loggingFunctions
 import beautifulDebug
 import loggingFunctions
+import visualizationSettings
 
 
 # dictionary to translate from string command to function name.
@@ -1247,9 +1248,16 @@ class Request:
 						while (len(xyz) < 3):
 							xyz = [1] + xyz
 						pos[2] += xyz[2]/2
-						coordinates = [float(i) for i in pos + xyz]
-						await self.send(("SPAWN CUBOID", coordinates))
-						await asyncio.sleep(0.2)
+						color = visualizationSettings.layerColors.get(layer[1].lower(),
+							visualizationSettings.layerColors.get("default"))
+						if (type(color) is not tuple) and (type(color) is not list):
+							color = [color]
+						color = list(color)
+						while (len(color) < 3):
+							color.append(color[0])
+						coordinates = [float(i) for i in pos + xyz + color]
+						await self.send(("SPAWN CUBOID pos size color", coordinates))
+						await asyncio.sleep(0.1)
 						pos[2] += xyz[2]/2 + 1000
 			else:
 				await self.sendstatus(17, f"Tensorflow network structure does not adhere to expected " +
