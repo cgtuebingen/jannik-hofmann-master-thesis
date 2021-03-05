@@ -11,6 +11,10 @@ from datetime import datetime
 # LOCAL IMPORTS
 import loggingFunctions
 
+# TEMPORARY DEBUGGING SETTINGS
+DEBUG_USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary
+# This allows the server to draw a precached structure without loading any model
+
 
 # WEBSOCKET SERVER SETTINGS
 SERVER_IP = "localhost"
@@ -70,10 +74,12 @@ LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S = 1
 
 # parameters that signify a negation or deactivation of some sort
 POSITIVE_PARAMETERS = ["true", "1", "yes", "some", "accept", "t", "y", "pos", "positive", "yup",
-	"j", "yeah", "sure", "active", "activate", "activated", "+"]
+	"j", "yeah", "sure", "active", "activate", "activated", "+", "affirm", "confirm", "confirmed",
+	"confirmation", "affirmation"]
 # parameters that signify a negation or deactivation of some sort
 NEGATIVE_PARAMETERS = ["false", "0", "no", "none", "ignore", "f", "n", "neg", "negative", "nope",
-	"x", "nah", "inactive", "deactivate", "deactivated", "-"]
+	"x", "nah", "inactive", "deactivate", "deactivated", "-", "negate", "negated", "deny", "denied",
+	"refuse", "refused", "ignored"]
 
 
 # Settings checks and warnings. Verifies user settings and gives warnings / recommendations

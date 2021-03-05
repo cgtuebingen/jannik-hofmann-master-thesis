@@ -16,5 +16,4 @@ layerColors = {
 
 	"default": (.4),
 }
-
 layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}

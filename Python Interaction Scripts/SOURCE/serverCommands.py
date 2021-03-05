@@ -6,9 +6,6 @@
 # and status messages, and to verify and retrieve parameters sent along with the commands.
 # Every command function has a reference stored in the commandList, so that it can be found
 # by the websocketServer script.
-# This module also contains the interaction of the server with the imported tensorflow and
-# pytorch neural networks. It takes care of loading them, calculating predictions, as well as
-# retrieving weight data and meta information about the architectures.
 
 # USED LIBRARIES
 import asyncio
@@ -25,16 +22,21 @@ import importlib.util
 import numpy as np
 from types import SimpleNamespace
 import ast
+import random
 
 # LOCAL IMPORTS
 import serverSettings as setting
 import websocketServer as server
+import aiInteraction as ai
+import visualizationFunctions as vis
 import loggingFunctions
 import beautifulDebug
 import loggingFunctions
-import visualizationSettings
+import debugAndTesting
 
 
+# Seeding random library
+random.seed()
 # dictionary to translate from string command to function name.
 # resulting tuple has function name in the first part and an explanation in the second part,
 # optional third part contains details about its recommended usage
@@ -47,12 +49,6 @@ preparedCommands = []
 
 # Other definitions / initializations
 clientVersionVerifiedAndConnected = False
-nnSuccessfullyLoaded = False
-nn_spec = None
-nn_module = None
-tfNetwork = SimpleNamespace()
-pytorchNetwork = SimpleNamespace()
-tf = None
 
 
 # The request class is instantiated by every new client command from websocketServer.py
@@ -130,10 +126,28 @@ class Request:
 		else:
 			return True
 
+	# ensures in a recursive manner that the data is serializable by msgpack
+	def makeDataSerializable(self, data):
+		acceptedTypes = [str, int, float, bool, bytes, None]
+		if type(data) in acceptedTypes:
+			return data
+		if type(data) is list:
+			return [self.makeDataSerializable(item) for item in data]
+		if type(data) is tuple:
+			return tuple(self.makeDataSerializable(list(data)))
+		if type(data) is dict:
+			return {self.makeDataSerializable(k):self.makeDataSerializable(v)
+				for (k, v) in data.items()}
+		else:
+			return str(data)
+
 	# Sends the specified message to the websocket client and prints it in console
 	# utilizing messagepack and projects data specification.
 	# Returns a boolean that signals whether the message was small enough to be sent properly
-	async def send(self, data, printhere=True):
+	async def send(self, data, printhere=True, forceDataSerializable = False):
+		if forceDataSerializable:
+			data = self.makeDataSerializable(data)
+		
 		# check for ints that are too large
 		if not self.numbersInRangeOfInt64(data):
 			# message contains numbers outside of int64 range
@@ -153,7 +167,13 @@ class Request:
 			packed = None
 		else:
 			# let's try to pack this up with msgpack
-			packed = msgpack.packb(data)
+			try:
+				packed = msgpack.packb(data)
+			except:
+				if not forceDataSerializable:
+					return await self.send(data, printhere, True)
+				else: # basically raising that error itself again
+					packed = msgpack.packb(data)
 			if (len(packed) > setting.MAX_MESSAGE_SIZE):
 				# still larger than expected
 				message_size_too_large = len(packed)
@@ -1055,8 +1075,7 @@ class Request:
 
 	# NEURAL NETWORK INTERACTION
 	async def loadnn(self, **kwargs):
-		global nnSuccessfullyLoaded
-		if nnSuccessfullyLoaded:
+		if ai.nnloaded or ai.nnprepared:
 			await self.senddebug(13, f'The server has already loaded another network. It is ' +
 			'recommended to use "server reset" before loading another network, to avoid ' +
 			'undefined behaviour!')
@@ -1066,33 +1085,25 @@ class Request:
 			"Using default path specified in python server script:\n" + path)
 		else:
 			path = await self.getParam()
-			path = setting.AVAILABLE_NN_PATHS.get(path, path)
+		# Try to match with a predefined path from server settings
+		path = setting.AVAILABLE_NN_PATHS.get(path, path)
 		
 		try:
 			await self.sendstatus(-10, f"Neural network at {path} is being loaded. This might " +
 				"take a while. Please view the python console for further information and loading details.")
 			await asyncio.sleep(0.1) # make sure other async tasks have a chance to be executed before
 			# blocking main thread for a while (so that the previous status mesage gets send properly)
-			global nn_spec
-			global nn_module
-			nn_spec = importlib.util.spec_from_file_location("", path)
-			nn_module = importlib.util.module_from_spec(nn_spec)
-			nn_spec.loader.exec_module(nn_module)
+			ai.preparemodule(path, True)
 		except:
 			await self.sendstatus(15, f"ERROR finding or loading python script at specified location {path}:\n" +
 				traceback.format_exc())
 			return False
 		
 		try:
-			if (True): # TODO: Check if tensorflow or pytorch
-				global tfNetwork
-				global tf
-				import tensorflow as tfref
-				tf = tfref
-				tfNetwork.loaded = True
+			if (ai.preparedModuleIsTf()):
+				ai.importtf()
 			await self.sendstatus(-30, f"Neural network at {path} has been successfully loaded and " +
 				"executed.")
-			nnSuccessfullyLoaded = True
 		except:
 			await self.sendstatus(15, f"ERROR loading Neural Network from script {path}:\n" +
 				traceback.format_exc())
@@ -1105,34 +1116,28 @@ class Request:
 
 
 	async def isnnloaded(self, **kwargs):
-		global tfNetwork
-		await self.send(hasattr(tfNetwork, 'loaded') and tfNetwork.loaded)
-		if not(hasattr(tfNetwork, 'loaded')):
+		await self.send(ai.tfloaded())
+		if not(ai.tfloaded()):
 			return False
 	commandList["nn is loaded"] = (isnnloaded, "Checks if any neural network has been loaded and " +
 		"initialized successfully", "Returns a boolean, can be used for assertion to chain commands")
 
-
-	async def checkTf(self, **kwargs):
-		global nnSuccessfullyLoaded
-		if not nnSuccessfullyLoaded:
+	# For internal use, not a command. Use the following code line in any function to only let
+	# execution continue if a tf has been loaded and initialized successfully:
+	#if not await self.assertTf(): return False
+	async def assertTf(self, **kwargs):
+		if not ai.nnloaded:
 			await self.sendstatus(18, f"Network hasn't been loaded and initialized yet!")
 			return False
-
-		global tfNetwork
-		if not hasattr(tfNetwork, 'loaded') or not tfNetwork.loaded:
+		if not ai.tfloaded:
 			await self.sendstatus(18, f"Network is not Tensorflow, tf-specific functions can't be used!")
 			return False
-
 		return True
 
 	async def tf_getversion(self, **kwargs):
-		if not await self.checkTf(): return False
+		if not await self.assertTf(): return False
 		try:
-			global tf
-			global tfNetwork
-			v = tf.__version__
-			tfNetwork.version = v
+			v = ai.tfversion()
 			await self.send(v)
 		except:
 			await self.sendstatus(16, f"Couldn't retrieve tensorflow version!\n" +
@@ -1143,128 +1148,27 @@ class Request:
 
 
 	async def tf_getstructure(self, **kwargs):
-		if not await self.checkTf(): return False
+		if not setting.DEBUG_USE_FAKE_STRUCTURE:
+			if not await self.assertTf(): return False
 		await self.checkParams(0, 1)
 		convertToShapeInstructions = await self.getParam(1, False)
 		try:
-			structure = []
-			global nn_module
-			nn_module.model.summary(print_fn=lambda x: structure.append(x), line_length=500)
+			if setting.DEBUG_USE_FAKE_STRUCTURE and not ai.tfloaded():
+				structure = debugAndTesting.const_fake_structure
+			else:
+				structure = ai.tfmodelsummary()
+				await self.senddebug(-8, "Structure of the network:\n" +
+					ai.makeModelSummaryReadable(structure))
 		except:
 			await self.sendstatus(16, f"Couldn't retrieve tensorflow structure!\n" +
 				traceback.format_exc())
 			return False
 		try:
-			readableStructure = "\n".join(structure)
-			readableStructure = re.sub(r" +", " ", readableStructure)
-			lineLength = max([len(
-				re.sub(r"\-\-+", "", re.sub(r"\=\=+", "", re.sub(r"\_\_+", "", re.sub(r" +", " ", line))))
-			) for line in structure])
-			readableStructure = re.sub(r"\-\-+", "-" * lineLength, readableStructure)
-			readableStructure = re.sub(r"\=\=+", "=" * lineLength, readableStructure)
-			readableStructure = re.sub(r"\_\_+", "_" * lineLength, readableStructure)
-			await self.senddebug(-8, "Structure of the network:\n" + readableStructure)
-			global tfNetwork
-			tfNetwork.validstructure = False
-			tfNetwork.layers = []
-			mainstructure = 0
-			layerCount = 0
-			for line in structure:
-				if (line.startswith("Model: \"")):
-					assert mainstructure == 0
-					tfNetwork.modelname = line.replace("Model: ", "").replace('"', '')
-				elif (re.fullmatch("Layer \\(type\\) *Output Shape *Param \\# *", line) is not None):
-					assert mainstructure == 0
-					tfNetwork.validstructure = True
-				elif (re.fullmatch("Layer \\(type\\) *Output Shape *Param \\# *Connected to *", line) is not None):
-					assert mainstructure == 0
-					tfNetwork.validstructure = True
-				elif (line.startswith("Total param")):
-					assert mainstructure == 2
-					tfNetwork.totalparams = int(re.sub("[a-zA-Z\\:\\, ]", "", line))
-				elif (line.startswith("Trainable param")):
-					assert mainstructure == 2
-					tfNetwork.trainableparams = int(re.sub("[a-zA-Z\\:\\, ]", "", line))
-				elif (line.startswith("Non-trainable param")):
-					assert mainstructure == 2
-					tfNetwork.nontrainableparams = int(re.sub("[a-zA-Z\\:\\, ]", "", line))
-				elif (re.fullmatch("\\=*", line) is not None):
-					mainstructure += 1
-				elif (re.fullmatch("\\_*", line) is not None):
-					pass
-				elif (re.fullmatch(r"[a-z0-9\_]* \([A-Za-z0-9 ]*\)   *" +
-					r"\[?\((None|[0-9]*|\, )*\)\]?   *[0-9]* *", line) is not None):
-					# Layer (type)      Output      Shape      Param #
-					assert mainstructure == 1
-					line = re.sub("   *", "\n", line).strip()
-					layertype, shape, params = line.split("\n")
-					layername, ltype = layertype.split("(")
-					layername = layername.strip()
-					ltype = ltype.replace(")", "")
-					if (shape.startswith("[") and shape.endswith("]")):
-						shape = shape[1:-1]
-					shape = ast.literal_eval(shape)
-					params = int(params)
-					layer = layername, ltype, shape, params
-					tfNetwork.layers.append(layer)
-					layerCount += 1
-				elif (re.fullmatch(r"[a-z0-9\_]* \([A-Za-z0-9 ]*\)?   *" +
-					r"\[?\((None|[0-9]*|\, )*\)\]?   *[0-9]*   *[a-z0-9\_]*(\[0\])* *", line) is not None):
-					# Layer (type)      Output      Shape      Param #      Connected to
-					assert mainstructure == 1
-					line = re.sub("   *", "\n", line).strip()
-					layertype, shape, params, connectedTo = line.split("\n")
-					layername, ltype = layertype.split("(")
-					layername = layername.strip()
-					ltype = ltype.replace(")", "")
-					if (shape.startswith("[") and shape.endswith("]")):
-						shape = shape[1:-1]
-					shape = ast.literal_eval(shape)
-					params = int(params)
-					while(connectedTo.endswith("[0]")):
-						connectedTo = connectedTo[:-3]
-					layer = layername, ltype, shape, params, [connectedTo]
-					tfNetwork.layers.append(layer)
-					layerCount += 1
-				elif (re.fullmatch(r"   *[a-z0-9\_]*(\[0\])* *", line) is not None):
-					connectedTo = line.strip()
-					while(connectedTo.endswith("[0]")):
-						connectedTo = connectedTo[:-3]
-					tfNetwork.layers[-1][4].append(connectedTo)
-				else:
-					await self.senddebug(14, f'Line "{line}" in tf network structure is unexpected ' + \
-						f"and cannot be parsed! Integrity of the architecture data cannot be guaranteed.")
-				tfNetwork.layerCount = layerCount
-			if (tfNetwork.validstructure):
-				if not convertToShapeInstructions:
-					await self.send(("TF STRUCTURE", tfNetwork.layers))
-				else:
-					pos = [0, 0, 0] # center position of each cube
-					for layer in tfNetwork.layers:
-						xyz = [] # size of each cube
-						for dim in layer[2]:
-							if dim is not None and dim > 0 and len(xyz) < 3:
-								xyz.append(dim)
-						while (len(xyz) < 3):
-							xyz = [1] + xyz
-						pos[2] += xyz[2]/2
-						color = visualizationSettings.layerColors.get(layer[1].lower(),
-							visualizationSettings.layerColors.get("default"))
-						if (type(color) is not tuple) and (type(color) is not list):
-							color = [color]
-						color = list(color)
-						while (len(color) < 3):
-							color.append(color[0])
-						coordinates = [float(i) for i in pos + xyz + color]
-						await self.send(("SPAWN CUBOID pos size color", coordinates))
-						await asyncio.sleep(0.1)
-						pos[2] += xyz[2]/2 + 1000
+			await ai.parsestructure(self, structure)
+			if convertToShapeInstructions:
+				await vis.drawstructure(self)
 			else:
-				await self.sendstatus(17, f"Tensorflow network structure does not adhere to expected " +
-					f"format!\nReceived structure: {structure[2]}\nExpected structure: Layer (type)\t" +
-					f"Output Shape\tParam #\nAlternative expected structure: Layer (type)\t" +
-					f"Output Shape\tParam #\tConnected to")
-				return False
+				await self.send(("TF STRUCTURE", ai.tfnet.layers))
 		except:
 			await self.sendstatus(17, f"Couldn't parse tensorflow structure!\n" +
 				traceback.format_exc())
@@ -1280,20 +1184,20 @@ class Request:
 
 
 	async def tf_getvars(self, **kwargs):
-		if not await self.checkTf(): return False
+		if not await self.assertTf(): return False
 		await self.checkParams(0, 1)
 		global tfNetwork
 		if (await self.checkParams(1, 1, False)):
 			attr = await self.getParam(1, str, True)
 			try:
-				await self.send(getattr(tfNetwork, attr))
+				await self.send(getattr(ai.tfnet, attr))
 			except:
 				await self.senddebug(12, f"Attribute {attr} does not (yet) exist in tfNetwork. " +
 					f"Sending back None as value for {attr}.")
 				await self.send(None)
 				return False
 		else:
-			await self.send(vars(tfNetwork))
+			await self.send(vars(ai.tfnet))
 	commandList["tf get vars"] = (tf_getvars, "Returns all variables and information currently loaded and " +
 		"known about the tensorflow network",
 		"Returns a map of the continually expanding class type that stores information about the " +
