@@ -35,7 +35,6 @@ class Coordinates:
 			self.x, self.y, self.z = a.x, a.y, a.z
 		# Without parameters as default, default, default
 		elif a is None:
-			self.x, self.y, self.z = float(default), float(default), float(default)
 			self.x = default.x if type(default) is Coordinates else float(default)
 			self.y = default.y if type(default) is Coordinates else float(default)
 			self.z = default.z if type(default) is Coordinates else float(default)
@@ -197,7 +196,7 @@ async def spawnCuboid(connection, position, size, color):
 	position, size = transformCoordinates(position, size)
 	# Append them into one large array and send them away as instruction
 	posSizeColor = [float(i) for i in
-		position.list() + size.list() + color]
+		position.list() + size.list() + formatColor(color)]
 	await connection.send(("SPAWN CUBOID pos size color", posSizeColor))
 	await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
 
@@ -220,7 +219,7 @@ async def drawstructure(connection):
 		# Wait, we can't draw that
 		return False
 	position = Coordinates() # center position of first cube at origin
-	drawnLayers = [] # For later reference for interconnected layers
+	drawnLayers = [] # For later reference for drawing layer connections
 
 	for index, layer in enumerate(ai.tfnet.layers):
 		# Retrieve reasonable size and scale x, y by 50
@@ -228,12 +227,12 @@ async def drawstructure(connection):
 		# Shift the position, so layers don't overlap
 		position.add(z = size)
 		# Check if actually connected to previously drawn layer
-		if not ai.tfnet.layers[index-1][0] in layer[4]:
-			position.add(z = 1000) # increase distance between unconnected layers
+		if design.additionalDistanceBetweenUnconnectedLayers and \
+			not ai.tfnet.layers[index-1][0] in layer[4]:
+				position.add(z = 1000) # increase distance between unconnected layers
 		# Retrieve color for this layer type
 		color = design.layerColors.get(layer[1].lower(),
 			design.layerColors.get("default"))
-		color = formatColor(color)
 		# Spawn that thing and append it to drawnLayers
 		await spawnCuboid(connection, position, size, color)
 		drawnLayers.append([position.copy(), size.copy(), color])
@@ -244,26 +243,25 @@ async def drawstructure(connection):
 			for connectedIndex, connectedLayer in enumerate(ai.tfnet.layers):
 				# Check if that layer matches with the connected list and isn't just the previous
 				if connectedLayer[0] in layer[4] and connectedIndex < index-1:
-					# retrieve color preference
-					connectionColor = formatColor(design.connectionColor)
 					# retrieve position and size of the connected layer
 					cposition, csize, *_ = drawnLayers[connectedIndex]
 					# calculate random x and y connection properties (so connections don't overlap)
 					xy = min(size.x, size.y, csize.x, csize.y)/2
-					randomx = random.uniform(-xy*0.3, xy*0.3)
-					randomy = random.uniform(xy*1, xy*1.4)
+					randomPos = Coordinates(
+						x = random.uniform(-xy * 0.3, xy * 0.3),
+						y = random.uniform(xy * 1, xy * 1.4))
 					print(f"position, c {position}, {cposition}")
 					await spawnCuboid(connection,
-						Coordinates(randomx, randomy/2, position),
-						Coordinates(design.connectionStrength, y = 2.5 * randomy),
-						connectionColor)
+						Coordinates(randomPos, randomPos / 2, position),
+						Coordinates(design.connectionStrength, y = randomPos * 2.5),
+						design.connectionColor)
 					await spawnCuboid(connection,
-						Coordinates(randomx, randomy, position | cposition),
+						Coordinates(randomPos, z = position | cposition),
 						Coordinates(design.connectionStrength, z = (position - cposition) / 2),
-						connectionColor)
+						design.connectionColor)
 					await spawnCuboid(connection,
-						Coordinates(randomx, randomy/2, cposition),
-						Coordinates(design.connectionStrength, y = 2.5 * randomy),
-						connectionColor)
+						Coordinates(randomPos, randomPos / 2, cposition),
+						Coordinates(design.connectionStrength, y = randomPos * 2.5),
+						design.connectionColor)
 		position.add(z = size + 300)
 	return True

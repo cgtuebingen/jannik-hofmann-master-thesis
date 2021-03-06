@@ -26,6 +26,7 @@ layerColors = {
 drawConnections = True
 connectionColor = .3
 connectionStrength = 70
+additionalDistanceBetweenUnconnectedLayers = True
 
 # INITIALIZATIONS
 
