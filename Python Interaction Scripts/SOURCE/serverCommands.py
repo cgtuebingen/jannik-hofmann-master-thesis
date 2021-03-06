@@ -1163,11 +1163,18 @@ class Request:
 			await self.sendstatus(16, f"Couldn't retrieve tensorflow structure!\n" +
 				traceback.format_exc())
 			return False
+		
 		try:
-			await ai.parsestructure(self, structure)
+			successful = await ai.parsestructure(self, structure)
+			if not successful:
+				# parestructure couldn't find valid structure. It has already output debug errors
+				# Just need to quit this function at this point
+				return False
+			
 			if convertToShapeInstructions:
 				await vis.drawstructure(self)
 			else:
+				# If the client doesn't want to draw, they get the whole structure as array
 				await self.send(("TF STRUCTURE", ai.tfnet.layers))
 		except:
 			await self.sendstatus(17, f"Couldn't parse tensorflow structure!\n" +
@@ -1181,6 +1188,15 @@ class Request:
 		'layer_name and type are strings retrieved from tensorflow. dimensions usually have ' +
 		'nil/None as their first value due to tensorflow standards with dynamic batch sizes')
 	commandList["tf get layers"] = commandAlias("tf get structure")
+
+
+	async def tf_resetstructure(self, **kwargs):
+		if not await self.assertTf(): return False
+		await self.checkParams(0)
+		ai.tfresetstructure()
+		await self.sendstatus(-30, f"Saved structure information of the loaded tf network has been reset.")
+	commandList["tf reset structure"] = (tf_getstructure, "Resets the stored tensorflow network structure",
+		'Takes no parameters. Just resets the stored structure information of tfnet.')
 
 
 	async def tf_getvars(self, **kwargs):
