@@ -23,7 +23,10 @@ layerColors = {
 	"default": (.4),
 }
 
+horizontalSpaceBetweenLayers = 300
+verticalSpaceBetweenLayers = 300
 drawConnections = True
+angledConnections = True
 connectionColor = .3
 connectionStrength = 70
 additionalDistanceBetweenUnconnectedLayers = True

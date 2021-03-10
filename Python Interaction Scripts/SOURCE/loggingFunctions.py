@@ -64,8 +64,9 @@ def log(text):
 
 	except IOError:
 		# uh oh, something went wrong... Let's warn the user, but only once this time
-		warn(f"ERROR accessing/creating logfile at {setting.LOGFILE_PATH}:\n" +
-			traceback.format_exc(), 8)
+		print(beautifulDebug.special(5, 3, 0) +
+			f"ERROR accessing/creating logfile at {setting.LOGFILE_PATH}:\n" +
+			traceback.format_exc() + beautifulDebug.RESET)
 		setting.LOGFILE_PATH = "ERROR"
 		return False
 
