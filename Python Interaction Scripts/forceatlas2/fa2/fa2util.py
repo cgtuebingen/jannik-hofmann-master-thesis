@@ -11,7 +11,8 @@
 # Available under the GPLv3
 
 from math import factorial, sqrt
-
+import numpy as np
+import math
 
 # This will substitute for the nLayout object
 class Node:
@@ -209,16 +210,103 @@ def apply_repulsion(nodes, coefficient):
 # The following functions iterate through the nodes or edges and apply
 # the forces directly to the node objects.  These iterations are here
 # instead of the main file because Python is slow with loops.
+def apply_repulsion_fast(nodes, coefficient, debugAlgorithm = False):
+    if (debugAlgorithm):
+        i = 0
+        for n1 in nodes:
+            j = i
+            for n2 in nodes:
+                if j == 0:
+                    break
+                xDist = n1.x - n2.x
+                yDist = n1.y - n2.y
+                distance2 = xDist * xDist + yDist * yDist  # Distance squared
+
+                if distance2 > 0:
+                    factor = coefficient * n1.mass * n2.mass / distance2
+                    n1.dx += xDist * factor
+                    n1.dy += yDist * factor
+                    n2.dx -= xDist * factor
+                    n2.dy -= yDist * factor
+                j -= 1
+            i += 1
+    x = np.array([n.x for n in nodes])
+    y = np.array([n.y for n in nodes])
+    mass = np.array([n.mass for n in nodes])
+    deltax = x[None, :] - x[:, None]
+    deltax = np.tril(deltax, -1)
+    deltay = y[None, :] - y[:, None]
+    deltay = np.tril(deltay, -1)
+    massmult = mass[None, :] * mass[:, None]
+    massmult = np.tril(massmult, -1)
+    distance2 = deltax * deltax + deltay * deltay
+    onesOnDiagAndAbove = np.triu(np.ones_like(deltax), 0)
+    factor = massmult * coefficient / (distance2 + onesOnDiagAndAbove)
+    deltax = deltax * factor
+    deltay = deltay * factor
+    n1x = deltax.sum(axis=0)
+    n2x = deltax.sum(axis=1)
+    n1y = deltay.sum(axis=0)
+    n2y = deltay.sum(axis=1)
+    dx = n1x - n2x
+    dy = n1y - n2y
+    for i, n in enumerate(nodes):
+        if (debugAlgorithm):
+            reltol = 0.000001
+            abstol = reltol
+            if not math.isclose(n.dx, dx[i], rel_tol=reltol, abs_tol=abstol):
+                print(f"\nindex {i} got {dx[i]}, expected {n.dx}")
+            if not math.isclose(n.dy, dy[i], rel_tol=reltol, abs_tol=abstol):
+                print(f"\nindex {i} got {dy[i]}, expected {n.dy}")
+        n.dx = dx[i]
+        n.dy = dy[i]
+    
+    
+
+# The following functions iterate through the nodes or edges and apply
+# the forces directly to the node objects.  These iterations are here
+# instead of the main file because Python is slow with loops.
 def apply_overlap_repulsion(nodes, coefficient, xspacing=0, yspacing=0, bufferZone=0):
+    maxdistx = max([n.width for n in nodes]) + xspacing + bufferZone
+    maxdisty = max([n.height for n in nodes]) + yspacing + bufferZone
     i = 0
     for n1 in nodes:
         j = i
         for n2 in nodes:
             if j == 0:
                 break
-            linOverlapRepulsion(n1, n2, coefficient, xspacing, yspacing, bufferZone)
+            if abs(n1.x - n2.x) < maxdistx:
+                if abs(n1.y - n2.y) < maxdisty:
+                    linOverlapRepulsion(n1, n2,
+                        coefficient, xspacing, yspacing, bufferZone)
             j -= 1
         i += 1
+
+
+# The following functions iterate through the nodes or edges and apply
+# the forces directly to the node objects.  These iterations are here
+# instead of the main file because Python is slow with loops.
+
+# not really faster as it's too complicated, so not recommended to be used
+def apply_overlap_repulsion_fast(nodes, coefficient, xspacing=0, yspacing=0, bufferZone=0):
+    maxdistx = max([n.width for n in nodes]) + xspacing + bufferZone
+    maxdisty = max([n.height for n in nodes]) + yspacing + bufferZone
+    x = np.array([n.x for n in nodes])
+    y = np.array([n.y for n in nodes])
+    deltax = x[None, :] - x[:, None]
+    deltay = y[None, :] - y[:, None]
+    deltax = np.tril(deltax, -1)
+    deltay = np.tril(deltay, -1)
+    deltax = np.abs(deltax)
+    deltay = np.abs(deltay)
+    
+    inrange = np.where((deltax < maxdistx) & (deltay < maxdisty),
+        np.ones_like(deltax), np.zeros_like(deltax))
+    applyto = np.transpose(np.nonzero(inrange)).tolist()
+
+    for pair in applyto:
+        linOverlapRepulsion(nodes[pair[0]], nodes[pair[1]],
+            coefficient, xspacing, yspacing, bufferZone)
 
 
 def apply_gravity(nodes, gravity, scalingRatio, useStrongGravity=False):

@@ -6,8 +6,14 @@ from matplotlib.animation import FuncAnimation
 
 NUMBER_OF_NODES = 100
 MAX_NODE_SIZE = 50
-G = nx.random_geometric_graph(NUMBER_OF_NODES, 0.1)
-sizes = np.random.random_sample((NUMBER_OF_NODES, 2)) * MAX_NODE_SIZE
+CONNECTION_RATIO = 0.1
+G = nx.random_geometric_graph(NUMBER_OF_NODES, CONNECTION_RATIO)
+SIZES = None
+SIZES = np.random.random_sample((NUMBER_OF_NODES, 2)) * MAX_NODE_SIZE
+NUMBER_OF_ITERATIONS = 1000
+NUMBER_OF_PLOTS = 20
+
+print(f"Selected settings: {NUMBER_OF_NODES} nodes, connection ratio of {CONNECTION_RATIO} and max size {MAX_NODE_SIZE}. Calculating {NUMBER_OF_ITERATIONS} iterations and drawing {NUMBER_OF_PLOTS} plots.")
 
 forceatlas2 = ForceAtlas2(
                         # Behavior alternatives
@@ -33,7 +39,8 @@ forceatlas2 = ForceAtlas2(
 
                         # Log
                         verbose=True,
-                        debugDisplayPlot=10)
+                        debugDisplayPlot=NUMBER_OF_PLOTS,
+                        addedMsPerFrame=0)
 
 # positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=200)
 # nx.draw_networkx_nodes(G, positions, node_size=20, label=None, node_color="blue", alpha=0.4)
@@ -48,27 +55,27 @@ forceatlas2 = ForceAtlas2(
 # plt.show()
 
 
-positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, quadsizes=sizes, iterations=1000)
-quit()
-
-fig, ax = plt.subplots(figsize=(6,4))
-
-def update(i):
-    ax.clear()
-    positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=100)
-    nx.draw_networkx_nodes(G, positions, node_size=20, label=None, node_color="blue", alpha=0.4)
-    nx.draw_networkx_edges(G, positions, edge_color="green", alpha=0.05)
-    ax.set_xticks([])
-    ax.set_yticks([])
-
-anim = FuncAnimation(fig, update, frames=5, interval=200, repeat=True)
-#anim.save('most_recent_animation.gif', writer='imagemagick')
-plt.show()
+positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, quadsizes=SIZES, iterations=NUMBER_OF_ITERATIONS)
 
 
+# fig, ax = plt.subplots(figsize=(6,4))
 
-# equivalently
-# import igraph
-# G = igraph.Graph.TupleList(G.edges(), directed=False)
-# layout = forceatlas2.forceatlas2_igraph_layout(G, pos=None, iterations=200)
-# igraph.plot(G, layout).show()
+# def update(i):
+#     ax.clear()
+#     positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, iterations=100)
+#     nx.draw_networkx_nodes(G, positions, node_size=20, label=None, node_color="blue", alpha=0.4)
+#     nx.draw_networkx_edges(G, positions, edge_color="green", alpha=0.05)
+#     ax.set_xticks([])
+#     ax.set_yticks([])
+
+# anim = FuncAnimation(fig, update, frames=5, interval=200, repeat=True)
+# #anim.save('most_recent_animation.gif', writer='imagemagick')
+# plt.show()
+
+
+
+# # equivalently
+# # import igraph
+# # G = igraph.Graph.TupleList(G.edges(), directed=False)
+# # layout = forceatlas2.forceatlas2_igraph_layout(G, pos=None, iterations=200)
+# # igraph.plot(G, layout).show()

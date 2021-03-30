@@ -70,7 +70,8 @@ class ForceAtlas2:
 
                  # Log
                  verbose=True,
-                 debugDisplayPlot=False):
+                 debugDisplayPlot=False,
+                 addedMsPerFrame=0):
         assert linLogMode == adjustSizes == multiThreaded == False, "You selected a feature that has not been implemented yet..."
         self.outboundAttractionDistribution = outboundAttractionDistribution
         self.linLogMode = linLogMode
@@ -88,6 +89,7 @@ class ForceAtlas2:
         self.gravity = gravity
         self.verbose = verbose
         self.debugDisplayPlot = debugDisplayPlot
+        self.addedMsPerFrame = addedMsPerFrame
 
     def init(self,
              G,  # a graph in 2D numpy ndarray format (or) scipy sparse matrix format
@@ -187,13 +189,15 @@ class ForceAtlas2:
 
         barneshut_timer = Timer(name="BarnesHut Approximation")
         repulsion_timer = Timer(name="Repulsion forces")
+        overlap_repulsion_timer = Timer(name="Overlap repulsion forces")
         gravity_timer = Timer(name="Gravitational forces")
         attraction_timer = Timer(name="Attraction forces")
         applyforces_timer = Timer(name="AdjustSpeedAndApplyForces step")
+        draw_timer = Timer(name="Drawing the plot")
 
         #for _i in niters:
         def execute_once(i):
-            nonlocal speed, speedEfficiency, nodes, edges, outboundAttCompensation, barneshut_timer, repulsion_timer, gravity_timer, attraction_timer, applyforces_timer, quadsizes
+            nonlocal speed, speedEfficiency, nodes, edges, outboundAttCompensation, barneshut_timer, repulsion_timer, overlap_repulsion_timer, gravity_timer, attraction_timer, applyforces_timer, quadsizes
 
             for n in nodes:
                 n.old_dx = n.dx
@@ -214,14 +218,16 @@ class ForceAtlas2:
             if self.barnesHutOptimize:
                 rootRegion.applyForceOnNodes(nodes, self.barnesHutTheta, self.scalingRatio)
             else:
-                fa2util.apply_repulsion(nodes, self.scalingRatio)
+                fa2util.apply_repulsion_fast(nodes, self.scalingRatio)
 
+            repulsion_timer.stop()
+            overlap_repulsion_timer.start()
             if quadsizes is not None:
                 CONS2 = 3 * i / iterations # linearly become more important
 
                 fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*CONS2, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
 
-            repulsion_timer.stop()
+            overlap_repulsion_timer.stop()
 
             # Gravitational forces
             gravity_timer.start()
@@ -256,10 +262,13 @@ class ForceAtlas2:
             applyforces_timer.stop()
 
         if self.debugDisplayPlot == True:
-            self.debugDisplayPlot = 0
+            self.debugDisplayPlot = 1
+        if self.debugDisplayPlot == 0:
+            self.debugDisplayPlot = False
         if type(self.debugDisplayPlot) is int or type(self.debugDisplayPlot) is float :
             def draw(i):
-                nonlocal ax
+                nonlocal draw_timer, ax, fig
+                draw_timer.start()
                 import networkx as nx
                 ax.clear()
                 oldG = nx.from_scipy_sparse_matrix(G)
@@ -277,6 +286,7 @@ class ForceAtlas2:
                 nx.draw_networkx_labels(oldG, positions, labels, font_size=10)
                 ax.set_xticks([])
                 ax.set_yticks([])
+                fig.suptitle(f'Iteration {i} of {iterations}', fontsize=15, va='top')
                 # if (i > 0):
                 #     from time import sleep
                 #     initialFrameTime = 1 # seconds
@@ -287,17 +297,32 @@ class ForceAtlas2:
                 #         accelerationFactor = 1 / accelerationFactor
                 #         sleeptime=initialFrameTime * accelerationFactor/(i+accelerationFactor)
                 #     sleep(sleeptime)
+                draw_timer.stop()
+            
+            if self.verbose: pbar = tqdm(total=iterations)
+            iterationCounter = 0
             def update(i):
-                execute_once(i)
-                if (i % 100 == 0):
-                    draw(i)
+                nonlocal iterationCounter
+                goUntil = int(i * iterations / self.debugDisplayPlot)
+                goUntil = min(goUntil, iterations)
+                while iterationCounter < goUntil:
+                    iterationCounter += 1
+                    execute_once(iterationCounter)
+                    if self.verbose: nonlocal pbar
+                    if self.verbose: pbar.update(1)
+                draw(iterationCounter)
+                #print("gountil " + str(goUntil))
+                #print("drawing " + str(iterationCounter))
+            
             import matplotlib.pyplot as plt
             from matplotlib.animation import FuncAnimation
             fig, ax = plt.subplots(figsize=(6,4))
             draw(0)
-            anim = FuncAnimation(fig, update, frames=iterations, interval=self.debugDisplayPlot, repeat=False)
+            anim = FuncAnimation(fig, update, frames=self.debugDisplayPlot+1,
+                interval=max(self.addedMsPerFrame, 10), repeat=False)
             #anim.save('most_recent_animation.gif', writer='imagemagick')
             plt.show()
+            if self.verbose: pbar.close()
 
         else: # no debugDisplayPlot
             # Each iteration of this loop represents a call to goAlgo().
@@ -305,15 +330,17 @@ class ForceAtlas2:
             if self.verbose:
                 niters = tqdm(niters)
             for i in niters:
-                execute_once()
+                execute_once(i)
         
         if self.verbose:
             if self.barnesHutOptimize:
                 barneshut_timer.display()
             repulsion_timer.display()
+            overlap_repulsion_timer.display()
             gravity_timer.display()
             attraction_timer.display()
             applyforces_timer.display()
+            draw_timer.display()
         # ================================================================
         return [(n.x, n.y) for n in nodes]
 
