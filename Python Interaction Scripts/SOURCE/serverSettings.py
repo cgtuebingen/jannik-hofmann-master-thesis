@@ -100,6 +100,9 @@ def checkSettings():
 	# as they contain a verbose warning describing the issue
 	# Any changes applied to the settings by this function should be broadcasted to the user!
 
+	POSITIVE_PARAMETERS = sorted(POSITIVE_PARAMETERS)
+	NEGATIVE_PARAMETERS = sorted(NEGATIVE_PARAMETERS)
+
 	if (SERVER_IP != "localhost" and SERVER_IP != "127.0.0.1" and
 		SERVER_IP != "::1" and ALLOW_REMOTE_CODE_EXECUTION):
 		msg = "SECURITY WARNING: Remote code execution over " + \
@@ -147,7 +150,7 @@ def checkSettings():
 
 	# Adds the server script path to a given path if it starts with / or \
 	def addServerScriptPath(filepath: str):
-		if (filepath.startswith(("\\", "/"))):
+		if filepath.startswith(("\\", "/")):
 			return centralController.SCRIPT_PATH() + filepath
 		else:
 			return filepath
@@ -167,9 +170,9 @@ def checkSettings():
 
 
 
-	# ----- ADD NEW SETTINGS CHECKS ABOVE THIS LINE
-
-	# Checking whether any local variables should've been global references to settings.
+	# ^ ^ ^ ^ ^ ADD NEW SETTINGS CHECKS ABOVE THIS LINE ^ ^ ^ ^ ^
+	# ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^
+	# Now checking whether any local variables should've been global references to settings.
 	# This ensures that this function really changes the settings
 	# instead of creating local variables in its function context.
 	localVariables = {varname for varname, value in locals().items() if
@@ -186,7 +189,7 @@ def checkSettings():
 		"Please add it to the list of global variables at the beginning of the " + \
 		"checkSettings-function in the serverSettings-file. Otherwise, checks and changes " + \
 		"to the settings are not applied properly.\n(This error can can be avoided by " + \
-		"renaming the local variable in the checkSettings-function)"
+		"renaming either the local or global variable in the checkSettings-function)"
 		#loggingFunctions.warn(msg, 18)
 		raise NameError(msg)
-	# PLEASE DO NOT ADD ANY SETTINGS CHECKS BELOW THIS LINE
+	return # DO NOT ADD ANY SETTINGS CHECKS HERE!

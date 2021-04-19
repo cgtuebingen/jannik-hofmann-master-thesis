@@ -23,6 +23,7 @@ import random
 import matplotlib.pyplot as plt
 import itertools
 import functools
+import networkx as nx
 
 # LOCAL IMPORTS
 import visualizationSettings as design
@@ -31,6 +32,7 @@ import serverCommands
 import loggingFunctions
 import serverSettings as setting
 import debugAndTesting
+from forceatlas2 import ForceAtlas2
 
 # Coordinates class stored 3 floats x, y, z
 class Coordinates:
@@ -591,9 +593,63 @@ async def drawstructureTreeBasic(connection = None):
 
 	return True
 
+
+# Draws the tfnet.layer structure via the client-connection
+# Returns whether we could successfully draw the architecture
+# If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
+# Using modified forceatlas2-algorithm for layouting
+async def drawstructureForceLayout(connection = None):
+	if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
+		# Wait, we can't draw that
+		return False
+	
+	graph = nx.Graph()
+	graph.add_nodes_from(range(len(ai.tfnet.layers)))
+	positioning = 0
+	positions = {}
+	sizes = []
+	for index, layer in enumerate(ai.tfnet.layers):
+		newSize = sizeFromLayerDimensions(layer[2]).scale(1, 1)
+		positioning += newSize.z/2
+		positions[index] = [positioning, np.random.random()*20-10]
+		positioning += newSize.z/2
+		positioning += design.horizontalSpaceBetweenLayers
+		sizes.append((newSize.z, newSize.y))
+		for indexParent, layerParent in enumerate(ai.tfnet.layers):
+			if layerParent[0] in layer[4]: # is a parent
+				graph.add_edge(indexParent, index)
+	
+	NUMBER_OF_ITERATIONS = 1000
+	NUMBER_OF_PLOTS = 20
+	forceatlas2 = ForceAtlas2(
+		# Behavior alternatives
+		outboundAttractionDistribution=True, # Dissuade hubs
+		edgeWeightInfluence=1.0,
+		orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
+		desiredHorizontalSpacing=0, # spacing between the nodes
+		desiredVerticalSpacing=0, # spacing between the nodes
+		bufferZone=design.horizontalSpaceBetweenLayers,
+
+		# Performance
+		jitterTolerance=1.0, # Tolerance
+		barnesHutOptimize=False,
+		barnesHutTheta=1.2,
+
+		# Tuning
+		scalingRatio=2.0,
+		strongGravityMode=False,
+		gravity=1.0,
+
+		# Log
+		verbose=False,
+		debugDisplayPlot=NUMBER_OF_PLOTS,
+		addedMsPerFrame=0
+	)
+	positions = forceatlas2.forceatlas2_networkx_layout(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
+
 # Choose which one to use on default
 async def drawstructure(connection = None):
-	await drawstructureTreeBasic(connection)
+	await drawstructureForceLayout(connection)
 
 
 
@@ -610,7 +666,7 @@ async def testVis():
 	else:
 		structure = debugAndTesting.const_fake_structure
 		await ai.parsestructure(None, structure)
-	await drawstructure()#Linearly()
+	await drawstructure()
 
 # call this module as main module, visualisation will be tested and displayed as a grahic
 if __name__ == '__main__':

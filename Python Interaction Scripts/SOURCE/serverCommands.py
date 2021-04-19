@@ -1186,7 +1186,10 @@ class Request:
 		'* This array is repeated as many times as there are layers in the network, and then ' +
 		'packaged into an array of itself\n' +
 		'layer_name and type are strings retrieved from tensorflow. dimensions usually have ' +
-		'nil/None as their first value due to tensorflow standards with dynamic batch sizes')
+		'nil/None as their first value due to tensorflow standards with dynamic batch sizes\n' +
+		'Layers will be layouted using the modified forceatlas2-algorithm.\n' +
+		'If first parameter is positive, the function will send a quad drawing instruction ' +
+		'for each layer. (Positive parameters are: ' + ', '.join(setting.POSITIVE_PARAMETERS) + ')')
 	commandList["tf get layers"] = commandAlias("tf get structure")
 
 
