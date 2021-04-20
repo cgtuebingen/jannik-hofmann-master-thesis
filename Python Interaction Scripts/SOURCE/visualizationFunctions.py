@@ -603,6 +603,7 @@ async def drawstructureForceLayout(connection = None):
 		# Wait, we can't draw that
 		return False
 	
+	# simple version with one individual node per layer:
 	graph = nx.Graph()
 	graph.add_nodes_from(range(len(ai.tfnet.layers)))
 	positioning = 0
@@ -611,14 +612,14 @@ async def drawstructureForceLayout(connection = None):
 	for index, layer in enumerate(ai.tfnet.layers):
 		newSize = sizeFromLayerDimensions(layer[2]).scale(1, 1)
 		positioning += newSize.z/2
-		positions[index] = [positioning, np.random.random()*20-10]
+		positions[index] = [positioning, 0] # np.random.random()*20-10]
 		positioning += newSize.z/2
 		positioning += design.horizontalSpaceBetweenLayers
 		sizes.append((newSize.z, newSize.y))
 		for indexParent, layerParent in enumerate(ai.tfnet.layers):
 			if layerParent[0] in layer[4]: # is a parent
 				graph.add_edge(indexParent, index)
-	
+
 	NUMBER_OF_ITERATIONS = 1000
 	NUMBER_OF_PLOTS = 20
 	forceatlas2 = ForceAtlas2(
@@ -629,6 +630,7 @@ async def drawstructureForceLayout(connection = None):
 		desiredHorizontalSpacing=0, # spacing between the nodes
 		desiredVerticalSpacing=0, # spacing between the nodes
 		bufferZone=design.horizontalSpaceBetweenLayers,
+    	groupLinearlyConnectedNodes=True, # only available with networkx layout
 
 		# Performance
 		jitterTolerance=1.0, # Tolerance
@@ -639,6 +641,7 @@ async def drawstructureForceLayout(connection = None):
 		scalingRatio=2.0,
 		strongGravityMode=False,
 		gravity=1.0,
+		randomlyOffsetNodes=10,
 
 		# Log
 		verbose=False,

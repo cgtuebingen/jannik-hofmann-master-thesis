@@ -28,6 +28,7 @@ from tqdm import tqdm
 
 #from . import fa2util
 import fa2util
+import itertools
 
 class Timer:
     def __init__(self, name="Timer"):
@@ -56,6 +57,7 @@ class ForceAtlas2:
         desiredHorizontalSpacing=50, # spacing between the nodes
         desiredVerticalSpacing=0, # spacing between the nodes
         bufferZone=50,
+        groupLinearlyConnectedNodes=False, # only available with networkx layout
 
         # Performance
         jitterTolerance=1.0,  # Tolerance
@@ -67,6 +69,7 @@ class ForceAtlas2:
         scalingRatio=2.0,
         strongGravityMode=False,
         gravity=1.0,
+        randomlyOffsetNodes=0.0,
 
         # Log
         verbose=True,
@@ -82,12 +85,14 @@ class ForceAtlas2:
         self.desiredHorizontalSpacing = desiredHorizontalSpacing
         self.desiredVerticalSpacing = desiredVerticalSpacing
         self.bufferZone = bufferZone
+        self.groupLinearlyConnectedNodes = groupLinearlyConnectedNodes
         self.jitterTolerance = jitterTolerance
         self.barnesHutOptimize = barnesHutOptimize
         self.barnesHutTheta = barnesHutTheta
         self.scalingRatio = scalingRatio
         self.strongGravityMode = strongGravityMode
         self.gravity = gravity
+        self.randomlyOffsetNodes = randomlyOffsetNodes
         self.verbose = verbose
         self.debugDisplayPlot = debugDisplayPlot
         self.addedMsPerFrame = addedMsPerFrame
@@ -170,9 +175,20 @@ class ForceAtlas2:
                     pos=None,  # Array of initial positions
                     quadsizes=None, # List of sizes of the graph nodes [(width, height)]
                     iterations=100,  # Number of times to iterate the main loop
+                    groups=None,
+                    individualG=None,
+                    individualPosOffset=None,
+                    individualSizes=None,
                     ):
         # Initializing, initAlgo()
         # ================================================================
+
+        if self.groupLinearlyConnectedNodes:
+            assert groups is not None and individualG is not None and \
+                individualPosOffset is not None and individualSizes is not None
+
+        if self.randomlyOffsetNodes != 0.0:
+            pos += (numpy.random.rand(*pos.shape) - 0.5) * self.randomlyOffsetNodes
 
         # speed and speedEfficiency describe a scaling factor of dx and dy
         # before x and y are adjusted.  These are modified as the
@@ -262,11 +278,9 @@ class ForceAtlas2:
             speedEfficiency = values['speedEfficiency']
             applyforces_timer.stop()
 
-        if self.debugDisplayPlot == True:
-            self.debugDisplayPlot = 1
-        if self.debugDisplayPlot == 0:
-            self.debugDisplayPlot = False
-        if type(self.debugDisplayPlot) is int or type(self.debugDisplayPlot) is float :
+        if self.debugDisplayPlot == 0: self.debugDisplayPlot = False
+        if self.debugDisplayPlot == True: self.debugDisplayPlot = 1
+        if type(self.debugDisplayPlot) in (int, float):
             def draw(i):
                 nonlocal draw_timer, ax, fig
                 draw_timer.start()
@@ -275,16 +289,42 @@ class ForceAtlas2:
                 oldG = nx.from_scipy_sparse_matrix(G)
                 positions = dict(zip(oldG.nodes(), [(n.x, n.y) for n in nodes]))
                 labels = dict(zip(oldG.nodes(), range(G.shape[0])))
-                nx.draw_networkx_nodes(oldG, positions, node_size=50, label=None, node_color="white", alpha=0.94)
+                if not self.groupLinearlyConnectedNodes:
+                    nx.draw_networkx_nodes(oldG, positions, node_size=50, label=None, node_color="white", alpha=0.94)
                 if quadsizes is not None:
                     for n in nodes:
                         from matplotlib import patches
+                        color = (.2,.3,0,.2) if self.groupLinearlyConnectedNodes else (.5,0,0,.3)
                         rect = patches.Rectangle((n.x-quadsizes[n.id][0]/2, n.y-quadsizes[n.id][1]/2),
-                            quadsizes[n.id][0], quadsizes[n.id][1], edgecolor=(.5,0,0,.3), fill=False)
+                            quadsizes[n.id][0], quadsizes[n.id][1], edgecolor=color, fill=False)
                         ax.add_patch(rect)
-                nx.draw_networkx_edges(oldG, positions, edge_color="blue", alpha=0.505)
-                nx.draw_networkx_labels(oldG, positions, labels, font_size=11, font_weight='bold', font_color='white')
-                nx.draw_networkx_labels(oldG, positions, labels, font_size=10)
+                if not self.groupLinearlyConnectedNodes:
+                    nx.draw_networkx_edges(oldG, positions, edge_color="blue", alpha=0.505)
+                    nx.draw_networkx_labels(oldG, positions, labels, font_size=11, font_weight='bold', font_color='white')
+                    nx.draw_networkx_labels(oldG, positions, labels, font_size=10, font_color='black')
+
+                if self.groupLinearlyConnectedNodes: # draw individual nodes
+                    indG = nx.from_scipy_sparse_matrix(individualG)
+                    individualPositions = []
+                    for index in range(len(indG)):
+                        x, y = 0, 0
+                        for g, group in enumerate(groups):
+                            for n, node in enumerate(group):
+                                if index == node:
+                                    x = positions[g][0] + individualPosOffset[g][n][0]
+                                    y = positions[g][1] + individualPosOffset[g][n][1]
+                        individualPositions.append([x, y])
+                    labels = dict(zip(indG.nodes(), range(individualG.shape[0])))
+                    nx.draw_networkx_nodes(indG, individualPositions, node_size=50, label=None, node_color="white", alpha=0.94)
+                    if individualSizes is not None:
+                        for n in range(len(individualSizes)):
+                            from matplotlib import patches
+                            rect = patches.Rectangle((individualPositions[n][0]-individualSizes[n][0]/2, individualPositions[n][1]-individualSizes[n][1]/2),
+                                individualSizes[n][0], individualSizes[n][1], edgecolor=(.5,0,0,.3), fill=False)
+                            ax.add_patch(rect)
+                    nx.draw_networkx_edges(indG, individualPositions, edge_color="blue", alpha=0.505)
+                    nx.draw_networkx_labels(indG, individualPositions, labels, font_size=11, font_weight='bold', font_color='white')
+                    nx.draw_networkx_labels(indG, individualPositions, labels, font_size=10, font_color='black')
                 ax.set_xticks([])
                 ax.set_yticks([])
                 fig.suptitle(f'Iteration {i} of {iterations}', fontsize=15, va='top')
@@ -361,7 +401,97 @@ class ForceAtlas2:
             or (cynetworkx and isinstance(G, cynetworkx.classes.graph.Graph))
         ), "Not a networkx graph"
         assert isinstance(pos, dict) or (pos is None), "pos must be specified as a dictionary, as in networkx"
+        assert not(self.groupLinearlyConnectedNodes and pos is None), \
+            "can only group linearly connected nodes when a list of positions is given"
+
         M = networkx.to_scipy_sparse_matrix(G, dtype='f', format='lil', weight=weight_attr)
+        
+        if self.groupLinearlyConnectedNodes:
+            def connectedIndices(index):
+                return scipy.sparse.find(M[index])[1].tolist()
+            def connectedIndicesHigher(index):
+                return [i for i in connectedIndices(index) if i > index]
+            def connectedIndicesLower(index):
+                return [i for i in connectedIndices(index) if i < index]
+            flatten = itertools.chain.from_iterable
+            groups = []
+            for index in range(len(G)):
+                if len(connectedIndicesHigher(index)) == 1:
+                    otherindex = connectedIndicesHigher(index)[0]
+                    if len(connectedIndicesLower(otherindex)) == 1:
+                        # Grouping node index with otherindex
+                        #print(f"Grouping {index} with {otherindex}")
+                        if index not in flatten(groups): # create new group
+                            groups.append([index, otherindex])
+                        else: # add to existing group
+                            for group in groups:
+                                if index in group:
+                                    group.append(otherindex)
+                    else:
+                        # check if index is already contained in any group
+                        if index not in flatten(groups):
+                            groups.append([index]) # layer is not grouped, stays alone
+            
+            graph = networkx.Graph()
+            graph.add_nodes_from(range(len(groups)))
+            for index in range(len(G)):
+                group1 = None
+                for g, group in enumerate(groups):
+                    if index in group:
+                        group1 = g
+                for otherindex in connectedIndicesHigher(index):
+                    group2 = None
+                    for g, group in enumerate(groups):
+                        if otherindex in group:
+                            group2 = g
+                    if group1 is not None and group2 is not None and group1 != group2:
+                        graph.add_edge(group1, group2)
+            GroupedM = networkx.to_scipy_sparse_matrix(graph, dtype='f', format='lil', weight=weight_attr)
+
+            groupspos = {}
+            groupssize = []
+            groupsoffsets = []
+            for index, group in enumerate(groups):
+                NAIVE = False
+                if NAIVE: # naive alignment just takes the original node positions
+                    minx = pos[group[0]][0] - quadsizes[group[0]][0]/2
+                    maxx = pos[group[0]][0] + quadsizes[group[0]][0]/2
+                    miny = pos[group[0]][1] - quadsizes[group[0]][1]/2
+                    maxy = pos[group[0]][1] + quadsizes[group[0]][1]/2
+                    for node in group[1:]:
+                        minx = min(minx, pos[node][0] - quadsizes[node][0]/2)
+                        maxx = max(maxx, pos[node][0] + quadsizes[node][0]/2)
+                        miny = min(miny, pos[node][1] - quadsizes[node][1]/2)
+                        maxy = max(maxy, pos[node][1] + quadsizes[node][1]/2)
+                    #print(f"group min ({minx}, {miny}) max ({maxx}, {maxy})")
+                    groupspos[index] = [(minx+maxx)/2, (miny+maxy)/2]
+                    groupssize.append((maxx-minx, maxy-miny))
+                    offsets = []
+                    for node in group:
+                        offsets.append([pos[node][0]-groupspos[index][0], pos[node][1]-groupspos[index][1]])
+                    groupsoffsets.append(offsets)
+                else: # use position of first node, then align horizontally with desired spacing + buffer
+                    groupwidth = - self.desiredHorizontalSpacing - self.bufferZone
+                    maxheight = 0
+                    for node in group:
+                        groupwidth += quadsizes[node][0]
+                        groupwidth += self.desiredHorizontalSpacing + self.bufferZone
+                        maxheight = max(maxheight, quadsizes[node][1])
+                    groupssize.append((groupwidth, maxheight))
+                    groupspos[index] = [pos[group[0]][0] - quadsizes[0][0]/2 + groupwidth/2, pos[group[0]][1]]
+                    offsets = []
+                    offset = - groupwidth / 2
+                    for node in group:
+                        offset += quadsizes[node][0] / 2
+                        offsets.append([offset, 0])
+                        offset += quadsizes[node][0] / 2
+                        offset += self.desiredHorizontalSpacing + self.bufferZone
+                    groupsoffsets.append(offsets)
+     
+            groupssize = numpy.array(groupssize)
+            
+            #return
+
         if quadsizes is not None:
             if not isinstance(quadsizes, numpy.ndarray):
                 quadsizes = numpy.array(quadsizes)
@@ -372,8 +502,13 @@ class ForceAtlas2:
         if pos is None:
             l = self.forceatlas2(M, pos=None, quadsizes=quadsizes, iterations=iterations)
         else:
-            poslist = numpy.asarray([pos[i] for i in G.nodes()])
-            l = self.forceatlas2(M, pos=poslist, quadsizes=quadsizes, iterations=iterations)
+            if self.groupLinearlyConnectedNodes:
+                groupsposlist = numpy.asarray([groupspos[i] for i in graph.nodes()])
+                l = self.forceatlas2(GroupedM, pos=groupsposlist, quadsizes=groupssize, iterations=iterations,
+                    groups=groups, individualG=M, individualPosOffset=groupsoffsets, individualSizes=quadsizes)
+            else:
+                poslist = numpy.asarray([pos[i] for i in G.nodes()])
+                l = self.forceatlas2(M, pos=poslist, quadsizes=quadsizes, iterations=iterations)
         return dict(zip(G.nodes(), l))
 
     # A layout for igraph.

@@ -23,8 +23,8 @@ layerColors = {
 	"default": (.4),
 }
 
-horizontalSpaceBetweenLayers = 300
-verticalSpaceBetweenLayers = 300
+horizontalSpaceBetweenLayers = 100
+verticalSpaceBetweenLayers = 100
 drawConnections = True
 angledConnections = True
 connectionColor = .3
