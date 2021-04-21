@@ -30,6 +30,8 @@ from tqdm import tqdm
 #from . import fa2util
 import fa2util
 import itertools
+import math
+import functools
 
 class Timer:
     def __init__(self, name="Timer"):
@@ -215,6 +217,20 @@ class ForceAtlas2:
         applyforces_timer = Timer(name="AdjustSpeedAndApplyForces step")
         draw_timer = Timer(name="Drawing the plot")
 
+        # exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
+        # exponentialCurveFactorpositive: curved downward, negative: curved upward
+        # reverse: False = from 0 to 1, True = from 1 to 0
+        # see https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+%5B0%2C1%5D
+        @functools.lru_cache(maxsize=10)
+        def exponentialCurve(i, exponentialCurveFactor, reverse = False):
+            x = i / iterations
+            if reverse:
+                x = 1 - x
+            if exponentialCurveFactor == 0:
+                return x
+            return (math.e**(exponentialCurveFactor*x) / math.e - 1/math.e) / \
+                (math.e**exponentialCurveFactor / math.e - 1/math.e)
+
         #for _i in niters:
         def execute_once(i):
             nonlocal speed, speedEfficiency, nodes, edges, outboundAttCompensation, barneshut_timer, repulsion_timer, overlap_repulsion_timer, gravity_timer, attraction_timer, applyforces_timer, quadsizes
@@ -243,7 +259,7 @@ class ForceAtlas2:
             repulsion_timer.stop()
             overlap_repulsion_timer.start()
             if quadsizes is not None:
-                CONS2 = 3 * i / iterations # linearly become more important
+                CONS2 = 3 * exponentialCurve(i, 1)
 
                 fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*CONS2, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
 
@@ -252,7 +268,7 @@ class ForceAtlas2:
             # Gravitational forces
             gravity_timer.start()
 
-            scalingFactor = self.scalingRatio * (1 - i / iterations) # linearly become less important
+            scalingFactor = self.scalingRatio * exponentialCurve(i, 1, True)
             fa2util.apply_gravity(nodes, self.gravity, scalingRatio=scalingFactor, useStrongGravity=self.strongGravityMode)
 
             gravity_timer.stop()
@@ -260,7 +276,7 @@ class ForceAtlas2:
             # If other forms of attraction were implemented they would be selected here.
             attraction_timer.start()
             if self.orderconnectedQuadsOnXaxis:
-                CONS1 = 100 * (1 - i / iterations) # linearly become less important to the end
+                CONS1 = 100 * exponentialCurve(i, 1, True)
 
                 fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*CONS1, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
 
@@ -268,7 +284,7 @@ class ForceAtlas2:
                 fa2util.apply_attraction(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation, self.edgeWeightInfluence)
             # order along x axis: directional attraction
             if self.orderconnectedQuadsOnXaxis:
-                CONS0 = 1000 * i / iterations * (1 - i / iterations) # linearly become more and then less important
+                CONS0 = 1000 * exponentialCurve(i, 1) * exponentialCurve(i, 1, True)
 
                 fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, CONS0, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
                 
