@@ -22,6 +22,7 @@ import random
 from sys import version_info
 import time
 
+import networkx
 import numpy
 import scipy
 from tqdm import tqdm
@@ -54,8 +55,9 @@ class ForceAtlas2:
         adjustSizes=False,  # Prevent overlap (NOT IMPLEMENTED)
         edgeWeightInfluence=1.0,
         orderconnectedQuadsOnXaxis=False, # orders connected nodes by their index on x axis
-        desiredHorizontalSpacing=50, # spacing between the nodes
         desiredVerticalSpacing=0, # spacing between the nodes
+        desiredHorizontalSpacing=50, # spacing between the nodes
+        desiredHorizontalSpacingWithinGroup=None, # spacing between the nodes
         bufferZone=50,
         groupLinearlyConnectedNodes=False, # only available with networkx layout
 
@@ -84,6 +86,7 @@ class ForceAtlas2:
         self.orderconnectedQuadsOnXaxis = orderconnectedQuadsOnXaxis
         self.desiredHorizontalSpacing = desiredHorizontalSpacing
         self.desiredVerticalSpacing = desiredVerticalSpacing
+        self.desiredHorizontalSpacingWithinGroup = desiredHorizontalSpacingWithinGroup
         self.bufferZone = bufferZone
         self.groupLinearlyConnectedNodes = groupLinearlyConnectedNodes
         self.jitterTolerance = jitterTolerance
@@ -265,7 +268,7 @@ class ForceAtlas2:
                 fa2util.apply_attraction(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation, self.edgeWeightInfluence)
             # order along x axis: directional attraction
             if self.orderconnectedQuadsOnXaxis:
-                CONS0 = 100 * i / iterations * (1 - i / iterations) # linearly become more and then less important
+                CONS0 = 1000 * i / iterations * (1 - i / iterations) # linearly become more and then less important
 
                 fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, CONS0, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
                 
@@ -383,14 +386,108 @@ class ForceAtlas2:
             applyforces_timer.display()
             draw_timer.display()
         # ================================================================
-        return [(n.x, n.y) for n in nodes]
+        if self.groupLinearlyConnectedNodes:
+            layerposition = {}
+            for g, group in enumerate(groups):
+                for l, layer in enumerate(group):
+                    layerposition[layer] = (nodes[g].x + individualPosOffset[g][l][0], nodes[g].y)
+            return [layerposition[i] for i in range(len(individualSizes))]        
+        else:
+            return [(n.x, n.y) for n in nodes]
+
+    def groupNodes(self, G, pos, quadsizes, weight_attr):
+        if self.desiredHorizontalSpacingWithinGroup == None:
+            self.desiredHorizontalSpacingWithinGroup = self.desiredHorizontalSpacing
+
+        M = networkx.to_scipy_sparse_matrix(G, dtype='f', format='lil', weight=weight_attr)
+        
+        def connectedIndices(index):
+            return scipy.sparse.find(M[index])[1].tolist()
+        def connectedIndicesHigher(index):
+            return [i for i in connectedIndices(index) if i > index]
+        def connectedIndicesLower(index):
+            return [i for i in connectedIndices(index) if i < index]
+        flatten = itertools.chain.from_iterable
+        groups = []
+        for index in range(len(G)):
+            if len(connectedIndicesHigher(index)) == 1:
+                otherindex = connectedIndicesHigher(index)[0]
+                if len(connectedIndicesLower(otherindex)) == 1:
+                    # Grouping node index with otherindex
+                    #print(f"Grouping {index} with {otherindex}")
+                    if index not in flatten(groups): # create new group
+                        groups.append([index, otherindex])
+                    else: # add to existing group
+                        for group in groups:
+                            if index in group:
+                                group.append(otherindex)
+                else:
+                    # check if index is already contained in any group
+                    if index not in flatten(groups):
+                        groups.append([index]) # layer is not grouped, stays alone
+        
+        graph = networkx.Graph()
+        graph.add_nodes_from(range(len(groups)))
+        for index in range(len(G)):
+            group1 = None
+            for g, group in enumerate(groups):
+                if index in group:
+                    group1 = g
+            for otherindex in connectedIndicesHigher(index):
+                group2 = None
+                for g, group in enumerate(groups):
+                    if otherindex in group:
+                        group2 = g
+                if group1 is not None and group2 is not None and group1 != group2:
+                    graph.add_edge(group1, group2)
+        GroupedM = networkx.to_scipy_sparse_matrix(graph, dtype='f', format='lil', weight=weight_attr)
+
+        groupspos, groupssize, groupsoffsets = {}, [], []
+        for index, group in enumerate(groups):
+            NAIVE = False
+            if NAIVE: # naive alignment just takes the original node positions
+                minx = pos[group[0]][0] - quadsizes[group[0]][0]/2
+                maxx = pos[group[0]][0] + quadsizes[group[0]][0]/2
+                miny = pos[group[0]][1] - quadsizes[group[0]][1]/2
+                maxy = pos[group[0]][1] + quadsizes[group[0]][1]/2
+                for node in group[1:]:
+                    minx = min(minx, pos[node][0] - quadsizes[node][0]/2)
+                    maxx = max(maxx, pos[node][0] + quadsizes[node][0]/2)
+                    miny = min(miny, pos[node][1] - quadsizes[node][1]/2)
+                    maxy = max(maxy, pos[node][1] + quadsizes[node][1]/2)
+                #print(f"group min ({minx}, {miny}) max ({maxx}, {maxy})")
+                groupspos[index] = [(minx+maxx)/2, (miny+maxy)/2]
+                groupssize.append((maxx-minx, maxy-miny))
+                offsets = []
+                for node in group:
+                    offsets.append([pos[node][0]-groupspos[index][0], pos[node][1]-groupspos[index][1]])
+                groupsoffsets.append(offsets)
+            else: # use position of first node, then align horizontally with desired spacing + buffer
+                groupwidth = - self.desiredHorizontalSpacingWithinGroup - self.bufferZone
+                maxheight = 0
+                for node in group:
+                    groupwidth += quadsizes[node][0]
+                    groupwidth += self.desiredHorizontalSpacingWithinGroup + self.bufferZone
+                    maxheight = max(maxheight, quadsizes[node][1])
+                groupssize.append((groupwidth, maxheight))
+                groupspos[index] = [pos[group[0]][0] - quadsizes[0][0]/2 + groupwidth/2, pos[group[0]][1]]
+                offsets = []
+                offset = - groupwidth / 2
+                for node in group:
+                    offset += quadsizes[node][0] / 2
+                    offsets.append([offset, 0])
+                    offset += quadsizes[node][0] / 2
+                    offset += self.desiredHorizontalSpacingWithinGroup + self.bufferZone
+                groupsoffsets.append(offsets)
+        groupssize = numpy.array(groupssize)
+
+        return graph, groups, GroupedM, groupspos, groupssize, groupsoffsets
 
     # A layout for NetworkX.
     #
     # This function returns a NetworkX layout, which is really just a
     # dictionary of node positions (2D X-Y tuples) indexed by the node name.
     def forceatlas2_networkx_layout(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
-        import networkx
         try:
             import cynetworkx
         except ImportError:
@@ -407,90 +504,7 @@ class ForceAtlas2:
         M = networkx.to_scipy_sparse_matrix(G, dtype='f', format='lil', weight=weight_attr)
         
         if self.groupLinearlyConnectedNodes:
-            def connectedIndices(index):
-                return scipy.sparse.find(M[index])[1].tolist()
-            def connectedIndicesHigher(index):
-                return [i for i in connectedIndices(index) if i > index]
-            def connectedIndicesLower(index):
-                return [i for i in connectedIndices(index) if i < index]
-            flatten = itertools.chain.from_iterable
-            groups = []
-            for index in range(len(G)):
-                if len(connectedIndicesHigher(index)) == 1:
-                    otherindex = connectedIndicesHigher(index)[0]
-                    if len(connectedIndicesLower(otherindex)) == 1:
-                        # Grouping node index with otherindex
-                        #print(f"Grouping {index} with {otherindex}")
-                        if index not in flatten(groups): # create new group
-                            groups.append([index, otherindex])
-                        else: # add to existing group
-                            for group in groups:
-                                if index in group:
-                                    group.append(otherindex)
-                    else:
-                        # check if index is already contained in any group
-                        if index not in flatten(groups):
-                            groups.append([index]) # layer is not grouped, stays alone
-            
-            graph = networkx.Graph()
-            graph.add_nodes_from(range(len(groups)))
-            for index in range(len(G)):
-                group1 = None
-                for g, group in enumerate(groups):
-                    if index in group:
-                        group1 = g
-                for otherindex in connectedIndicesHigher(index):
-                    group2 = None
-                    for g, group in enumerate(groups):
-                        if otherindex in group:
-                            group2 = g
-                    if group1 is not None and group2 is not None and group1 != group2:
-                        graph.add_edge(group1, group2)
-            GroupedM = networkx.to_scipy_sparse_matrix(graph, dtype='f', format='lil', weight=weight_attr)
-
-            groupspos = {}
-            groupssize = []
-            groupsoffsets = []
-            for index, group in enumerate(groups):
-                NAIVE = False
-                if NAIVE: # naive alignment just takes the original node positions
-                    minx = pos[group[0]][0] - quadsizes[group[0]][0]/2
-                    maxx = pos[group[0]][0] + quadsizes[group[0]][0]/2
-                    miny = pos[group[0]][1] - quadsizes[group[0]][1]/2
-                    maxy = pos[group[0]][1] + quadsizes[group[0]][1]/2
-                    for node in group[1:]:
-                        minx = min(minx, pos[node][0] - quadsizes[node][0]/2)
-                        maxx = max(maxx, pos[node][0] + quadsizes[node][0]/2)
-                        miny = min(miny, pos[node][1] - quadsizes[node][1]/2)
-                        maxy = max(maxy, pos[node][1] + quadsizes[node][1]/2)
-                    #print(f"group min ({minx}, {miny}) max ({maxx}, {maxy})")
-                    groupspos[index] = [(minx+maxx)/2, (miny+maxy)/2]
-                    groupssize.append((maxx-minx, maxy-miny))
-                    offsets = []
-                    for node in group:
-                        offsets.append([pos[node][0]-groupspos[index][0], pos[node][1]-groupspos[index][1]])
-                    groupsoffsets.append(offsets)
-                else: # use position of first node, then align horizontally with desired spacing + buffer
-                    groupwidth = - self.desiredHorizontalSpacing - self.bufferZone
-                    maxheight = 0
-                    for node in group:
-                        groupwidth += quadsizes[node][0]
-                        groupwidth += self.desiredHorizontalSpacing + self.bufferZone
-                        maxheight = max(maxheight, quadsizes[node][1])
-                    groupssize.append((groupwidth, maxheight))
-                    groupspos[index] = [pos[group[0]][0] - quadsizes[0][0]/2 + groupwidth/2, pos[group[0]][1]]
-                    offsets = []
-                    offset = - groupwidth / 2
-                    for node in group:
-                        offset += quadsizes[node][0] / 2
-                        offsets.append([offset, 0])
-                        offset += quadsizes[node][0] / 2
-                        offset += self.desiredHorizontalSpacing + self.bufferZone
-                    groupsoffsets.append(offsets)
-     
-            groupssize = numpy.array(groupssize)
-            
-            #return
+            graph, groups, GroupedM, groupspos, groupssize, groupsoffsets = self.groupNodes(G, pos, quadsizes, weight_attr)
 
         if quadsizes is not None:
             if not isinstance(quadsizes, numpy.ndarray):
@@ -536,6 +550,9 @@ class ForceAtlas2:
             pos = numpy.array(pos)
         assert isinstance(pos, numpy.ndarray) or (pos is None), "pos must be a list or numpy array"
 
+        if self.groupLinearlyConnectedNodes:
+            graph, groups, GroupedM, groupspos, groupssize, groupsoffsets = self.groupNodes(G, pos, quadsizes)
+
         if quadsizes is not None:
             if not isinstance(quadsizes, numpy.ndarray):
                 quadsizes = numpy.array(quadsizes)
@@ -545,6 +562,12 @@ class ForceAtlas2:
                 "quadsizes has the wrong dimensions. Each node entry must have exactly two float values: width and height"
 
         adj = to_sparse(G, weight_attr)
-        coords = self.forceatlas2(adj, pos=pos, quadsizes=quadsizes, iterations=iterations)
+        if self.groupLinearlyConnectedNodes:
+            groupsposlist = numpy.asarray([groupspos[i] for i in graph.nodes()])
+            coords = self.forceatlas2(GroupedM, pos=groupsposlist, quadsizes=groupssize, iterations=iterations,
+                groups=groups, individualG=adj, individualPosOffset=groupsoffsets, individualSizes=quadsizes)
+        else:
+            poslist = numpy.asarray([pos[i] for i in G.nodes()])
+            coords = self.forceatlas2(adj, pos=poslist, quadsizes=quadsizes, iterations=iterations)
 
         return igraph.layout.Layout(coords, 2)

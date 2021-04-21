@@ -307,8 +307,7 @@ async def drawstructureLinearly(connection = None):
 		# Shift the position, so layers don't overlap
 		position.add(z = size/2)
 		# Check if actually connected to previously drawn layer
-		if design.additionalDistanceBetweenUnconnectedLayers and \
-			not ai.tfnet.layers[index-1][0] in layer[4]:
+		if not ai.tfnet.layers[index-1][0] in layer[4]:
 				position.add(z = 1000) # increase distance between unconnected layers
 		# Retrieve color for this layer type
 		color = design.layerColors.get(layer[1].lower(),
@@ -593,6 +592,56 @@ async def drawstructureTreeBasic(connection = None):
 
 	return True
 
+async def drawLayout(connection, positions):
+	positionOffset = Coordinates(0, positions[0][1], positions[0][0]).scale(-1)
+	drawnLayers = [] # For later reference for drawing layer connections
+
+	# If no connection has been given, initialize matplotlib
+	if connection is None:
+		plt.axes()
+	
+	Layer.resetAllLayers()
+
+	for index, layer in enumerate(ai.tfnet.layers):
+		# Create layer instance and append it to layerList
+		Layer.layerList.append(Layer(
+			position = (positionOffset + (0, positions[index][1], positions[index][0])) * (50, 1),
+			size = sizeFromLayerDimensions(layer[2]) * (50, 1),
+			parents = layer[4],
+			color = layer[1],
+			index = index))
+	
+	for current in Layer.layerList:
+		await spawnCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
+		for parent in current.parents:
+			y = parent.position.y
+			z = parent.position.z
+			yy = current.position.y
+			zz = current.position.z
+			deltay = yy-y
+			deltaz = zz-z
+			drawIt = True
+			if deltay == 0:
+				#drawIt = False
+				alpha = math.pi/2
+				long = deltaz
+			else:
+				alpha = math.atan(deltaz/deltay)
+				long = deltay / math.cos(alpha)
+			if drawIt:
+				await spawnCuboid(connection,
+					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
+					Coordinates(design.connectionStrength, z = long),
+					color = design.connectionColor,
+					rotator = Coordinates(x = 90-math.degrees(-alpha)),
+					positionIsCenterPoint = True)
+
+	# Displaying plot if no client connection was given
+	if connection is None:
+		plt.axis('auto')
+		plt.show()
+
+	return True
 
 # Draws the tfnet.layer structure via the client-connection
 # Returns whether we could successfully draw the architecture
@@ -614,22 +663,23 @@ async def drawstructureForceLayout(connection = None):
 		positioning += newSize.z/2
 		positions[index] = [positioning, 0] # np.random.random()*20-10]
 		positioning += newSize.z/2
-		positioning += design.horizontalSpaceBetweenLayers
+		positioning += design.horizontalSpaceBetweenLayers * 5
 		sizes.append((newSize.z, newSize.y))
 		for indexParent, layerParent in enumerate(ai.tfnet.layers):
 			if layerParent[0] in layer[4]: # is a parent
 				graph.add_edge(indexParent, index)
 
 	NUMBER_OF_ITERATIONS = 1000
-	NUMBER_OF_PLOTS = 20
+	NUMBER_OF_PLOTS = 0
 	forceatlas2 = ForceAtlas2(
 		# Behavior alternatives
 		outboundAttractionDistribution=True, # Dissuade hubs
 		edgeWeightInfluence=1.0,
 		orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
-		desiredHorizontalSpacing=0, # spacing between the nodes
-		desiredVerticalSpacing=0, # spacing between the nodes
 		bufferZone=design.horizontalSpaceBetweenLayers,
+		desiredVerticalSpacing=design.verticalSpaceBetweenLayers-design.horizontalSpaceBetweenLayers,
+		desiredHorizontalSpacing=500, # spacing between the nodes
+		desiredHorizontalSpacingWithinGroup=design.horizontalSpaceBetweenGroupedLayers-design.horizontalSpaceBetweenLayers, # spacing between the nodes
     	groupLinearlyConnectedNodes=True, # only available with networkx layout
 
 		# Performance
@@ -649,9 +699,12 @@ async def drawstructureForceLayout(connection = None):
 		addedMsPerFrame=0
 	)
 	positions = forceatlas2.forceatlas2_networkx_layout(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
+	
+	return await drawLayout(connection, positions)
 
 # Choose which one to use on default
 async def drawstructure(connection = None):
+	#await drawstructureLinearly(connection)
 	await drawstructureForceLayout(connection)
 
 

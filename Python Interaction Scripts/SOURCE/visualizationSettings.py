@@ -22,14 +22,14 @@ layerColors = {
 	# For anything unknown / unspecified. This "default" value always needs to be kept!
 	"default": (.4),
 }
+connectionColor = .3
 
-horizontalSpaceBetweenLayers = 100
+horizontalSpaceBetweenLayers = 500
+horizontalSpaceBetweenGroupedLayers = 100
 verticalSpaceBetweenLayers = 100
 drawConnections = True
 angledConnections = True
-connectionColor = .3
 connectionStrength = 70
-additionalDistanceBetweenUnconnectedLayers = True
 
 # INITIALIZATIONS
 
