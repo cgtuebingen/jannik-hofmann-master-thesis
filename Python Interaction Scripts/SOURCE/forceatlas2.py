@@ -259,34 +259,34 @@ class ForceAtlas2:
             repulsion_timer.stop()
             overlap_repulsion_timer.start()
             if quadsizes is not None:
-                CONS2 = 3 * exponentialCurve(i, 1)
 
-                fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*CONS2, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
+                strength = 3 * exponentialCurve(i, 1)
+                fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*strength, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
 
             overlap_repulsion_timer.stop()
 
             # Gravitational forces
             gravity_timer.start()
 
-            scalingFactor = self.scalingRatio * exponentialCurve(i, 1, True)
-            fa2util.apply_gravity(nodes, self.gravity, scalingRatio=scalingFactor, useStrongGravity=self.strongGravityMode)
+            strength = exponentialCurve(i, 1, True)
+            fa2util.apply_gravity(nodes, self.gravity, scalingRatio=self.scalingRatio*strength, useStrongGravity=self.strongGravityMode)
 
             gravity_timer.stop()
 
             # If other forms of attraction were implemented they would be selected here.
             attraction_timer.start()
             if self.orderconnectedQuadsOnXaxis:
-                CONS1 = 100 * exponentialCurve(i, 1, True)
-
-                fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*CONS1, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
+                
+                strength = 100 * exponentialCurve(i, 1, True)
+                fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
 
             else:
                 fa2util.apply_attraction(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation, self.edgeWeightInfluence)
             # order along x axis: directional attraction
             if self.orderconnectedQuadsOnXaxis:
-                CONS0 = 1000 * exponentialCurve(i, 1) * exponentialCurve(i, 1, True)
 
-                fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, CONS0, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
+                strength = 1000 * exponentialCurve(i, 1) * exponentialCurve(i, 1, True)
+                fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
                 
             attraction_timer.stop()
 
