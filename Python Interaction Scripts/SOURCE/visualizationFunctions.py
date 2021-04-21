@@ -605,8 +605,8 @@ async def drawLayout(connection, positions):
 	for index, layer in enumerate(ai.tfnet.layers):
 		# Create layer instance and append it to layerList
 		Layer.layerList.append(Layer(
-			position = (positionOffset + (0, positions[index][1], positions[index][0])) * (50, 1),
-			size = sizeFromLayerDimensions(layer[2]) * (50, 1),
+			position = (positionOffset + (0, positions[index][1], positions[index][0])),
+			size = sizeFromLayerDimensions(layer[2]).scale(50, 1),
 			parents = layer[4],
 			color = layer[1],
 			index = index))
@@ -621,6 +621,9 @@ async def drawLayout(connection, positions):
 			deltay = yy-y
 			deltaz = zz-z
 			drawIt = True
+			thickness = min(design.connectionStrength,
+				parent.size.x/2, parent.size.y/2,
+				current.size.x/2, current.size.y/2)
 			if deltay == 0:
 				#drawIt = False
 				alpha = math.pi/2
@@ -631,7 +634,7 @@ async def drawLayout(connection, positions):
 			if drawIt:
 				await spawnCuboid(connection,
 					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
-					Coordinates(design.connectionStrength, z = long),
+					Coordinates(thickness, z = long),
 					color = design.connectionColor,
 					rotator = Coordinates(x = 90-math.degrees(-alpha)),
 					positionIsCenterPoint = True)
@@ -659,7 +662,7 @@ async def drawstructureForceLayout(connection = None):
 	positions = {}
 	sizes = []
 	for index, layer in enumerate(ai.tfnet.layers):
-		newSize = sizeFromLayerDimensions(layer[2]).scale(1, 1)
+		newSize = sizeFromLayerDimensions(layer[2]).scale(50, 1)
 		positioning += newSize.z/2
 		positions[index] = [positioning, 0] # np.random.random()*20-10]
 		positioning += newSize.z/2
@@ -670,7 +673,7 @@ async def drawstructureForceLayout(connection = None):
 				graph.add_edge(indexParent, index)
 
 	NUMBER_OF_ITERATIONS = 1000
-	NUMBER_OF_PLOTS = 0
+	NUMBER_OF_PLOTS = 20
 	forceatlas2 = ForceAtlas2(
 		# Behavior alternatives
 		outboundAttractionDistribution=True, # Dissuade hubs
