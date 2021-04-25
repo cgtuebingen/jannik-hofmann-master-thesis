@@ -30,6 +30,7 @@ import serverCommands
 # Definitions / initializations
 nnloaded = False
 nnprepared = False
+modelvarname = None
 nn_spec = None
 nn_module = None
 tfnet = SimpleNamespace()
@@ -43,9 +44,16 @@ def tfloaded():
 # Prepares a python module and execs it.
 # Afterwards, if no error was thrown, call importtf for tensorflow networks
 def preparemodule(path, allowPreparingNewModuleOnTop = False):
-	global nn_spec, nn_module, nnprepared
+	global nn_spec, nn_module, nnprepared, modelvarname
+	if ':' in path:
+		path, modelvarname = path.rsplit(':', 1)
+		path = path.strip()
+		modelvarname = modelvarname.strip()
+	else:
+		modelvarname = 'model'
 	if not allowPreparingNewModuleOnTop and (nnprepared or nnloaded):
 		raise AssertionError("The ai interface has already loaded a module in the past and should not load another (or the same) nn script on top. You can override this check by setting the flag by calling preparemodule(path, True)")
+	print(path)
 	nn_spec = importlib.util.spec_from_file_location("", path)
 	nn_module = importlib.util.module_from_spec(nn_spec)
 	nn_spec.loader.exec_module(nn_module)
@@ -75,8 +83,8 @@ def tfversion():
 # Just returns a model summary. Call parsestructure afterwards.
 def tfmodelsummary():
 	structure = []
-	global nn_module
-	nn_module.model.summary(print_fn=lambda x: structure.append(x), line_length=1024)
+	global nn_module, modelvarname
+	getattr(nn_module, modelvarname).summary(print_fn=lambda x: structure.append(x), line_length=1024)
 	return structure
 
 # Converts a model summary of arbitrary line length into a more human-readable format for output
