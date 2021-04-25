@@ -45,7 +45,9 @@ def tfloaded():
 # Afterwards, if no error was thrown, call importtf for tensorflow networks
 def preparemodule(path, allowPreparingNewModuleOnTop = False):
 	global nn_spec, nn_module, nnprepared, modelvarname
-	if ':' in path:
+	# Check if model variable name has been specified
+	# by searching for a ':' in the filename / in the string after the last folder
+	if ':' in path.rsplit('/', 1)[-1].rsplit('\\', 1)[-1]:
 		path, modelvarname = path.rsplit(':', 1)
 		path = path.strip()
 		modelvarname = modelvarname.strip()

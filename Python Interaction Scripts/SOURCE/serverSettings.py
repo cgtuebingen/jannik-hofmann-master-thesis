@@ -36,10 +36,10 @@ EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE = False
 ALLOW_REMOTE_CODE_EXECUTION = True
 
 # Available neural networks that can be loaded via keywords
-# Behind the filepath add a colon and specify the variable name of the model in that script
-# (would default to 'model' as variable name that contains the tf model)
 # Start with a \ or / to indicate a path relative to the location of the centralController.py script
 # Path will then be automatically converted to absolute in checkSettings()-functions
+# Behind each filepath add a colon and specify the variable name of the model in that script
+# (would default to 'model' as variable name that contains the tf model)
 AVAILABLE_NN_PATHS = {
 	"vgg16": R"\..\..\First tests\VGGNet16 Tensorflow\vgg16experimentation.py : model",
 	"resnet": R"\..\..\First tests\ResNet50 Tensorflow\resnet.py : model",
