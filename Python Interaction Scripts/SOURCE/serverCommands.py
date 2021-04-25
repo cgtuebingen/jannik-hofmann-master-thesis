@@ -562,7 +562,7 @@ class Request:
 		else:
 			result = {}
 			allcommands = '\n' + '\n'.join({value[1] for (key,value) in commandList.items()}) + '\n'
-			print(allcommands)
+			#print(allcommands)
 			for (key,value) in commandList.items():
 				cmd = value[1]
 				description = value[2]
@@ -578,7 +578,7 @@ class Request:
 			'python interaction server.\nType "help all" for a complete list of all individual commands.\n' +
 			'Type "help [command]" for a more detailed explanation of a specific command.\n' +
 			'All commands can also be typed without spaces in the command name.')
-			await self.send(("GROUPED LIST OF AVAILABLE COMMANDS GROUPED", result))
+			await self.send(("GROUPED LIST OF AVAILABLE COMMANDS", result))
 			# await self.sendstatus(-30, "Short list of available commands: " + ", ".join(sorted(commandList.keys()))) # don't need that
 	commandList["help"] = (displayhelp,
 		"Displays available commands or detailed info about a certain command",
@@ -638,14 +638,14 @@ class Request:
 
 	async def echo(self, **kwargs):
 		await self.sendstatus(-30, await self.getParam(-1, "echo"))
-	commandList["echo"] = (echo, "Echos back with a status message of type successful",
+	commandList["test echo"] = (echo, "Echos back with a status message of type successful",
 		'Without parameters, it sends the string "echo", otherwise it sends back all parameters as string')
 
 
 	async def respondtest(self, **kwargs):
 		await self.checkParams(0)
 		await self.senddebug(-5, "Respond test executed. This is your response.")
-	commandList["respond"] = (respondtest, "Responds with a debug message of level -5")
+	commandList["test respond"] = (respondtest, "Responds with a debug message of level -5")
 
 
 	async def sleeptest(self, **kwargs):
@@ -655,7 +655,7 @@ class Request:
 		#time.sleep(sleepDuration) # blocks whole thread and doesn't allow other async execution
 		await asyncio.sleep(sleepDuration) # allows other async operations to run
 		await self.senddebug(-9, "Slept successfully for " + str(sleepDuration) + " seconds.")
-	commandList["sleep"] = (sleeptest, "Sleeps for specified number of seconds",
+	commandList["test sleep"] = (sleeptest, "Sleeps for specified number of seconds",
 		"First and only parameter should be of type float, defaults to 2\n" +
 		"Sleeping is asynchronous and allows for other commands to be processed in the meantime")
 
@@ -851,7 +851,7 @@ class Request:
 	async def add(self, **kwargs):
 		await self.checkParams(2)
 		await self.send(await self.getParam(1, 2.0) + await self.getParam(2, 3.0))
-	commandList["add"] = (add, "Adds two float numbers",
+	commandList["test add"] = (add, "Adds two float numbers",
 		"Two parameters specify the two numbers to be added up as floats, responds with the result " +
 		"as float\nPar°ameters default to 2 and 3 respectively\nCan be used for testing purposes")
 
@@ -859,7 +859,7 @@ class Request:
 	async def divide(self, **kwargs):
 		await self.checkParams(2)
 		await self.send(await self.getParam(1, 2.0) / await self.getParam(2, 3.0))
-	commandList["divide"] = (divide, "Divides two float numbers",
+	commandList["test divide"] = (divide, "Divides two float numbers",
 		"Two parameters specify the two numbers to be added up as floats, responds with the result " +
 		"as float\nParameters default to 2 and 3 respectively\nCan be used for testing purposes")
 
