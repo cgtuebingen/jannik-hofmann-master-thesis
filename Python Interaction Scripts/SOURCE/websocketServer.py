@@ -284,7 +284,11 @@ def startServer():
 				errorMsg += f"Trying {triesLeft} more times in " + \
 				f"{setting.SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER} seconds.\n" + beautifulDebug.RESET
 			else:
-				errorMsg += beautifulDebug.RED + "Giving up and shutting down the server." + beautifulDebug.RESET
+				errorMsg += beautifulDebug.RED + \
+					"Address and port for the desired websocket connection are blocked!\n" + \
+					"Giving up and shutting down the server.\n(It might help to terminate all " + \
+					"running python tasks if the server was just running and has crashed)" + \
+					beautifulDebug.RESET
 			
 			# Print and log this error message on high, almost critical error level
 			loggingFunctions.printlog(errorMsg, verbosity = 19)

@@ -1147,11 +1147,9 @@ class Request:
 		"Returns a string with the version number")
 
 
-	async def tf_getstructure(self, **kwargs):
+	async def tf_getstructure(self, printStructure=True, **kwargs):
 		if not setting.DEBUG_USE_FAKE_STRUCTURE:
 			if not await self.assertTf(): return False
-		await self.checkParams(0, 1)
-		convertToShapeInstructions = await self.getParam(1, False)
 		try:
 			if setting.DEBUG_USE_FAKE_STRUCTURE and not ai.tfloaded():
 				structure = debugAndTesting.const_fake_structure
@@ -1170,12 +1168,10 @@ class Request:
 				# parestructure couldn't find valid structure. It has already output debug errors
 				# Just need to quit this function at this point
 				return False
-			
-			if convertToShapeInstructions:
-				await vis.drawstructure(self)
 			else:
-				# If the client doesn't want to draw, they get the whole structure as array
-				await self.send(("TF STRUCTURE", ai.tfnet.layers))
+				if printStructure:
+					# Send the whole structure as array
+					await self.send(("TF STRUCTURE", ai.tfnet.layers))
 		except:
 			await self.sendstatus(17, f"Couldn't parse tensorflow structure!\n" +
 				traceback.format_exc())
@@ -1186,11 +1182,26 @@ class Request:
 		'* This array is repeated as many times as there are layers in the network, and then ' +
 		'packaged into an array of itself\n' +
 		'layer_name and type are strings retrieved from tensorflow. dimensions usually have ' +
-		'nil/None as their first value due to tensorflow standards with dynamic batch sizes\n' +
-		'Layers will be layouted using the modified forceatlas2-algorithm.\n' +
-		'If first parameter is positive, the function will send a quad drawing instruction ' +
-		'for each layer. (Positive parameters are: ' + ', '.join(setting.POSITIVE_PARAMETERS) + ')')
+		'nil/None as their first value due to tensorflow standards with dynamic batch sizes')
 	commandList["tf get layers"] = commandAlias("tf get structure")
+
+
+	async def tf_drawstructure(self, **kwargs):
+		successful = await self.tf_getstructure(printStructure=False)
+		if successful == False:
+			# parestructure couldn't find valid structure. It has already output debug errors
+			# Just need to quit this function at this point
+			return False
+		else:
+			await self.sendstatus(-10, f"Layouting for the network structure is being calculated.\n" +
+			"This might take a minute... (you can see a progress bar in the python server console)")
+			await vis.drawstructure(self)
+	
+	commandList["tf draw structure"] = (tf_drawstructure, "Creates quads for tensorflow network structure",
+		'Will send a quad drawing instruction for each layer of the neural network to display the ' +
+		'DNN in the game engine.\n' +
+		'Layers will be layouted with the modified forceatlas2-algorithm using the visualization settings.')
+	commandList["tf draw layers"] = commandAlias("tf draw structure")
 
 
 	async def tf_resetstructure(self, **kwargs):
