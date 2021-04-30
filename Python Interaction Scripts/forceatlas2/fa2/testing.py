@@ -59,6 +59,7 @@ positions = forceatlas2.forceatlas2_networkx_layout(G, pos=None, quadsizes=SIZES
 
 
 # fig, ax = plt.subplots(figsize=(6,4))
+# fig.set_size_inches(15, 10)
 
 # def update(i):
 #     ax.clear()

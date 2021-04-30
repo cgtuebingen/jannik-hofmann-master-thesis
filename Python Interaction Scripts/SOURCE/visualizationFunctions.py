@@ -49,7 +49,7 @@ class Coordinates:
 		# By a tuple or list which acts the same way as one, two or three parameters
 		elif type(a) is tuple or type(a) is list:
 			if a is tuple:
-				a = layerList(a)
+				a = list(a)
 			if len(a) == 1:
 				self.x, self.y, self.z = float(a[0]), float(a[0]), float(a[0])
 			if len(a) == 2:
@@ -673,7 +673,7 @@ async def drawstructureForceLayout(connection = None):
 				graph.add_edge(indexParent, index)
 
 	NUMBER_OF_ITERATIONS = 1000
-	NUMBER_OF_PLOTS = 20
+	NUMBER_OF_PLOTS = 40
 	forceatlas2 = ForceAtlas2(
 		# Behavior alternatives
 		outboundAttractionDistribution=True, # Dissuade hubs
@@ -697,7 +697,7 @@ async def drawstructureForceLayout(connection = None):
 		randomlyOffsetNodes=10,
 
 		# Log
-		verbose=False,
+		verbose=True,
 		debugDisplayPlot=NUMBER_OF_PLOTS,
 		addedMsPerFrame=0
 	)

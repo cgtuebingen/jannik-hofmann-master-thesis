@@ -377,10 +377,11 @@ class ForceAtlas2:
             import matplotlib.pyplot as plt
             from matplotlib.animation import FuncAnimation
             fig, ax = plt.subplots(figsize=(6,4))
+            #fig.set_size_inches(20, 10)
             draw(0)
             anim = FuncAnimation(fig, update, frames=self.debugDisplayPlot+1,
                 interval=max(self.addedMsPerFrame, 10), repeat=False)
-            #anim.save('most_recent_animation.gif', writer='imagemagick')
+            #anim.save('most_recent_animation.gif', writer='imagemagick', fps=10)
             plt.show()
             if self.verbose: pbar.close()
 
