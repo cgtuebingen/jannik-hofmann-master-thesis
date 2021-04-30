@@ -286,6 +286,7 @@ def sizeFromLayerDimensions(layerDims):
 		size = [1] + size
 	return Coordinates(size)
 
+# DEPRECATED
 # Draws the tfnet.layer structure via the client-connection
 # Returns whether we could successfully draw the architecture
 # If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
@@ -479,7 +480,7 @@ class Layer:
 				badOnes.append(layer)
 		return badOnes
 		
-
+# DEPRECATED
 # Draws the tfnet.layer structure via the client-connection
 # Returns whether we could successfully draw the architecture
 # If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
@@ -592,6 +593,9 @@ async def drawstructureTreeBasic(connection = None):
 
 	return True
 
+# Draws a given layout via the connection by sending drawing instructions.
+# If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
+# Positions are given in an array as parameter, the other info is retrieved from ai.tfnet.layers
 async def drawLayout(connection, positions):
 	positionOffset = Coordinates(0, positions[0][1], positions[0][0]).scale(-1)
 	drawnLayers = [] # For later reference for drawing layer connections
@@ -609,7 +613,8 @@ async def drawLayout(connection, positions):
 			size = sizeFromLayerDimensions(layer[2]).scale(50, 1),
 			parents = layer[4],
 			color = layer[1],
-			index = index))
+			index = index,
+		))
 	
 	for current in Layer.layerList:
 		await spawnCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
@@ -655,35 +660,43 @@ async def drawstructureForceLayout(connection = None):
 		# Wait, we can't draw that
 		return False
 	
-	# simple version with one individual node per layer:
+	# Creating a graph layout from the layer structure...
 	graph = nx.Graph()
 	graph.add_nodes_from(range(len(ai.tfnet.layers)))
 	positioning = 0
 	positions = {}
 	sizes = []
+	# Add each layer to the graph
 	for index, layer in enumerate(ai.tfnet.layers):
 		newSize = sizeFromLayerDimensions(layer[2]).scale(50, 1)
+		# Aligning all layers along the z axis
 		positioning += newSize.z/2
-		positions[index] = [positioning, 0] # np.random.random()*20-10]
+		# storing the accumulated z position
+		positions[index] = [positioning, 0]
+		# Keep aligning all layers with horizontal spacing for initilization
 		positioning += newSize.z/2
 		positioning += design.horizontalSpaceBetweenLayers * 5
+		# storing size
 		sizes.append((newSize.z, newSize.y))
+		# Find all parents of the current layer
 		for indexParent, layerParent in enumerate(ai.tfnet.layers):
 			if layerParent[0] in layer[4]: # is a parent
-				graph.add_edge(indexParent, index)
+				graph.add_edge(indexParent, index) # add an edge in the graph
 
+	# Layouting instructions for modified forceatlas2-algorithm
 	NUMBER_OF_ITERATIONS = 1000
 	NUMBER_OF_PLOTS = 40
 	forceatlas2 = ForceAtlas2(
 		# Behavior alternatives
 		outboundAttractionDistribution=True, # Dissuade hubs
 		edgeWeightInfluence=1.0,
-		orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
-		bufferZone=design.horizontalSpaceBetweenLayers,
-		desiredVerticalSpacing=design.verticalSpaceBetweenLayers-design.horizontalSpaceBetweenLayers,
-		desiredHorizontalSpacing=500, # spacing between the nodes
-		desiredHorizontalSpacingWithinGroup=design.horizontalSpaceBetweenGroupedLayers-design.horizontalSpaceBetweenLayers, # spacing between the nodes
     	groupLinearlyConnectedNodes=True, # only available with networkx layout
+		orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
+		# spacing between the nodes:
+		desiredHorizontalSpacing=500,
+		desiredVerticalSpacing=design.verticalSpaceBetweenLayers-design.horizontalSpaceBetweenLayers,
+		desiredHorizontalSpacingWithinGroup=design.horizontalSpaceBetweenGroupedLayers-design.horizontalSpaceBetweenLayers,
+		bufferZone=design.horizontalSpaceBetweenLayers,
 
 		# Performance
 		jitterTolerance=1.0, # Tolerance
@@ -701,18 +714,19 @@ async def drawstructureForceLayout(connection = None):
 		debugDisplayPlot=NUMBER_OF_PLOTS,
 		addedMsPerFrame=0
 	)
+	# execute force based algorithm
 	positions = forceatlas2.forceatlas2_networkx_layout(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
-	
+	# draw layers at the resulting positions
 	return await drawLayout(connection, positions)
 
-# Choose which one to use on default
+# Choose which one to use by default
 async def drawstructure(connection = None):
 	#await drawstructureLinearly(connection)
 	await drawstructureForceLayout(connection)
 
 
 
-# FOR DEBUGGING
+# FOR DEBUGGING, executed if you start this script directly
 async def testVis():
 	loadRealNN = False
 	

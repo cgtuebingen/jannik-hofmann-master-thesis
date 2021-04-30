@@ -1195,7 +1195,12 @@ class Request:
 		else:
 			await self.sendstatus(-10, f"Layouting for the network structure is being calculated.\n" +
 			"This might take a minute... (you can see a progress bar in the python server console)")
-			await vis.drawstructure(self)
+			try:
+				await vis.drawstructure(self) # Includes layouting calculations
+			except:
+				await self.sendstatus(17, f"Couldn't draw tensorflow structure!\n" +
+					traceback.format_exc())
+				return False
 	
 	commandList["tf draw structure"] = (tf_drawstructure, "Creates quads for tensorflow network structure",
 		'Will send a quad drawing instruction for each layer of the neural network to display the ' +
