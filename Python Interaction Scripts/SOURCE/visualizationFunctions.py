@@ -724,7 +724,7 @@ async def drawstructureForceLayout(connection = None):
 
 		# Layouting instructions for modified forceatlas2-algorithm
 		NUMBER_OF_ITERATIONS = design.layouting.iterations
-		NUMBER_OF_PLOTS = design.layouting.debugDrawPlots
+		NUMBER_OF_PLOTS = design.layouting.debug.drawPlots
 		forceatlas2 = ForceAtlas2(
 			# Behavior alternatives
 			outboundAttractionDistribution=True, # Dissuade hubs

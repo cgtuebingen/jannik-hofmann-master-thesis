@@ -43,8 +43,12 @@ class layouting:
 
 	# SETTINGS FOR THE FORCE ALGORITHM:
 	iterations = ITERATIONS # exclusive this one, starting at 0, ending one below
-	debugDrawPlots = 12 # number of plots to draw
-	# You need to close the drawn plot window on the server before the layout can be sent. Put a 0 to not draw any plots
+	class debug:
+		drawPlots = 12 # number of plots to draw
+		# You need to close the drawn plot window on the server before the layout can be sent. Put a 0 to not draw any plots
+		saveAsGif = True # needs drawPlots > 1
+		gifSizeInches = (20, 10) # determines the resolution of the gif, might depend on your screens dpi
+		gifFps = 10
 
 	class classicRepulsion:
 		strength = 1

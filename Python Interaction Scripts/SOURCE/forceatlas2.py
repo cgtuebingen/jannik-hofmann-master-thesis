@@ -28,6 +28,7 @@ import networkx
 import numpy
 import scipy
 from tqdm import tqdm
+from datetime import datetime
 
 #from . import fa2util
 import fa2util
@@ -406,11 +407,14 @@ class ForceAtlas2:
             import matplotlib.pyplot as plt
             from matplotlib.animation import FuncAnimation
             fig, ax = plt.subplots(figsize=(6,4))
-            #fig.set_size_inches(20, 10)
+            if layouting.debug.saveAsGif:
+                fig.set_size_inches(*getattr(layouting.debug, "gifSizeInches", (20, 10)))
             draw(0)
             anim = FuncAnimation(fig, update, frames=self.debugDisplayPlot+1,
                 interval=max(self.addedMsPerFrame, 10), repeat=False)
-            #anim.save('most_recent_animation.gif', writer='imagemagick', fps=10)
+            if layouting.debug.saveAsGif:
+                filename = 'layouting_animation_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.gif'
+                anim.save(filename, writer='imagemagick', fps=getattr(layouting.debug, "fps", 10))
             plt.show()
             if self.verbose: pbar.close()
 

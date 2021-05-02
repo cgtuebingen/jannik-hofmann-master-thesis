@@ -1196,8 +1196,8 @@ class Request:
 				return False
 			await self.sendstatus(-10, f"Layouting for the network structure is being calculated.\n" +
 				"This might take a minute... (you can see a progress bar in the python server console)")
-			if design.layouting.debugDrawPlots > 0:
-				await self.sendstatus(1, "Visualization functions have debugDrawPlots enabled.\n" +
+			if design.layouting.debug.drawPlots > 0:
+				await self.sendstatus(1, "Visualization functions have debug.drawPlots enabled.\n" +
 					"That means, the layouting algorithm opens an animated plot on the python server,\n" +
 					"which needs to be closed manually after completion, before the layout can be sent via websocket.")
 		try:
