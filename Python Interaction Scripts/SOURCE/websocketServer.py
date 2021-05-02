@@ -24,7 +24,7 @@ import loggingFunctions
 # allows the client to check its version against the server to guarantee feature parity
 # Minor version difference will result in a warning
 # Major version difference will result in refusal to interact with neural network
-PYTHON_INTERACTION_SCRIPT_VERSION = "0.0.1"
+PYTHON_INTERACTION_SCRIPT_VERSION = "0.1.0"
 
 # WEBSOCKET SERVER THAT INTERACTS WITH COMMANDS
 async def interactiveServer	(websocket, path, *, initialCommand=None, debugDisconnect=True):
