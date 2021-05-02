@@ -10,6 +10,7 @@ from datetime import datetime
 
 # LOCAL IMPORTS
 import loggingFunctions
+import beautifulDebug
 
 # TEMPORARY DEBUGGING SETTINGS
 DEBUG_USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary
@@ -70,6 +71,8 @@ DESIRED_VERBOSITY = 11
 PRINT_COLOR_ANSI_CODES = True
 # Respond with color-formatted debug and status strings to the client.
 RESPOND_WITH_COLOR_ANSI_CODES = False
+# Change this value if you can see a text in the console that recommends you to.
+ONLY_USE_SIMPLE_CODES = True
 
 # Append new timestamp in the logfile if last log entry is older than ___ seconds:
 LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S = 1
@@ -92,7 +95,7 @@ def checkSettings():
 	SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER, AMPERSAND_CHAINS_COMMANDS, \
 	EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE, ALLOW_REMOTE_CODE_EXECUTION, \
 	AVAILABLE_NN_PATHS, DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
-	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, \
+	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, ONLY_USE_SIMPLE_CODES, \
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS
 	
 	# to be able to retrieve SCRIPT_PATH()
@@ -170,6 +173,16 @@ def checkSettings():
 	if (DEFAULT_LOAD_NN_PATH not in AVAILABLE_NN_PATHS.keys()):
 		addServerScriptPath(DEFAULT_LOAD_NN_PATH)
 
+	if PRINT_COLOR_ANSI_CODES:
+		if ONLY_USE_SIMPLE_CODES:
+			print('\u001b[40m' + beautifulDebug.ansicode(30) + beautifulDebug.ansicode(120, False) + # green text on black background
+			"You can disable ONLY_USE_SIMPLE_CODES in the server settings for more " +
+			"nuanced colors in the console output.\n" + beautifulDebug.RESET)
+		else:
+			print('\u001b[40m' + beautifulDebug.YELLOW + beautifulDebug.ansicode(232, False) + # green text on black background
+			"Please enable ONLY_USE_SIMPLE_CODES in the server settings for correct colors in " +
+			"the console output!\nOtherwise, warnings and errors could be overlooked easily." +
+			beautifulDebug.RESET)
 
 
 	# ^ ^ ^ ^ ^ ADD NEW SETTINGS CHECKS ABOVE THIS LINE ^ ^ ^ ^ ^

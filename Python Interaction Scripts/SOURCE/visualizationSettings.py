@@ -3,8 +3,12 @@
 # In this file, the user can specify preferences for the visualization in Unreal Engine.
 # This includes color schemes, animations and other properties for visual representation
 
+# LOCAL IMPORTS
+import loggingFunctions
+
 # Colors of different DNN layers, specified by their type as it appears in the model summary
 # (spaces and capitalization will be ignored and reversed)
+# Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255, or as string containing hex code
 layerColors = {
 	"input layer": (0, .5, .6),
 	"zero padding 2d": (.3, .3, .4),
@@ -37,16 +41,8 @@ class layouting:
 	# SETTINGS FOR THE FORCE ALGORITHM:
 	iterations = 1000
 	debugDrawPlots = 40 # number of plots to draw
-	# You need to close the drawn plot window on the server before the layout can be sent.
-	# Put a 0 to not draw any plots
+	# You need to close the drawn plot window on the server before the layout can be sent. Put a 0 to not draw any plots
 
-	# Finetune importance of certain rules during force algorithm iterations.
-	# importance can be 'increasing' (0 at start), 'decreasing' (0 at end)
-	# or 'midway' (0 at start and end, just multiplies increasing * decreasing)
-	# exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
-	# positive: curved downward, negative: curved upward. example with factor 5:
-	# https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
-	# Use importance = 'none' or strength = 0 to disable a rule
 	class overlapRepulsion:
 		strength = 3
 		importance = 'increasing'
@@ -63,6 +59,13 @@ class layouting:
 		strength = 1000
 		importance = 'midway'
 		exponentialCurveFactor = 1
+	# Finetune importance of certain rules during force algorithm iterations.
+	# importance can be 'increasing' (0 at start), 'decreasing' (0 at end)
+	# or 'midway' (0 at start and end, just multiplies increasing * decreasing)
+	# exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
+	# positive: curved downward, negative: curved upward. example with factor 5:
+	# https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
+	# Use importance = 'none' or strength = 0 to disable a rule
 		
 
 
@@ -70,5 +73,11 @@ class layouting:
 
 # INITIALIZATIONS
 
-# revert capitalization and spaces, this is done to facilitate a more human-readable specification above.
-layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}
+def checkSettings():
+	global layerColors
+	# revert capitalization and spaces, this is done to facilitate a more human-readable specification above.
+	layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}
+	if layouting.debugDrawPlots > 0:
+		loggingFunctions.warn("""Visualization functions have debugDrawPlots enabled.
+That means, the layouting algorithm will open a plot on the python server, \
+which needs to be closed before the layout can be sent via websocket.""", 10)

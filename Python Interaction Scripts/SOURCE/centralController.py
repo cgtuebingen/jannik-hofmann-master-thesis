@@ -20,12 +20,20 @@ import numpy as np
 from types import SimpleNamespace
 import ast
 
+if __name__ == '__main__':
+	# Clearing screen for the start of this new session before the imports can display warnings
+	if os.name == 'nt': # windows
+		os.system('cls')
+	else: # os.name == 'posix' # linux or mac
+		os.system('clear')
+
 # LOCAL IMPORTS
 import serverSettings as setting
-import websocketServer as server
 import loggingFunctions
 import beautifulDebug
+import websocketServer as server
 import serverCommands
+import visualizationSettings as design
 
 
 # so other modules can access the current script location
@@ -34,12 +42,9 @@ def SCRIPT_PATH():
 	
 # MAIN SECTION THAT CALLS EVERYTHING ELSE
 if __name__ == '__main__':
-
-	# Clearing screen for the start of this new session
-	beautifulDebug.clearScreen()
-
 	# verify user settings and check for warnings / recommendations
 	setting.checkSettings()
+	design.checkSettings()
 
 	# initialize command list
 	serverCommands.Request(None, None)
