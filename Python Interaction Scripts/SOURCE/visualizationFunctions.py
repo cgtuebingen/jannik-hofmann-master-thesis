@@ -313,7 +313,7 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		#await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
-def sizeFromLayerDimensions(layerDims):
+def sizeFromLayerDimensions(layerDims, scaleDims=None, addToDims=None, minDims=None, maxDims=None):
 	size = []
 	for dim in layerDims:
 		# Append useful dim values to size-list until we have 3
@@ -322,6 +322,52 @@ def sizeFromLayerDimensions(layerDims):
 	# If we have less, just put 1 in the front a few times
 	while (len(size) < 3):
 		size = [1] + size
+	if scaleDims is None:
+		scaleDims = [1, 1, 1]
+	if type(scaleDims) is tuple:
+		scaleDims = list(scaleDims)
+	if type(scaleDims) is not list:
+		scaleDims = [scaleDims]
+	if len(scaleDims) == 1:
+		scaleDims *= 3
+	if len(scaleDims) == 2:
+		scaleDims = [scaleDims[0]] + scaleDims
+	if addToDims is None:
+		addToDims = [1, 1, 1]
+	if type(addToDims) is tuple:
+		addToDims = list(addToDims)
+	if type(addToDims) is not list:
+		addToDims = [addToDims]
+	if len(addToDims) == 1:
+		addToDims *= 3
+	if len(addToDims) == 2:
+		addToDims = [addToDims[0]] + addToDims
+	for i in range(3):
+		size[i] *= scaleDims[i]
+		size[i] += addToDims[i]
+	if minDims is None:
+		minDims = size
+	if type(minDims) is tuple:
+		minDims = list(minDims)
+	if type(minDims) is not list:
+		minDims = [minDims]
+	if len(minDims) == 1:
+		minDims *= 3
+	if len(minDims) == 2:
+		minDims = [minDims[0]] + minDims
+	if maxDims is None:
+		maxDims = size
+	if type(maxDims) is tuple:
+		maxDims = list(maxDims)
+	if type(maxDims) is not list:
+		maxDims = [maxDims]
+	if len(maxDims) == 1:
+		maxDims *= 3
+	if len(maxDims) == 2:
+		maxDims = [maxDims[0]] + maxDims
+	for i in range(3):
+		size[i] = max(size[i], minDims[i])
+		size[i] = min(size[i], maxDims[i])
 	return Coordinates(size)
 
 # DEPRECATED
@@ -707,7 +753,11 @@ async def drawstructureForceLayout(connection = None):
 		sizes = []
 		# Add each layer to the graph
 		for index, layer in enumerate(ai.tfnet.layers):
-			newSize = sizeFromLayerDimensions(layer[2]).scale(design.layouting.scaleLayerSizes)
+			newSize = sizeFromLayerDimensions(layer[2],
+				scaleDims=getattr(design.layouting, 'scaleLayerSizes', None),
+				addToDims=getattr(design.layouting, 'addToLayerSizes', None),
+				minDims=getattr(design.layouting, 'minLayerDimensions', None),
+				maxDims=getattr(design.layouting, 'maxLayerDimensions', None))
 			# Aligning all layers along the z axis
 			positioning += newSize.z/2
 			# storing the accumulated z position

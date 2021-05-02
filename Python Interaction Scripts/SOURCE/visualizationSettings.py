@@ -35,7 +35,10 @@ class connections:
 ITERATIONS = 1200
 
 class layouting:
-	scaleLayerSizes = (50, 50, 1)
+	scaleLayerSizes = (50, 1)
+	addToLayerSizes = (100, 20) # takes place after scaling
+	minLayerDimensions = None # as hard cutoff after scaling and adding
+	maxLayerDimensions = None # as hard cutoff after scaling and adding
 	horizontalSpaceBetweenGroupedLayers = 100
 	bufferZone = 500
 	horizontalSpaceBetweenLayers = 500
@@ -46,7 +49,7 @@ class layouting:
 	class debug:
 		drawPlots = 12 # number of plots to draw
 		# You need to close the drawn plot window on the server before the layout can be sent. Put a 0 to not draw any plots
-		saveAsGif = True # needs drawPlots > 1
+		saveAsGif = False # needs drawPlots > 1
 		gifSizeInches = (20, 10) # determines the resolution of the gif, might depend on your screens dpi
 		gifFps = 10
 
