@@ -195,9 +195,8 @@ class ForceAtlas2:
         if self.groupLinearlyConnectedNodes:
             assert groups is not None and individualG is not None and \
                 individualPosOffset is not None and individualSizes is not None
-
-        if self.randomlyOffsetNodes != 0.0:
-            pos += (numpy.random.rand(*pos.shape) - 0.5) * self.randomlyOffsetNodes
+        if self.randomlyOffsetNodes != 0:
+            pos += (numpy.random.rand(*pos.shape) - 0.5) * 2 * self.randomlyOffsetNodes
 
         # speed and speedEfficiency describe a scaling factor of dx and dy
         # before x and y are adjusted.  These are modified as the
@@ -227,26 +226,38 @@ class ForceAtlas2:
         # Here an example with the exponentialCurveFactor of 5:
         # https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
         @functools.lru_cache(maxsize=25)
-        def exponentialCurve(i, exponentialCurveFactor, importance=None, reverse = False):
-            if importance is not None:
-                if importance == 'increasing':
-                    return exponentialCurve(i, exponentialCurveFactor, None, False)
-                if importance == 'decreasing':
-                    return exponentialCurve(i, exponentialCurveFactor, None, True)
-                if importance == 'midway':
-                    return exponentialCurve(i, exponentialCurveFactor, None, True) * exponentialCurve(i, exponentialCurveFactor, None, False)
-                if importance == 'none':
-                    return 0
-                # otherwise can't parse! So print warning and ignore it
-                print("Warning! Exponential curve function cannot understand importance parameter " + importance)
-                importance = None
-            x = i / iterations
-            if reverse:
-                x = 1 - x
+        def exponentialCurve(x, exponentialCurveFactor):
             if exponentialCurveFactor == 0:
                 return x
             return (math.e**(exponentialCurveFactor*x) / math.e - 1/math.e) / \
                 (math.e**exponentialCurveFactor / math.e - 1/math.e)
+
+        @functools.lru_cache(maxsize=25)
+        def interpretExponentialCurve(i, rule):
+            iRange = getattr(rule, 'withinInteractions', range(0, iterations))
+            if iRange is None or len(iRange) == 0 or i not in iRange:
+                return 0
+            importance = getattr(rule, 'importance', "constant").lower()
+            if importance in "disabled disable never off none zero 0 x deactivated inactive no".split():
+                return 0
+            strength = getattr(rule, 'strength', 1)
+            if importance in "constant enabled enable always active activated 1 on one yes".split():
+                return strength
+            if len(iRange) == 1:
+                return strength
+            # x gets progress of i within the withinIterations range resulting in a range from 0 to 1
+            x = (i - min(iRange)) / (max(iRange) - min(iRange))
+            exponentialCurveFactor = getattr(rule, 'exponentialCurveFactor', 0)
+            if importance in "increasing increase inc + more up".split():
+                return strength * exponentialCurve(x, exponentialCurveFactor)
+            if importance in "decreasing decrease dec - less down".split():
+                return strength * exponentialCurve(1 - x, exponentialCurveFactor)
+            if importance in "middle mid midway half center mirror mirrored".split():
+                x = min(x * 2, 2 * (1 - x))
+                return strength * exponentialCurve(x * 2, exponentialCurveFactor)
+            # otherwise can't parse! So print warning and ignore it
+            print("Warning! Exponential curve function cannot understand importance parameter " + rule.importance)
+            return 0
 
         #for _i in niters:
         def execute_once(i):
@@ -268,48 +279,49 @@ class ForceAtlas2:
             # Charge repulsion forces
             repulsion_timer.start()
             # parallelization should be implemented here
-            if self.barnesHutOptimize:
-                rootRegion.applyForceOnNodes(nodes, self.barnesHutTheta, self.scalingRatio)
-            else:
-                fa2util.apply_repulsion_fast(nodes, self.scalingRatio)
-
+            strength = interpretExponentialCurve(i, layouting.classicRepulsion)
+            if strength > 0:
+                if self.barnesHutOptimize:
+                    rootRegion.applyForceOnNodes(nodes, self.barnesHutTheta, self.scalingRatio*strength)
+                else:
+                    fa2util.apply_repulsion_fast(nodes, self.scalingRatio*strength)
             repulsion_timer.stop()
-            overlap_repulsion_timer.start()
+
             if quadsizes is not None:
-                strength = layouting.overlapRepulsion.strength * \
-                    exponentialCurve(i,
-                    layouting.overlapRepulsion.exponentialCurveFactor,
-                    layouting.overlapRepulsion.importance)
-                fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*strength, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
-            overlap_repulsion_timer.stop()
+                overlap_repulsion_timer.start()
+                strength = interpretExponentialCurve(i, layouting.overlapRepulsion)
+                if strength > 0:
+                    fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*strength, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
+                overlap_repulsion_timer.stop()
 
             # Gravitational forces
             gravity_timer.start()
-            strength = layouting.gravity.strength * \
-                exponentialCurve(i,
-                layouting.gravity.exponentialCurveFactor,
-                layouting.gravity.importance)
-            fa2util.apply_gravity(nodes, self.gravity, scalingRatio=self.scalingRatio*strength, useStrongGravity=self.strongGravityMode)
+            strength = interpretExponentialCurve(i, layouting.gravity)
+            if strength > 0:
+                fa2util.apply_gravity(nodes, self.gravity, scalingRatio=self.scalingRatio*strength, useStrongGravity=self.strongGravityMode)
             gravity_timer.stop()
 
             # If other forms of attraction were implemented they would be selected here.
             attraction_timer.start()
-            if self.orderconnectedQuadsOnXaxis:
-                strength = layouting.connectedAttraction.strength * \
-                    exponentialCurve(i,
-                    layouting.connectedAttraction.exponentialCurveFactor,
-                    layouting.connectedAttraction.importance)
-                fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing, self.bufferZone)
-            else:
-                fa2util.apply_attraction(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation, self.edgeWeightInfluence)
+            strength = interpretExponentialCurve(i, layouting.connectedAttraction)
+            if strength > 0:
+                if self.orderconnectedQuadsOnXaxis:
+                    fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing, self.bufferZone)
+                else:
+                    fa2util.apply_attraction(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*strength, self.edgeWeightInfluence)
             # order along x axis: directional attraction
             if self.orderconnectedQuadsOnXaxis:
-                strength = layouting.shiftOnAxisToOrderByIndex.strength * \
-                    exponentialCurve(i,
-                    layouting.shiftOnAxisToOrderByIndex.exponentialCurveFactor,
-                    layouting.shiftOnAxisToOrderByIndex.importance)
-                fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
+                strength = interpretExponentialCurve(i, layouting.shiftOnAxisToOrderByIndex)
+                if strength > 0:
+                    fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
             attraction_timer.stop()
+
+            if quadsizes is not None:
+                overlap_repulsion_timer.start()
+                strength = interpretExponentialCurve(i, layouting.manuallyCorrectOverlaps)
+                # if strength > 0:
+                #     fa2util.manually_correct_overlap(nodes, strength, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
+                overlap_repulsion_timer.stop()
 
             # Adjust speeds and apply forces
             applyforces_timer.start()

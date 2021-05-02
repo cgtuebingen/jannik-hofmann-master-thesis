@@ -648,7 +648,7 @@ async def drawLayout(connection, positions):
 		# Create layer instance and append it to layerList
 		Layer.layerList.append(Layer(
 			position = (positionOffset + (0, positions[index][1], positions[index][0])),
-			size = sizeFromLayerDimensions(layer[2]).scale(50, 1),
+			size = sizeFromLayerDimensions(layer[2]),#.scale(50, 1),
 			parents = layer[4],
 			color = layer[1],
 			index = index,
@@ -707,7 +707,7 @@ async def drawstructureForceLayout(connection = None):
 		sizes = []
 		# Add each layer to the graph
 		for index, layer in enumerate(ai.tfnet.layers):
-			newSize = sizeFromLayerDimensions(layer[2]).scale(50, 1)
+			newSize = sizeFromLayerDimensions(layer[2]).scale(design.layouting.scaleLayerSizes)
 			# Aligning all layers along the z axis
 			positioning += newSize.z/2
 			# storing the accumulated z position
@@ -746,7 +746,7 @@ async def drawstructureForceLayout(connection = None):
 			scalingRatio=2.0,
 			strongGravityMode=False,
 			gravity=1.0,
-			randomlyOffsetNodes=design.layouting.bufferZone/10,
+			randomlyOffsetNodes=(0, design.layouting.bufferZone/20),
 
 			# Log
 			verbose=True,
