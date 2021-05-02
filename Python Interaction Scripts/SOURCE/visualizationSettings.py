@@ -77,7 +77,3 @@ def checkSettings():
 	global layerColors
 	# revert capitalization and spaces, this is done to facilitate a more human-readable specification above.
 	layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}
-	if layouting.debugDrawPlots > 0:
-		loggingFunctions.warn("""Visualization functions have debugDrawPlots enabled.
-That means, the layouting algorithm will open a plot on the python server, \
-which needs to be closed before the layout can be sent via websocket.""", 10)

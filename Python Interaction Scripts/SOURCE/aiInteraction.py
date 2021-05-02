@@ -142,6 +142,7 @@ def tfresetstructure():
 	remove("trainableparams")
 	remove("nontrainableparams")
 	remove("layerCount")
+	remove("layoutPositions")
 
 # Parses a given tf model summary string as structure and saves relevant information to tfnet
 # Structure should be in the form of the result of tfmodelsummary()

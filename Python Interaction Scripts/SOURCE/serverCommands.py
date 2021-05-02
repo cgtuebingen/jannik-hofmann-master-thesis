@@ -33,6 +33,7 @@ import loggingFunctions
 import beautifulDebug
 import loggingFunctions
 import debugAndTesting
+import visualizationSettings as design
 
 
 # Seeding random library
@@ -1187,20 +1188,24 @@ class Request:
 
 
 	async def tf_drawstructure(self, **kwargs):
-		successful = await self.tf_getstructure(printStructure=False)
-		if successful == False:
-			# parestructure couldn't find valid structure. It has already output debug errors
-			# Just need to quit this function at this point
-			return False
-		else:
-			await self.sendstatus(-10, f"Layouting for the network structure is being calculated.\n" +
-			"This might take a minute... (you can see a progress bar in the python server console)")
-			try:
-				await vis.drawstructure(self) # Includes layouting calculations
-			except:
-				await self.sendstatus(17, f"Couldn't draw tensorflow structure!\n" +
-					traceback.format_exc())
+		if not hasattr(ai.tfnet, "layoutPositions") or ai.tfnet.layoutPositions is None:
+			successful = await self.tf_getstructure(printStructure=False)
+			if successful == False:
+				# parestructure couldn't find valid structure. It has already output debug errors
+				# Just need to quit this function at this point
 				return False
+			await self.sendstatus(-10, f"Layouting for the network structure is being calculated.\n" +
+				"This might take a minute... (you can see a progress bar in the python server console)")
+			if design.layouting.debugDrawPlots > 0:
+				await self.sendstatus(1, "Visualization functions have debugDrawPlots enabled.\n" +
+					"That means, the layouting algorithm opens an animated plot on the python server,\n" +
+					"which needs to be closed manually after completion, before the layout can be sent via websocket.")
+		try:
+			await vis.drawstructure(self) # Includes layouting calculations
+		except:
+			await self.sendstatus(17, f"Couldn't draw tensorflow structure!\n" +
+				traceback.format_exc())
+			return False
 	
 	commandList["tf draw structure"] = (tf_drawstructure, "Creates quads for tensorflow network structure",
 		'Will send a quad drawing instruction for each layer of the neural network to display the ' +

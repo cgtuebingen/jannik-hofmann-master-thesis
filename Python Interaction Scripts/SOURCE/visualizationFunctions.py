@@ -694,68 +694,69 @@ async def drawLayout(connection, positions):
 # If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
 # Using modified forceatlas2-algorithm for layouting
 async def drawstructureForceLayout(connection = None):
-	if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
-		# Wait, we can't draw that
-		return False
-	
-	# Creating a graph layout from the layer structure...
-	graph = nx.Graph()
-	graph.add_nodes_from(range(len(ai.tfnet.layers)))
-	positioning = 0
-	positions = {}
-	sizes = []
-	# Add each layer to the graph
-	for index, layer in enumerate(ai.tfnet.layers):
-		newSize = sizeFromLayerDimensions(layer[2]).scale(50, 1)
-		# Aligning all layers along the z axis
-		positioning += newSize.z/2
-		# storing the accumulated z position
-		positions[index] = [positioning, 0]
-		# Keep aligning all layers with horizontal spacing for initilization
-		positioning += newSize.z/2
-		positioning += design.layouting.horizontalSpaceBetweenLayers * 5
-		# storing size
-		sizes.append((newSize.z, newSize.y))
-		# Find all parents of the current layer
-		for indexParent, layerParent in enumerate(ai.tfnet.layers):
-			if layerParent[0] in layer[4]: # is a parent
-				graph.add_edge(indexParent, index) # add an edge in the graph
+	if not hasattr(ai.tfnet, "layoutPositions") or ai.tfnet.layoutPositions is None:
+		if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
+			# Wait, we can't draw that
+			return False
+		
+		# Creating a graph layout from the layer structure...
+		graph = nx.Graph()
+		graph.add_nodes_from(range(len(ai.tfnet.layers)))
+		positioning = 0
+		positions = {}
+		sizes = []
+		# Add each layer to the graph
+		for index, layer in enumerate(ai.tfnet.layers):
+			newSize = sizeFromLayerDimensions(layer[2]).scale(50, 1)
+			# Aligning all layers along the z axis
+			positioning += newSize.z/2
+			# storing the accumulated z position
+			positions[index] = [positioning, 0]
+			# Keep aligning all layers with horizontal spacing for initilization
+			positioning += newSize.z/2
+			positioning += design.layouting.horizontalSpaceBetweenLayers * 5
+			# storing size
+			sizes.append((newSize.z, newSize.y))
+			# Find all parents of the current layer
+			for indexParent, layerParent in enumerate(ai.tfnet.layers):
+				if layerParent[0] in layer[4]: # is a parent
+					graph.add_edge(indexParent, index) # add an edge in the graph
 
-	# Layouting instructions for modified forceatlas2-algorithm
-	NUMBER_OF_ITERATIONS = design.layouting.forceAlgorithm.iterations
-	NUMBER_OF_PLOTS = design.layouting.forceAlgorithm.debugDrawPlots
-	forceatlas2 = ForceAtlas2(
-		# Behavior alternatives
-		outboundAttractionDistribution=True, # Dissuade hubs
-		edgeWeightInfluence=1.0,
-    	groupLinearlyConnectedNodes=True, # only available with networkx layout
-		orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
-		# spacing between the nodes:
-		desiredHorizontalSpacing=design.layouting.horizontalSpaceBetweenLayers,
-		desiredVerticalSpacing=design.layouting.verticalSpaceBetweenLayers,
-		bufferZone=design.layouting.bufferZone,
-		desiredHorizontalSpacingWithinGroup=design.layouting.horizontalSpaceBetweenGroupedLayers,
+		# Layouting instructions for modified forceatlas2-algorithm
+		NUMBER_OF_ITERATIONS = design.layouting.iterations
+		NUMBER_OF_PLOTS = design.layouting.debugDrawPlots
+		forceatlas2 = ForceAtlas2(
+			# Behavior alternatives
+			outboundAttractionDistribution=True, # Dissuade hubs
+			edgeWeightInfluence=1.0,
+			groupLinearlyConnectedNodes=True, # only available with networkx layout
+			orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
+			# spacing between the nodes:
+			desiredHorizontalSpacing=design.layouting.horizontalSpaceBetweenLayers,
+			desiredVerticalSpacing=design.layouting.verticalSpaceBetweenLayers,
+			bufferZone=design.layouting.bufferZone,
+			desiredHorizontalSpacingWithinGroup=design.layouting.horizontalSpaceBetweenGroupedLayers,
 
-		# Performance
-		jitterTolerance=1.0, # Tolerance
-		barnesHutOptimize=False,
-		barnesHutTheta=1.2,
+			# Performance
+			jitterTolerance=1.0, # Tolerance
+			barnesHutOptimize=False,
+			barnesHutTheta=1.2,
 
-		# Tuning
-		scalingRatio=2.0,
-		strongGravityMode=False,
-		gravity=1.0,
-		randomlyOffsetNodes=design.layouting.bufferZone/10,
+			# Tuning
+			scalingRatio=2.0,
+			strongGravityMode=False,
+			gravity=1.0,
+			randomlyOffsetNodes=design.layouting.bufferZone/10,
 
-		# Log
-		verbose=True,
-		debugDisplayPlot=NUMBER_OF_PLOTS,
-		addedMsPerFrame=0
-	)
-	# execute force based algorithm
-	positions = forceatlas2.forceatlas2_networkx_layout(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
+			# Log
+			verbose=True,
+			debugDisplayPlot=NUMBER_OF_PLOTS,
+			addedMsPerFrame=0
+		)
+		# execute force based algorithm
+		ai.tfnet.layoutPositions = forceatlas2.forceatlas2_networkx_layout(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
 	# draw layers at the resulting positions
-	return await drawLayout(connection, positions)
+	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
 # Choose which one to use by default
 async def drawstructure(connection = None):
