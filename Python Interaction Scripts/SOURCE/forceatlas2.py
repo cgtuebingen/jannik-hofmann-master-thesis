@@ -234,7 +234,7 @@ class ForceAtlas2:
 
         @functools.lru_cache(maxsize=25)
         def interpretExponentialCurve(i, rule):
-            iRange = getattr(rule, 'withinInteractions', range(0, iterations))
+            iRange = getattr(rule, 'withinIterations', range(0, iterations))
             if iRange is None or len(iRange) == 0 or i not in iRange:
                 return 0
             importance = getattr(rule, 'importance', "constant").lower()
@@ -253,8 +253,11 @@ class ForceAtlas2:
             if importance in "decreasing decrease dec - less down".split():
                 return strength * exponentialCurve(1 - x, exponentialCurveFactor)
             if importance in "middle mid midway half center mirror mirrored".split():
-                x = min(x * 2, 2 * (1 - x))
-                return strength * exponentialCurve(x * 2, exponentialCurveFactor)
+                x = min(x, 1 - x) * 2
+                return strength * exponentialCurve(x, exponentialCurveFactor)
+            if importance in "outsides antimirror outside".split():
+                x = max(x - 0.5, 0.5 - x) * 2
+                return strength * exponentialCurve(x, exponentialCurveFactor)
             # otherwise can't parse! So print warning and ignore it
             print("Warning! Exponential curve function cannot understand importance parameter " + rule.importance)
             return 0
@@ -315,13 +318,6 @@ class ForceAtlas2:
                 if strength > 0:
                     fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
             attraction_timer.stop()
-
-            if quadsizes is not None:
-                overlap_repulsion_timer.start()
-                strength = interpretExponentialCurve(i, layouting.manuallyCorrectOverlaps)
-                # if strength > 0:
-                #     fa2util.manually_correct_overlap(nodes, strength, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
-                overlap_repulsion_timer.stop()
 
             # Adjust speeds and apply forces
             applyforces_timer.start()

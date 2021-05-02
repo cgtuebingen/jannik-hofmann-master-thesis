@@ -297,26 +297,6 @@ def apply_overlap_repulsion(nodes, coefficient, xspacing=0, yspacing=0, bufferZo
 # The following functions iterate through the nodes or edges and apply
 # the forces directly to the node objects.  These iterations are here
 # instead of the main file because Python is slow with loops.
-def manually_correct_overlap(nodes, coefficient, xspacing=0, yspacing=0, bufferZone=0):
-    maxdistx = max([n.width for n in nodes]) + xspacing + bufferZone
-    maxdisty = max([n.height for n in nodes]) + yspacing + bufferZone
-    i = 0
-    for n1 in nodes:
-        j = i
-        for n2 in nodes:
-            if j == 0:
-                break
-            if abs(n1.x - n2.x) < maxdistx:
-                if abs(n1.y - n2.y) < maxdisty:
-                    linOverlapRepulsion(n1, n2,
-                        coefficient, xspacing, yspacing, bufferZone)
-            j -= 1
-        i += 1
-
-
-# The following functions iterate through the nodes or edges and apply
-# the forces directly to the node objects.  These iterations are here
-# instead of the main file because Python is slow with loops.
 
 # not really faster as it's too complicated, so not recommended to be used
 # Could be useful for DNNs that contain thousands of layers instead of hundreds.
