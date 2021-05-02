@@ -769,7 +769,7 @@ class Request:
 			"Cannot be used to chain commands together! All commands after it will be discarded!\n"+
 			"Please refer to the python server console to see if re-establishing the server is " +
 			'successful or test a second later (with a newly established connection) with ' +
-			'"send status -30".')
+			'"send status"')
 		os.execl(sys.executable, *([sys.executable]+sys.argv))
 	commandList["server restart"] = (restart, "Restarts and resets the server",
 		"No parameters. Will not ask for confirmation!\n" +

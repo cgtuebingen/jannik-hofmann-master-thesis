@@ -201,6 +201,44 @@ def transformCoordinates(originalposition = None, originalsize = None, positionI
 
 # Format a color to always have three float values between 0 and 1
 def formatColor(color):
+	if (type(color) is str):
+		# what different lengths mean:
+		# empty => black
+		#x => #xxxxxxff
+		#xy => #xyxyxyff
+		#rgb => rrggbbff
+		#rgba => rrggbbaa
+		#rgbxy => rrggbbxy
+		#rrggbb => #rrggbbff
+		#rrggbba => #rrggbbaa
+		#rrggbbaa => #rrggbbaa
+		if color[0] == '#':
+			color = color[1:]
+		if len(color) == 0:
+			color = '0' * 6 + 'ff'
+		elif len(color) == 1:
+			color = color * 6 + 'ff'
+		elif len(color) == 2:
+			color = color * 3 + 'ff'
+		elif len(color) == 3:
+			color = color[0]*2 + color[1]*2 + color[2]*2 + 'ff'
+		elif len(color) == 4:
+			color = color[0]*2 + color[1]*2 + color[2]*2 + color[3]*2
+		elif len(color) == 5:
+			color = color[0]*2 + color[1]*2 + color[2]*2 + color[3:]
+		elif len(color) == 6:
+			color = color + 'ff'
+		elif len(color) == 7:
+			color = color + color[-1]
+		elif len(color) > 8:
+			color = color[:8]
+		converted = []
+		for i in range(4):
+			hex = color[i*2:i*2+2]
+			val = int(hex, 16)
+			converted.append(val/256)
+		return converted
+	
 	# Tuple to list
 	if (type(color) is tuple):
 		color = list(color)
@@ -215,7 +253,7 @@ def formatColor(color):
 		for i in range(3):
 			color[i] = color[i] / 255
 	if len(color) < 4:
-		color.append(1)
+		color.append(1) # alpha
 	return color
 
 def colorToHex(color):
@@ -272,7 +310,7 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		posSizeColor = [float(i) for i in
 			position.list() + size.list() + formatColor(color) + rotator.list()]
 		await connection.send(("SPAWN CUBOID pos size color opacity rot", posSizeColor))
-		await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
+		#await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
 def sizeFromLayerDimensions(layerDims):
@@ -317,7 +355,7 @@ async def drawstructureLinearly(connection = None):
 		await spawnCuboid(connection, position, size, color, positionIsCenterPoint = True)
 		drawnLayers.append([position.copy(), size.copy(), color])
 		# Draw connections between layers if applicable
-		if design.drawConnections and \
+		if design.connections.display and \
 			(len(layer[4]) > 1 or layer[4][0] != ai.tfnet.layers[index-1][0]):
 			# connected to another layer than just the previous one. Check which one it is
 			for connectedIndex, connectedLayer in enumerate(ai.tfnet.layers):
@@ -331,23 +369,23 @@ async def drawstructureLinearly(connection = None):
 					randomPos = Coordinates(
 						x = random.uniform(-minval * 0.8, minval * 0.8),
 						y = random.uniform(maxval * 1.3, maxval * 2))
-					if not design.angledConnections:
+					if True:#not design.angledConnections:
 						await spawnCuboid(connection,
-							Coordinates(randomPos, size/2, position - design.connectionStrength/2),
-							Coordinates(design.connectionStrength, y = randomPos - size/2),
-							design.connectionColor)
+							Coordinates(randomPos, size/2, position - design.connections.strength/2),
+							Coordinates(design.connections.strength, y = randomPos - size/2),
+							design.connections.color)
 						await spawnCuboid(connection,
-							Coordinates(randomPos, randomPos, cposition - design.connectionStrength/2),
-							Coordinates(design.connectionStrength, z = position - cposition + design.connectionStrength),
-							design.connectionColor)
+							Coordinates(randomPos, randomPos, cposition - design.connections.strength/2),
+							Coordinates(design.connections.strength, z = position - cposition + design.connections.strength),
+							design.connections.color)
 						await spawnCuboid(connection,
-							Coordinates(randomPos, csize/2, cposition - design.connectionStrength/2),
-							Coordinates(design.connectionStrength, y = randomPos - csize/2),
-							design.connectionColor)
+							Coordinates(randomPos, csize/2, cposition - design.connections.strength/2),
+							Coordinates(design.connections.strength, y = randomPos - csize/2),
+							design.connections.color)
 					else:
 						# define proportion of horizontal bar to angle away on each side
 						deltaz = random.uniform(0, 0.5)
-						deltaz *= (position.z - cposition.z + design.connectionStrength)
+						deltaz *= (position.z - cposition.z + design.connections.strength)
 						def alpha(size, degrees = True):
 							alpha = math.atan(deltaz / (randomPos.y - size.y/2))
 							if degrees: return math.degrees(alpha)
@@ -358,17 +396,17 @@ async def drawstructureLinearly(connection = None):
 						sizey = origsizey / math.cos(alpha(size, False))
 						await spawnCuboid(connection,
 							Coordinates(randomPos, size/2 + origsizey/2, posz),
-							Coordinates(design.connectionStrength, y = sizey),
-							design.connectionColor,
+							Coordinates(design.connections.strength, y = sizey),
+							design.connections.color,
 							rotator = Coordinates(x = -alpha(size)),
 							positionIsCenterPoint = True)
 						
-						posz = cposition - design.connectionStrength/2 + deltaz
-						sizez = position - cposition + design.connectionStrength - deltaz * 2
+						posz = cposition - design.connections.strength/2 + deltaz
+						sizez = position - cposition + design.connections.strength - deltaz * 2
 						await spawnCuboid(connection,
 							Coordinates(randomPos, randomPos, posz + sizez/2),
-							Coordinates(design.connectionStrength, z = sizez),
-							design.connectionColor,
+							Coordinates(design.connections.strength, z = sizez),
+							design.connections.color,
 							positionIsCenterPoint = True)
 						
 						posz = cposition + deltaz/2
@@ -376,11 +414,11 @@ async def drawstructureLinearly(connection = None):
 						sizey = origsizey / math.cos(alpha(csize, False))
 						await spawnCuboid(connection,
 							Coordinates(randomPos, csize/2 + origsizey/2, posz),
-							Coordinates(design.connectionStrength, y = sizey),
-							design.connectionColor,
+							Coordinates(design.connections.strength, y = sizey),
+							design.connections.color,
 							rotator = Coordinates(x = alpha(csize)),
 							positionIsCenterPoint = True)
-		position.add(z = size/2 + design.horizontalSpaceBetweenLayers)
+		position.add(z = size/2 + design.layouting.horizontalSpaceBetweenLayers)
 	
 	# Displaying plot if no client connection was given
 	if connection is None:
@@ -464,9 +502,9 @@ class Layer:
 	
 	def doesItOverlap(self, start, end, startt, endd, minimumSpace = 0):
 		if type(start) is Coordinates and type(end) is Coordinates and type(startt) is Coordinates and type(endd) is Coordinates:
-			return self.doesItOverlap(start.x, end.x, startt.x, endd.x, design.verticalSpaceBetweenLayers) \
-			and self.doesItOverlap(start.y, end.y, startt.y, endd.y, design.verticalSpaceBetweenLayers) \
-			and self.doesItOverlap(start.z, end.z, startt.z, endd.z, design.horizontalSpaceBetweenLayers)
+			return self.doesItOverlap(start.x, end.x, startt.x, endd.x, design.layouting.verticalSpaceBetweenLayers) \
+			and self.doesItOverlap(start.y, end.y, startt.y, endd.y, design.layouting.verticalSpaceBetweenLayers) \
+			and self.doesItOverlap(start.z, end.z, startt.z, endd.z, design.layouting.horizontalSpaceBetweenLayers)
 		if minimumSpace == 0:
 			return not (end <= startt or start >= endd)
 		else:
@@ -507,7 +545,7 @@ async def drawstructureTreeBasic(connection = None):
 	for current in Layer.layerList:
 		# z is set to be directly behind the furthest parent layer
 		current.position.z = max([0] + [layer.position.z + layer.size.z/2 for layer in current.parents])
-		current.position.z += design.horizontalSpaceBetweenLayers + current.size.z/2
+		current.position.z += design.layouting.horizontalSpaceBetweenLayers + current.size.z/2
 		
 		if len(current.parents) == 0:
 			pass # position.x and y stay at 0
@@ -520,7 +558,7 @@ async def drawstructureTreeBasic(connection = None):
 			for parent in current.parents:
 				if parent.isDescendantOfList(current.parents):
 					# move parent and its children by this amount:
-					moveBy = min(current.size.y, parent.size.y)/2 + design.verticalSpaceBetweenLayers
+					moveBy = min(current.size.y, parent.size.y)/2 + design.layouting.verticalSpaceBetweenLayers
 					moveBy = Coordinates(y = moveBy)
 					parent.moveWithDescendants(moveBy)
 					current.activeAreaAbove += moveBy
@@ -545,7 +583,7 @@ async def drawstructureTreeBasic(connection = None):
 				#moveBy = current.position.y + current.size.y/2 - layer.position.y - layer.size.y/2
 				# OVERWRITE: It's safer to calculate to just move everyone by a const. value
 				moveBy = current.size.y
-				moveBy += design.verticalSpaceBetweenLayers # add some space
+				moveBy += design.layouting.verticalSpaceBetweenLayers # add some space
 				moveBy /= 2 # everyone does half the work
 				moveBy = Coordinates(y = moveBy)
 				layer.moveWithDescendants(moveBy, dontMoveSameAgain = True)
@@ -554,7 +592,7 @@ async def drawstructureTreeBasic(connection = None):
 					parent.activeAreaAbove.y = max(parent.activeAreaAbove.y,
 						layer.position.y + layer.size.y/2)
 		if len(current.whoOverlaps()) > 0:
-			current.position.y = minY - design.verticalSpaceBetweenLayers - current.size.y/2
+			current.position.y = minY - design.layouting.verticalSpaceBetweenLayers - current.size.y/2
 		for parent in current.parents:
 			parent.activeAreaAbove.y = max(parent.activeAreaAbove.y,
 				current.position.y + current.size.y/2)
@@ -581,8 +619,8 @@ async def drawstructureTreeBasic(connection = None):
 			if drawIt:
 				await spawnCuboid(connection,
 					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
-					Coordinates(design.connectionStrength, z = long),
-					color = design.connectionColor,
+					Coordinates(design.connections.strength, z = long),
+					color = design.connections.color,
 					rotator = Coordinates(x = 90-math.degrees(-alpha)),
 					positionIsCenterPoint = True)
 
@@ -626,7 +664,7 @@ async def drawLayout(connection, positions):
 			deltay = yy-y
 			deltaz = zz-z
 			drawIt = True
-			thickness = min(design.connectionStrength,
+			thickness = min(design.connections.strength,
 				parent.size.x/2, parent.size.y/2,
 				current.size.x/2, current.size.y/2)
 			if deltay == 0:
@@ -640,7 +678,7 @@ async def drawLayout(connection, positions):
 				await spawnCuboid(connection,
 					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
 					Coordinates(thickness, z = long),
-					color = design.connectionColor,
+					color = design.connections.color,
 					rotator = Coordinates(x = 90-math.degrees(-alpha)),
 					positionIsCenterPoint = True)
 
@@ -675,7 +713,7 @@ async def drawstructureForceLayout(connection = None):
 		positions[index] = [positioning, 0]
 		# Keep aligning all layers with horizontal spacing for initilization
 		positioning += newSize.z/2
-		positioning += design.horizontalSpaceBetweenLayers * 5
+		positioning += design.layouting.horizontalSpaceBetweenLayers * 5
 		# storing size
 		sizes.append((newSize.z, newSize.y))
 		# Find all parents of the current layer
@@ -684,8 +722,8 @@ async def drawstructureForceLayout(connection = None):
 				graph.add_edge(indexParent, index) # add an edge in the graph
 
 	# Layouting instructions for modified forceatlas2-algorithm
-	NUMBER_OF_ITERATIONS = 1000
-	NUMBER_OF_PLOTS = 40
+	NUMBER_OF_ITERATIONS = design.layouting.forceAlgorithm.iterations
+	NUMBER_OF_PLOTS = design.layouting.forceAlgorithm.debugDrawPlots
 	forceatlas2 = ForceAtlas2(
 		# Behavior alternatives
 		outboundAttractionDistribution=True, # Dissuade hubs
@@ -693,10 +731,10 @@ async def drawstructureForceLayout(connection = None):
     	groupLinearlyConnectedNodes=True, # only available with networkx layout
 		orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
 		# spacing between the nodes:
-		desiredHorizontalSpacing=500,
-		desiredVerticalSpacing=design.verticalSpaceBetweenLayers-design.horizontalSpaceBetweenLayers,
-		desiredHorizontalSpacingWithinGroup=design.horizontalSpaceBetweenGroupedLayers-design.horizontalSpaceBetweenLayers,
-		bufferZone=design.horizontalSpaceBetweenLayers,
+		desiredHorizontalSpacing=design.layouting.horizontalSpaceBetweenLayers,
+		desiredVerticalSpacing=design.layouting.verticalSpaceBetweenLayers,
+		bufferZone=design.layouting.bufferZone,
+		desiredHorizontalSpacingWithinGroup=design.layouting.horizontalSpaceBetweenGroupedLayers,
 
 		# Performance
 		jitterTolerance=1.0, # Tolerance
@@ -707,7 +745,7 @@ async def drawstructureForceLayout(connection = None):
 		scalingRatio=2.0,
 		strongGravityMode=False,
 		gravity=1.0,
-		randomlyOffsetNodes=10,
+		randomlyOffsetNodes=design.layouting.bufferZone/10,
 
 		# Log
 		verbose=True,

@@ -18,6 +18,8 @@
 #
 # Available under the GPLv3
 
+# Modified for layouting of DNNs
+
 import random
 from sys import version_info
 import time
@@ -32,6 +34,8 @@ import fa2util
 import itertools
 import math
 import functools
+
+from visualizationSettings import layouting
 
 class Timer:
     def __init__(self, name="Timer"):
@@ -220,9 +224,22 @@ class ForceAtlas2:
         # exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
         # exponentialCurveFactorpositive: curved downward, negative: curved upward
         # reverse: False = from 0 to 1, True = from 1 to 0
-        # see https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+%5B0%2C1%5D
-        @functools.lru_cache(maxsize=10)
-        def exponentialCurve(i, exponentialCurveFactor, reverse = False):
+        # Here an example with the exponentialCurveFactor of 5:
+        # https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
+        @functools.lru_cache(maxsize=25)
+        def exponentialCurve(i, exponentialCurveFactor, importance=None, reverse = False):
+            if importance is not None:
+                if importance == 'increasing':
+                    return exponentialCurve(i, exponentialCurveFactor, None, False)
+                if importance == 'decreasing':
+                    return exponentialCurve(i, exponentialCurveFactor, None, True)
+                if importance == 'midway':
+                    return exponentialCurve(i, exponentialCurveFactor, None, True) * exponentialCurve(i, exponentialCurveFactor, None, False)
+                if importance == 'none':
+                    return 0
+                # otherwise can't parse! So print warning and ignore it
+                print("Warning! Exponential curve function cannot understand importance parameter " + importance)
+                importance = None
             x = i / iterations
             if reverse:
                 x = 1 - x
@@ -259,35 +276,39 @@ class ForceAtlas2:
             repulsion_timer.stop()
             overlap_repulsion_timer.start()
             if quadsizes is not None:
-
-                strength = 3 * exponentialCurve(i, 1)
+                strength = layouting.overlapRepulsion.strength * \
+                    exponentialCurve(i,
+                    layouting.overlapRepulsion.exponentialCurveFactor,
+                    layouting.overlapRepulsion.importance)
                 fa2util.apply_overlap_repulsion(nodes, self.scalingRatio*strength, self.desiredHorizontalSpacing, self.desiredVerticalSpacing, self.bufferZone)
-
             overlap_repulsion_timer.stop()
 
             # Gravitational forces
             gravity_timer.start()
-
-            strength = exponentialCurve(i, 1, True)
+            strength = layouting.gravity.strength * \
+                exponentialCurve(i,
+                layouting.gravity.exponentialCurveFactor,
+                layouting.gravity.importance)
             fa2util.apply_gravity(nodes, self.gravity, scalingRatio=self.scalingRatio*strength, useStrongGravity=self.strongGravityMode)
-
             gravity_timer.stop()
 
             # If other forms of attraction were implemented they would be selected here.
             attraction_timer.start()
             if self.orderconnectedQuadsOnXaxis:
-                
-                strength = 100 * exponentialCurve(i, 1, True)
-                fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
-
+                strength = layouting.connectedAttraction.strength * \
+                    exponentialCurve(i,
+                    layouting.connectedAttraction.exponentialCurveFactor,
+                    layouting.connectedAttraction.importance)
+                fa2util.apply_attraction_to_sides(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation*strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing, self.bufferZone)
             else:
                 fa2util.apply_attraction(nodes, edges, self.outboundAttractionDistribution, outboundAttCompensation, self.edgeWeightInfluence)
             # order along x axis: directional attraction
             if self.orderconnectedQuadsOnXaxis:
-
-                strength = 1000 * exponentialCurve(i, 1) * exponentialCurve(i, 1, True)
+                strength = layouting.shiftOnAxisToOrderByIndex.strength * \
+                    exponentialCurve(i,
+                    layouting.shiftOnAxisToOrderByIndex.exponentialCurveFactor,
+                    layouting.shiftOnAxisToOrderByIndex.importance)
                 fa2util.apply_directional_attraction(nodes, edges, self.outboundAttractionDistribution, strength, self.edgeWeightInfluence, self.desiredHorizontalSpacing)
-                
             attraction_timer.stop()
 
             # Adjust speeds and apply forces
@@ -413,7 +434,7 @@ class ForceAtlas2:
             return [(n.x, n.y) for n in nodes]
 
     def groupNodes(self, G, pos, quadsizes, weight_attr):
-        if self.desiredHorizontalSpacingWithinGroup == None:
+        if self.desiredHorizontalSpacingWithinGroup is None:
             self.desiredHorizontalSpacingWithinGroup = self.desiredHorizontalSpacing
 
         M = networkx.to_scipy_sparse_matrix(G, dtype='f', format='lil', weight=weight_attr)
@@ -480,11 +501,11 @@ class ForceAtlas2:
                     offsets.append([pos[node][0]-groupspos[index][0], pos[node][1]-groupspos[index][1]])
                 groupsoffsets.append(offsets)
             else: # use position of first node, then align horizontally with desired spacing + buffer
-                groupwidth = - self.desiredHorizontalSpacingWithinGroup - self.bufferZone
+                groupwidth = - self.desiredHorizontalSpacingWithinGroup
                 maxheight = 0
                 for node in group:
                     groupwidth += quadsizes[node][0]
-                    groupwidth += self.desiredHorizontalSpacingWithinGroup + self.bufferZone
+                    groupwidth += self.desiredHorizontalSpacingWithinGroup
                     maxheight = max(maxheight, quadsizes[node][1])
                 groupssize.append((groupwidth, maxheight))
                 groupspos[index] = [pos[group[0]][0] - quadsizes[0][0]/2 + groupwidth/2, pos[group[0]][1]]
@@ -494,7 +515,7 @@ class ForceAtlas2:
                     offset += quadsizes[node][0] / 2
                     offsets.append([offset, 0])
                     offset += quadsizes[node][0] / 2
-                    offset += self.desiredHorizontalSpacingWithinGroup + self.bufferZone
+                    offset += self.desiredHorizontalSpacingWithinGroup
                 groupsoffsets.append(offsets)
         groupssize = numpy.array(groupssize)
 

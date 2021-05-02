@@ -20,18 +20,55 @@ layerColors = {
 	"flatten": (0, .7, .1),
 
 	# For anything unknown / unspecified. This "default" value always needs to be kept!
-	"default": (.4),
+	"default": .4,
 }
-connectionColor = .3
 
-horizontalSpaceBetweenLayers = 500
-horizontalSpaceBetweenGroupedLayers = 100
-verticalSpaceBetweenLayers = 100
-drawConnections = True
-angledConnections = True
-connectionStrength = 70
+class connections:
+	display = True
+	strength = 70
+	color = .3
+
+class layouting:
+	horizontalSpaceBetweenGroupedLayers = 100
+	bufferZone = 500
+	horizontalSpaceBetweenLayers = 500
+	verticalSpaceBetweenLayers = -400
+
+	# SETTINGS FOR THE FORCE ALGORITHM:
+	iterations = 1000
+	debugDrawPlots = 40 # number of plots to draw
+	# You need to close the drawn plot window on the server before the layout can be sent.
+	# Put a 0 to not draw any plots
+
+	# Finetune importance of certain rules during force algorithm iterations.
+	# importance can be 'increasing' (0 at start), 'decreasing' (0 at end)
+	# or 'midway' (0 at start and end, just multiplies increasing * decreasing)
+	# exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
+	# positive: curved downward, negative: curved upward. example with factor 5:
+	# https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
+	# Use importance = 'none' or strength = 0 to disable a rule
+	class overlapRepulsion:
+		strength = 3
+		importance = 'increasing'
+		exponentialCurveFactor = 1
+	class gravity:
+		strength = 1
+		importance = 'decreasing'
+		exponentialCurveFactor = 1
+	class connectedAttraction:
+		strength = 100
+		importance = 'decreasing'
+		exponentialCurveFactor = 1
+	class shiftOnAxisToOrderByIndex:
+		strength = 1000
+		importance = 'midway'
+		exponentialCurveFactor = 1
+		
+
+
+
 
 # INITIALIZATIONS
 
-# revert capitalization and spaces, this is done for a more human-readable specification above.
+# revert capitalization and spaces, this is done to facilitate a more human-readable specification above.
 layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}

@@ -10,6 +10,10 @@
 #
 # Available under the GPLv3
 
+# Modifications made for DNN layouting: Included numpy in functions,
+# so they run quick even without using cython
+# And added some new functions
+
 from math import factorial, sqrt
 import numpy as np
 import math
@@ -73,8 +77,11 @@ def sign(x):
         return -1
     return 0
 
-# Repulsion function.  `n1` and `n2` should be nodes.  This will
-# adjust the dx and dy values of `n1`  `n2`
+# Repulsion function.  `n1` and `n2` should be nodes with sizes.
+# coefficient specifies the strength of this effect.
+# xspacing, yspacing and added bufferZone specifies
+# what area around the quads should not overlap.
+# This will adjust the dx and dy values of `n1`  `n2`
 def linOverlapRepulsion(n1, n2, coefficient=0, xspacing=0, yspacing=0, bufferZone=0):
     xDist = n1.x - n2.x
     bigxspacing = xspacing + bufferZone + n1.width/2 + n2.width/2
@@ -167,15 +174,18 @@ def linAttraction(n1, n2, e, distributedAttraction, coefficient=0, onlyAlongXaxi
         n2.dy -= yDist * factor
 
 
-# Attraction function.  `n1` and `n2` should be nodes.  This will
+# Attraction function to attract nodes along their sides
+# considering their index order and desired spacing
+# including buffer zones.
+# `n1` and `n2` should be nodes with sizes.  This will
 # adjust the dx and dy values of `n1` and `n2`.  It does
 # not return anything.
-def linAttractionSides(n1, n2, e, distributedAttraction, coefficient=0, xspacing=0, yspacing=0):
+def linAttractionSides(n1, n2, e, distributedAttraction, coefficient=0, xspacing=0, bufferZone=0):
     if n1.id < n2.id:
         nleft, nright = n1, n2
     else:
         nleft, nright = n2, n1
-    xDist = nright.x - nleft.x - xspacing - nleft.width/2 - nright.width/2
+    xDist = nright.x - nleft.x - xspacing - bufferZone - nleft.width/2 - nright.width/2
     yDist = nright.y - nleft.y
     # if yDist > 0:
     #     yDist -= yspacing + nleft.height/2 + nright.height/2
@@ -210,6 +220,7 @@ def apply_repulsion(nodes, coefficient):
 # The following functions iterate through the nodes or edges and apply
 # the forces directly to the node objects.  These iterations are here
 # instead of the main file because Python is slow with loops.
+# Optimized using numpy and optionally checked against the original algorithm.
 def apply_repulsion_fast(nodes, coefficient, debugAlgorithm = False):
     if (debugAlgorithm):
         i = 0
@@ -288,6 +299,7 @@ def apply_overlap_repulsion(nodes, coefficient, xspacing=0, yspacing=0, bufferZo
 # instead of the main file because Python is slow with loops.
 
 # not really faster as it's too complicated, so not recommended to be used
+# Could be useful for DNNs that contain thousands of layers instead of hundreds.
 def apply_overlap_repulsion_fast(nodes, coefficient, xspacing=0, yspacing=0, bufferZone=0):
     maxdistx = max([n.width for n in nodes]) + xspacing + bufferZone
     maxdisty = max([n.height for n in nodes]) + yspacing + bufferZone
@@ -331,18 +343,18 @@ def apply_attraction(nodes, edges, distributedAttraction, coefficient, edgeWeigh
             linAttraction(nodes[edge.node1], nodes[edge.node2], pow(edge.weight, edgeWeightInfluence),
                           distributedAttraction, coefficient)
 
-def apply_attraction_to_sides(nodes, edges, distributedAttraction, coefficient, edgeWeightInfluence, desiredHorizontalSpacing):
+def apply_attraction_to_sides(nodes, edges, distributedAttraction, coefficient, edgeWeightInfluence, desiredHorizontalSpacing, bufferZone):
     # Optimization, since usually edgeWeightInfluence is 0 or 1, and pow is slow
     if edgeWeightInfluence == 0:
         for edge in edges:
-            linAttractionSides(nodes[edge.node1], nodes[edge.node2], 1, distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing)
+            linAttractionSides(nodes[edge.node1], nodes[edge.node2], 1, distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing, bufferZone=bufferZone)
     elif edgeWeightInfluence == 1:
         for edge in edges:
-            linAttractionSides(nodes[edge.node1], nodes[edge.node2], edge.weight, distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing)
+            linAttractionSides(nodes[edge.node1], nodes[edge.node2], edge.weight, distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing, bufferZone=bufferZone)
     else:
         for edge in edges:
             linAttractionSides(nodes[edge.node1], nodes[edge.node2], pow(edge.weight, edgeWeightInfluence),
-                          distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing)
+                          distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing, bufferZone=bufferZone)
 
 def apply_directional_attraction(nodes, edges, distributedAttraction, coefficient, edgeWeightInfluence, desiredHorizontalSpacing):
     # Optimization, since usually edgeWeightInfluence is 0 or 1, and pow is slow
