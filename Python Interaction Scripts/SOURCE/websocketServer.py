@@ -249,7 +249,10 @@ def startServer():
 			asyncio.get_event_loop().run_until_complete(newServer)
 			# Great, print the success
 			loggingFunctions.printlog(beautifulDebug.B_GREEN + "Websocket server has been started. " +
-				"Listening for incoming connection requests...\n" + beautifulDebug.RESET, verbosity = -1)
+				"Listening for incoming connection requests...\n" +
+				'Type "server info" for a current status and a hint on what to do next ' +
+				'or "help" for a list of available commands on this server.\n' +
+				beautifulDebug.RESET, verbosity = -1)
 			# Set triesLeft to 0 to avoid restarts after server shutdown
 			triesLeft = 0
 
