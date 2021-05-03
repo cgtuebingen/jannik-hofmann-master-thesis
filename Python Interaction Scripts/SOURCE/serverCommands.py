@@ -715,10 +715,32 @@ class Request:
 
 	async def serverInfo(self, **kwargs):
 		await self.checkParams(0)
-		await self.sendstatus(-30, f"According the python server settings, this websocket server is located on {setting.SERVER_IP}:{setting.SERVER_PORT}")
+		text = f"You are connected to the python interaction server, " + \
+			f"which is located on {setting.SERVER_IP}:{setting.SERVER_PORT}"
+		finaloutput = text
+		#await self.sendstatus(-30, text, False)
+		if not(ai.tfloaded()):
+			text = f"No neural network has been loaded in this server session yet (or a loaded one has been reset).\n" + \
+				'Use the command "nn load ..." to load a neural network. More info available on typing "help nn load"'
+			finaloutput += '\n\n' + text
+			#await self.sendstatus(1, text, False)
+		else:
+			text = f"A neural network has been successfully loaded and initialized on this server."
+			#await self.sendstatus(-30, text, False)
+			if not hasattr(ai.tfnet, "layoutPositions") or ai.tfnet.layoutPositions is None:
+				text = f"The layouting of the initialized neural network has not been calculated yet.\n" + \
+				'Use the command "tf draw structure" to execute the force-based algorithm and receive drawing instructions.'
+				finaloutput += '\n\n' + text
+				#await self.sendstatus(1, text, False)
+			else:
+				text = f"The layouting for the loaded network has already been calculated and drawn."
+				finaloutput += '\n\n' + text
+				#await self.sendstatus(-30, text, False)
+		await self.sendstatus(-30, finaloutput, False)
 	commandList["server info"] = (serverInfo, "Gives back the IP address and port of the active websocket server as verbose status",
 		'Does not take parameters and responds with a verbose text as status level -30 (successful).\n' +
 		'IP and port are returned according to the python server settings')
+	commandList["server status"] = commandAlias("server info")
 
 
 	async def serverIP(self, **kwargs):
@@ -837,16 +859,22 @@ class Request:
 
 	async def teststatus(self, **kwargs):
 		await self.checkParams(0, 1)
-		level = await self.getParam(1, -30)
-		text = f"This is a fake status message of level {level} as " + \
-			"requested by the client."
-		if (level >= 20):
-			text += "\nRaising an exception and shutting down the system has been suppressed, " + \
-				"although this would normally happen on level 20+"
-		await self.sendstatus(level, text, False)
+		if await self.checkParams(1, 1, warnUser=False):
+			level = await self.getParam(1, -30)
+			text = f"This is a fake status message of level {level} as " + \
+				"requested by the client."
+			if (level >= 20):
+				text += "\nRaising an exception and shutting down the system has been suppressed, " + \
+					"although this would normally happen on level 20+"
+			await self.sendstatus(level, text, False)
+		else:
+			text = f'You are connected to the python interaction server. ' + \
+				f'Type the command "server info" for more information.'
+			await self.sendstatus(-30, text, False)
 	commandList["send status"] = (teststatus, "Sends a test status message",
 		"First and only parameter defines the level (importance) of that debug message. " +
-		"Defaults to -30 (successful)")
+		"Defaults to -30 (successful)\n" +
+		'Not to be confused with the command "server status" which returns the current state of this server.')
 
 
 	async def add(self, **kwargs):

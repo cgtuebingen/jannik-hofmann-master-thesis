@@ -310,7 +310,7 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		posSizeColor = [float(i) for i in
 			position.list() + size.list() + formatColor(color) + rotator.list()]
 		await connection.send(("SPAWN CUBOID pos size color opacity rot", posSizeColor))
-		#await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
+		await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
 def sizeFromLayerDimensions(layerDims, scaleDims=None, addToDims=None, minDims=None, maxDims=None):
