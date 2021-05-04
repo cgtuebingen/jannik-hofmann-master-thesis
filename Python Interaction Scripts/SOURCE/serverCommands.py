@@ -605,16 +605,16 @@ class Request:
 				setting.DESIRED_VERBOSITY = newVerbosity
 				infotext = f"Verbosity level of the server has been changed to {newVerbosity}."
 				await self.senddebug(-1, infotext)
-				if (-1 <= -setting.DESIRED_VERBOSITY):
+				if (-1 < setting.DESIRED_VERBOSITY):
 					loggingFunctions.log(infotext)
 					# To make sure that at least the logfile logs this change to avoid confusion
 					# about missing debug info later on
 	commandList["set verbosity"] = (setverbosity, "Displays or sets the desired verbosity level",
 		'Without parameter, it displays the current verbosity level of the server.\nA parameter ' +
 		'changes the servers verbosity level of debug and status information. Will affect which ' +
-		'messages are printed in the console and stored in the logfile.\nThe higher you go the ' +
-		'more verbose debug info gets printed. 11 = all debug, 0 = only warnings and errors, ' +
-		'-1 = ignore mild warnings, -9 = ignore all warnings, -10 = ignore mild errors, -19 = ' +
+		'messages are printed in the console and stored in the logfile.\nThe lower you go the ' +
+		'more verbose debug info gets printed. -10 = all debug, 1 = only warnings and errors, ' +
+		'3 = ignore mild warnings, 10 = ignore all warnings, 11 = ignore mild errors, 20 = ' +
 		'don''t print any non-critical errors.')
 	commandList["verbosity"] = commandAlias("set verbosity")
 

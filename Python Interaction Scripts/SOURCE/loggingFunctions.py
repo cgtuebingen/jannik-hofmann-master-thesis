@@ -82,7 +82,7 @@ def warn(text, verbosity = 5):
 # Prints and logs a specified text, optionally according to specified verbosity preferences
 def printlog(text, verbosity = None):
 	if verbosity is not None:
-		if (verbosity <= -setting.DESIRED_VERBOSITY):
+		if (verbosity < setting.DESIRED_VERBOSITY):
 			# Not important enough for the user, discard
 			return True
 

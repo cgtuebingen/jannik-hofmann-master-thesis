@@ -61,11 +61,11 @@ LOGFILE_PATH +=	R"\session " + datetime.now().strftime("on %Y-%m-%d at %H %M") +
 
 #LOGFILE_PATH = None# This deactivates logging entirely. Not recommended.
 
-# Desired level of debugging verbosity in console and debug. The higher you go the more verbose
-# debug info gets printed. 11 = all debug, 0 = only warnings and errors, -1 = ignore mild warnings,
-# -9 = ignore all warnings, -10 = ignore mild errors, -19 = don't print any non-critical errors.
+# Desired level of debugging verbosity in console and debug. The lower you go the more verbose
+# debug info gets printed. -11 = all debug, 0 = only warnings and errors, 1 = ignore mild warnings,
+# 9 = ignore all warnings, 10 = ignore mild errors, 19 = don't print any non-critical errors.
 # Also changes what is stored in the logfile.
-DESIRED_VERBOSITY = 11
+DESIRED_VERBOSITY = -11
 
 # Prints colored output in the console. Nevertheless, ansi color codes will be emitted from the log
 PRINT_COLOR_ANSI_CODES = True
