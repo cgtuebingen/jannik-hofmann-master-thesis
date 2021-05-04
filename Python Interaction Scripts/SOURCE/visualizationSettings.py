@@ -52,7 +52,7 @@ class layouting:
 	# SETTINGS FOR THE FORCE ALGORITHM:
 	iterations = 1200 # starting at 0, ending one below
 	class debug:
-		drawPlots = True # If this is False, this whole debug section will be deactivated
+		drawPlots = False # If this is False, this whole debug section will be deactivated
 		# With this enabled, the layouting cannot run in an async thread and will block the server
 		# You need to close the drawn plot window on the server before the layout can be sent
 		numberOfPlots = 20 # number of plots to draw during layouting iterations

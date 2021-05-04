@@ -715,11 +715,11 @@ async def drawLayout(connection, positions):
 				zz = current.position.z
 				deltay = yy-y
 				deltaz = zz-z
-				if math.isclose(deltaz, 0) and \
-					math.isclose(deltay - current.size.y/2 - parent.size.y/2,
-					design.layouting.horizontalSpaceBetweenGroupedLayers) and \
-					not design.connections.displayBetweenGroupedLayers:
-						continue # connection between grouped layers should not be drawn
+				if not design.connections.displayBetweenGroupedLayers:
+					if math.isclose(deltaz - current.size.z/2 - parent.size.z/2,
+						design.layouting.horizontalSpaceBetweenGroupedLayers) and \
+						math.isclose(deltay, 0):
+							continue # connection between grouped layers should not be drawn
 				thickness = min(design.connections.strength,
 					parent.size.x/2, parent.size.y/2,
 					current.size.x/2, current.size.y/2)
