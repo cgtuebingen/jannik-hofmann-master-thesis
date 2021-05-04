@@ -274,11 +274,11 @@ class Request:
 	# Sends a debug message to the client.
 	# decreasing level = less important / more verbose debug info
 	async def senddebug(self, level, info, autoShutdownOnCriticalError = True, *,
-		sendToServer = True, removeOutsideWhitespace = True):
+		sendToClient = True, removeOutsideWhitespace = True):
 		assert type(level) is int
 		assert type(info) is str
 
-		if (sendToServer):
+		if sendToClient:
 			# create structure according to data specification and send it packed by msgpack
 			struct = info
 			if (removeOutsideWhitespace):
@@ -297,7 +297,7 @@ class Request:
 			sentSuccessfully = True
 
 		# print if user chosen verbosity level demands it
-		if (sentSuccessfully and (level > -setting.DESIRED_VERBOSITY or level == 0)):
+		if (sentSuccessfully and (level >= setting.DESIRED_VERBOSITY or level == 0)):
 			if (level >= 20): # critical error / failure. shuts down the client system
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 					f"\n> CRITICAL ERROR (lvl {level}) with {self.command}!\nX {info}\n", True, self.command))

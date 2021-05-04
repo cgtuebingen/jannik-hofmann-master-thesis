@@ -208,10 +208,11 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			
 			# Give other threads a chance to pass through. This should have a negligible effect
 			# on performance exclusively on &-chained commands.
-			if (len(chainedCommands) > 0):
-				await sleep(0.001, "Chained commands " + str(chainedCommands))
-			else:
-				await sleep(0.001, "websocket connection that has been left open")
+			if not setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
+				if (len(chainedCommands) > 0):
+					await sleep(0.001, "Chained commands " + str(chainedCommands))
+				else:
+					await sleep(0.001, "websocket connection that has been left open")
 
 		except asyncio.CancelledError:
 			# Command thread has been interrupted from outside, probably by command "server stop"

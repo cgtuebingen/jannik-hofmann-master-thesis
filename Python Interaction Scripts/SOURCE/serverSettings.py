@@ -17,9 +17,11 @@ DEBUG_USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary
 # This allows the server to draw a precached structure without loading any model
 
 
-# WEBSOCKET SERVER SETTINGS
+# WEBSOCKET SERVER ADDRESS
 SERVER_IP = "localhost"
 SERVER_PORT = 80
+
+# WEBSOCKET SERVER SETTINGS
 MAX_MESSAGE_SIZE = 2**24 # in bytes. should not be larger than 2**24 without changing msgpack specs
 TIMES_TO_RETRY_ESTABLISHING_SERVER = 10 # needs to be at least 1
 SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER = 1 # should be at least 1
@@ -28,7 +30,7 @@ SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER = 1 # should be at least 1
 # If enabled and you want to relay an ampersand to a command, escape it with a double ampersand
 AMPERSAND_CHAINS_COMMANDS = True
 # If commands can be chained, this determines whether following commands will still be executed
-# after encountering an error with a previous command
+# after encountering an error with a previous command or after "server stop" has been called
 EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE = False
 
 # Allows the websocket client to execute and evaluate any string with python.
