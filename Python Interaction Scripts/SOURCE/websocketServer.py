@@ -219,7 +219,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 				" has been interrupted from the outside! Command execution could not be finished properly."
 			# Trying to at least transfer error message to client
 			try:
-				await commandInstance.senddebug(10, errormsg)
+				await commandInstance.senddebug(5, errormsg)
 			except:
 				# No chance, then just print and log it on the server
 				loggingFunctions.printlog(beautifulDebug.B_RED + beautifulDebug.BOLD + errormsg + beautifulDebug.RESET,
@@ -236,7 +236,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 				"! The connection has been closed by the client and is no longer available."
 			# Trying to at least transfer error message to client
 			try:
-				await commandInstance.senddebug(10, errormsg)
+				await commandInstance.senddebug(7, errormsg)
 			except:
 				# No chance, then just print and log it on the server
 				loggingFunctions.printlog(beautifulDebug.B_RED + beautifulDebug.BOLD + errormsg + beautifulDebug.RESET,
@@ -359,7 +359,7 @@ async def sleep(delay, description):
 
 # Stops and interrupts all ongoing coroutines
 # Returns a list of descriptions of all the cancelled tasks
-async def stopCoroutines2():
+async def cancelYieldingCoroutines():
 	global yieldingCoroutines
 	if len(yieldingCoroutines) == 0:
 		return []
@@ -376,7 +376,7 @@ async def stopCoroutines2():
 # Stops and interrupts all ongoing coroutines
 # Returns a list of descriptions of all the cancelled tasks
 async def stopCoroutines():
-	return await asyncio.create_task(stopCoroutines2())
+	return await asyncio.create_task(cancelYieldingCoroutines())
 
 
 # Shuts down the server after optionally displaying and sending the specified message
