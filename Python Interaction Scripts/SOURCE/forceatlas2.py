@@ -35,8 +35,10 @@ import fa2util
 import itertools
 import math
 import functools
+import asyncio
 
 from visualizationSettings import layouting
+import websocketServer as server
 
 class Timer:
     def __init__(self, name="Timer"):
@@ -180,7 +182,7 @@ class ForceAtlas2:
     #
     # Currently, only undirected graphs are supported so the adjacency matrix
     # should be symmetric.
-    def forceatlas2(self,
+    async def forceatlas2(self,
                     G,  # a graph in 2D numpy ndarray format (or) scipy sparse matrix format
                     pos=None,  # Array of initial positions
                     quadsizes=None, # List of sizes of the graph nodes [(width, height)]
@@ -264,8 +266,10 @@ class ForceAtlas2:
             return 0
 
         #for _i in niters:
-        def execute_once(i):
+        async def execute_once(i):
             nonlocal speed, speedEfficiency, nodes, edges, outboundAttCompensation, barneshut_timer, repulsion_timer, overlap_repulsion_timer, gravity_timer, attraction_timer, applyforces_timer, quadsizes
+
+            await server.sleep(0.001, f"Layouting at iteration {i} of {iterations}")
 
             for n in nodes:
                 n.old_dx = n.dx
@@ -397,13 +401,13 @@ class ForceAtlas2:
                 goUntil = min(goUntil, iterations)
                 while iterationCounter < goUntil:
                     iterationCounter += 1
-                    execute_once(iterationCounter)
+                    asyncio.run(execute_once(iterationCounter))
                     if self.verbose: nonlocal pbar
                     if self.verbose: pbar.update(1)
                 draw(iterationCounter)
                 #print("gountil " + str(goUntil))
                 #print("drawing " + str(iterationCounter))
-            
+
             import matplotlib.pyplot as plt
             from matplotlib.animation import FuncAnimation
             fig, ax = plt.subplots(figsize=(6,4))
@@ -424,7 +428,7 @@ class ForceAtlas2:
             if self.verbose:
                 niters = tqdm(niters)
             for i in niters:
-                execute_once(i)
+                await execute_once(i)
         
         if self.verbose:
             if self.barnesHutOptimize:
@@ -537,7 +541,7 @@ class ForceAtlas2:
     #
     # This function returns a NetworkX layout, which is really just a
     # dictionary of node positions (2D X-Y tuples) indexed by the node name.
-    def forceatlas2_networkx_layout(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
+    async def forceatlas2_networkx_layout_async(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
         try:
             import cynetworkx
         except ImportError:
@@ -564,21 +568,24 @@ class ForceAtlas2:
             assert (quadsizes.shape[1] == 2), \
                 "quadsizes has the wrong dimensions. Each node entry must have exactly two float values: width and height"
         if pos is None:
-            l = self.forceatlas2(M, pos=None, quadsizes=quadsizes, iterations=iterations)
+            l = await self.forceatlas2(M, pos=None, quadsizes=quadsizes, iterations=iterations)
         else:
             if self.groupLinearlyConnectedNodes:
                 groupsposlist = numpy.asarray([groupspos[i] for i in graph.nodes()])
-                l = self.forceatlas2(GroupedM, pos=groupsposlist, quadsizes=groupssize, iterations=iterations,
+                l = await self.forceatlas2(GroupedM, pos=groupsposlist, quadsizes=groupssize, iterations=iterations,
                     groups=groups, individualG=M, individualPosOffset=groupsoffsets, individualSizes=quadsizes)
             else:
                 poslist = numpy.asarray([pos[i] for i in G.nodes()])
-                l = self.forceatlas2(M, pos=poslist, quadsizes=quadsizes, iterations=iterations)
+                l = await self.forceatlas2(M, pos=poslist, quadsizes=quadsizes, iterations=iterations)
         return dict(zip(G.nodes(), l))
+
+    def forceatlas2_networkx_layout(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
+        return asyncio.run(self.forceatlas2_networkx_layout_async(G, pos, quadsizes, iterations, weight_attr))
 
     # A layout for igraph.
     #
     # This function returns an igraph layout
-    def forceatlas2_igraph_layout(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
+    async def forceatlas2_igraph_layout_async(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
         from scipy.sparse import csr_matrix
         import igraph
 
@@ -614,10 +621,13 @@ class ForceAtlas2:
         adj = to_sparse(G, weight_attr)
         if self.groupLinearlyConnectedNodes:
             groupsposlist = numpy.asarray([groupspos[i] for i in graph.nodes()])
-            coords = self.forceatlas2(GroupedM, pos=groupsposlist, quadsizes=groupssize, iterations=iterations,
+            coords = await self.forceatlas2(GroupedM, pos=groupsposlist, quadsizes=groupssize, iterations=iterations,
                 groups=groups, individualG=adj, individualPosOffset=groupsoffsets, individualSizes=quadsizes)
         else:
             poslist = numpy.asarray([pos[i] for i in G.nodes()])
-            coords = self.forceatlas2(adj, pos=poslist, quadsizes=quadsizes, iterations=iterations)
+            coords = await self.forceatlas2(adj, pos=poslist, quadsizes=quadsizes, iterations=iterations)
 
         return igraph.layout.Layout(coords, 2)
+
+    def forceatlas2_igraph_layout(self, G, pos=None, quadsizes=None, iterations=100, weight_attr=None):
+        asyncio.run(self.forceatlas2_igraph_layout_async(G, pos, quadsizes, iterations, weight_attr))

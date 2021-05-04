@@ -27,6 +27,7 @@ import networkx as nx
 
 # LOCAL IMPORTS
 import visualizationSettings as design
+import websocketServer as server
 import aiInteraction as ai
 import serverCommands
 import loggingFunctions
@@ -310,7 +311,7 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		posSizeColor = [float(i) for i in
 			position.list() + size.list() + formatColor(color) + rotator.list()]
 		await connection.send(("SPAWN CUBOID pos size color opacity rot", posSizeColor))
-		await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
+		await server.sleep(0.2, "Spawning cuboids in the virtual world") # TODO: Find way to spawn all in the same frame
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
 def sizeFromLayerDimensions(layerDims):
@@ -372,7 +373,6 @@ def sizeFromLayerDimensions(layerDims):
 	for i in range(3):
 		size[i] = max(size[i], minDims[i])
 		size[i] = min(size[i], maxDims[i])
-	print(size)
 	return Coordinates(size)
 
 # DEPRECATED
@@ -746,8 +746,10 @@ async def drawLayout(connection, positions):
 # Using modified forceatlas2-algorithm for layouting
 async def drawstructureForceLayout(connection = None):
 	if not hasattr(ai.tfnet, "layoutPositions") or ai.tfnet.layoutPositions is None:
+		# layouting hasn't been calculated yet, so we need to do the force layout from scratch
+
 		if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
-			# Wait, we can't draw that
+			# Wait, we can't draw that, network doesn't have a valid structure...
 			return False
 		
 		# Creating a graph layout from the layer structure...
@@ -805,13 +807,12 @@ async def drawstructureForceLayout(connection = None):
 			addedMsPerFrame=0
 		)
 		# execute force based algorithm
-		ai.tfnet.layoutPositions = forceatlas2.forceatlas2_networkx_layout(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
+		ai.tfnet.layoutPositions = await forceatlas2.forceatlas2_networkx_layout_async(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
 	# draw layers at the resulting positions
 	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
 # Choose which one to use by default
 async def drawstructure(connection = None):
-	#await drawstructureLinearly(connection)
 	await drawstructureForceLayout(connection)
 
 

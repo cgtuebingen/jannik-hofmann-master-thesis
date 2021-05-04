@@ -620,7 +620,7 @@ class Request:
 
 
 	async def clearScreenInSeconds(self, waitSeconds=0):
-		await asyncio.sleep(waitSeconds)
+		await server.sleep(waitSeconds, "Clear screen command")
 		beautifulDebug.clearScreen()
 
 
@@ -654,7 +654,8 @@ class Request:
 		sleepDuration = await self.getParam(1, 2.0)
 		await self.senddebug(-10, "Sleeping now for " + str(sleepDuration) + " seconds.")
 		#time.sleep(sleepDuration) # blocks whole thread and doesn't allow other async execution
-		await asyncio.sleep(sleepDuration) # allows other async operations to run
+		await server.sleep(sleepDuration, "Test sleep command, sleeping for " + str(sleepDuration) + " seconds.")
+		#await asyncio.sleep(sleepDuration) # allows other async operations to run
 		await self.senddebug(-9, "Slept successfully for " + str(sleepDuration) + " seconds.")
 	commandList["test sleep"] = (sleeptest, "Sleeps for specified number of seconds",
 		"First and only parameter should be of type float, defaults to 2\n" +
@@ -717,6 +718,11 @@ class Request:
 		await self.checkParams(0)
 		text = f"You are connected to the python interaction server, " + \
 			f"which is located on {setting.SERVER_IP}:{setting.SERVER_PORT}"
+		if len(server.yieldingCoroutines) == 0:
+			text += f'\n(No other command coroutines are currently running on the server)'
+		else:
+			text += f'\nCurrently running command coroutines:\n      ' + \
+				'\n      '.join(desc for (_, desc) in server.yieldingCoroutines)
 		finaloutput = text
 		#await self.sendstatus(-30, text, False)
 		if not(ai.tfloaded()):
@@ -800,6 +806,22 @@ class Request:
 		"the python interaction server. Neural networks will be unloaded and the server resets " +
 		"its state to the initial server state.")
 	commandList["server reset"] = commandAlias("server restart")
+
+
+	async def stopCoroutines(self, **kwargs):
+		await self.checkParams(0)
+		stopped = await server.stopCoroutines()
+		if len(stopped) == 0:
+			await self.senddebug(10, f"Nothing to stop. No stoppable coroutines are currently running or yielding to be stopped")
+		else:
+			await self.sendstatus(-30, f"Successfully interrupted these processes:\n      " + '\n      '.join(stopped) +
+				"\nPlease be aware that stopping coroutines this way might lead to undefined behaviour! " +
+				'It is recommended to reinitialize the server with "server reset"')
+	commandList["server stop"] = (stopCoroutines, "Interrupts all running coroutines",
+		"Interrupts all running coroutines that yield to be stopped. This can be used " +
+		"to stop command processing that has taken much longer than expected.\n" +
+		"Should only be used in emergencies, as it might lead to undefined behaviour. " +
+		'It is recommended to reinitialize the server afterwards with the command "server reset"')
 
 
 	async def sendalot(self, **kwargs):
@@ -1120,7 +1142,7 @@ class Request:
 		try:
 			await self.sendstatus(-10, f"Neural network at {path} is being loaded. This might " +
 				"take a while. Please view the python console for further information and loading details.")
-			await asyncio.sleep(0.1) # make sure other async tasks have a chance to be executed before
+			await server.sleep(0.1, "Loading neural network") # make sure other async tasks have a chance to be executed before
 			# blocking main thread for a while (so that the previous status mesage gets send properly)
 			ai.preparemodule(path, True)
 		except:
@@ -1128,6 +1150,8 @@ class Request:
 				traceback.format_exc())
 			return False
 		
+		await server.sleep(0.1, "Initializing neural network") # make sure other async tasks have a chance to be executed before
+		# blocking main thread for a while (so that the previous status mesage gets send properly)
 		try:
 			if (ai.preparedModuleIsTf()):
 				ai.importtf()
@@ -1230,6 +1254,8 @@ class Request:
 					"which needs to be closed manually after completion, before the layout can be sent via websocket.")
 		try:
 			await vis.drawstructure(self) # Includes layouting calculations
+		except asyncio.CancelledError:
+			raise asyncio.CancelledError
 		except:
 			await self.sendstatus(17, f"Couldn't draw tensorflow structure!\n" +
 				traceback.format_exc())

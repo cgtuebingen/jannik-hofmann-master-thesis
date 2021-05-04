@@ -27,7 +27,7 @@ import loggingFunctions
 PYTHON_INTERACTION_SCRIPT_VERSION = "0.1.0"
 
 # WEBSOCKET SERVER THAT INTERACTS WITH COMMANDS
-async def interactiveServer	(websocket, path, *, initialCommand=None, debugDisconnect=True):
+async def interactiveServer(websocket, path, *, initialCommand=None, debugDisconnect=True):
 	# Create a new command instance for this client connection and store the websocket connection,
 	# as well as the command string
 	commandInstance = serverCommands.Request(websocket, initialCommand)
@@ -208,9 +208,47 @@ async def interactiveServer	(websocket, path, *, initialCommand=None, debugDisco
 			
 			# Give other threads a chance to pass through. This should have a negligible effect
 			# on performance exclusively on &-chained commands.
-			await asyncio.sleep(0.001)
+			if (len(chainedCommands) > 0):
+				await sleep(0.001, "Chained commands " + str(chainedCommands))
+			else:
+				await sleep(0.001, "websocket connection that has been left open")
 
-		except:
+		except asyncio.CancelledError:
+			# Command thread has been interrupted from outside, probably by command "server stop"
+			errormsg = f"The coroutine of command " + commandInstance.command + \
+				" has been interrupted from the outside! Command execution could not be finished properly."
+			# Trying to at least transfer error message to client
+			try:
+				await commandInstance.senddebug(10, errormsg)
+			except:
+				# No chance, then just print and log it on the server
+				loggingFunctions.printlog(beautifulDebug.B_RED + beautifulDebug.BOLD + errormsg + beautifulDebug.RESET,
+				verbosity = 12)
+			
+			# Closing the current connection to the client
+			loggingFunctions.printlog(beautifulDebug.special(5,0,3) +
+				f"x Terminating connection due to outside interruption.\n\n" + beautifulDebug.RESET, verbosity = -3)
+			await websocket.close()
+			return False
+		except websockets.exceptions.ConnectionClosedError:
+			# Command thread has been interrupted from outside, probably by command "server stop"
+			errormsg = f"ERROR responding to command " + commandInstance.command + \
+				"! The connection has been closed by the client and is no longer available."
+			# Trying to at least transfer error message to client
+			try:
+				await commandInstance.senddebug(10, errormsg)
+			except:
+				# No chance, then just print and log it on the server
+				loggingFunctions.printlog(beautifulDebug.B_RED + beautifulDebug.BOLD + errormsg + beautifulDebug.RESET,
+				verbosity = 12)
+			
+			# Closing the current connection to the client
+			loggingFunctions.printlog(beautifulDebug.special(5,0,3) +
+				f"x Terminating connection due to disconnected client.\n\n" + beautifulDebug.RESET, verbosity = -3)
+			await websocket.close()
+			return False
+		except Exception:
+			#if str(traceback.format_exc()).contains("The specified network name is no longer available")
 			# If command execution failed somewhere, the server will print the exception,
 			# close the current connection (so the client does not reach unspecified states)
 			# and asyncio's run forever (in main program section at the bottom)
@@ -305,12 +343,54 @@ def startServer():
 				time.sleep(setting.SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER)
 
 
+yieldingCoroutines = set()
+
+# Sleeps in an asynchronous manner while yielding other threads, can be cancelled with stopCoroutines
+async def sleep(delay, description):
+	global yieldingCoroutines
+	task = asyncio.ensure_future(asyncio.sleep(delay))
+	yieldingCoroutines.add((task, description))
+	try:
+		await task
+	except asyncio.CancelledError:
+		raise asyncio.CancelledError
+	finally:
+		yieldingCoroutines.remove((task, description))
+
+# Stops and interrupts all ongoing coroutines
+# Returns a list of descriptions of all the cancelled tasks
+async def stopCoroutines2():
+	global yieldingCoroutines
+	if len(yieldingCoroutines) == 0:
+		return []
+	cancelledCoroutines = set()
+	justTasks = set()
+	for (task, description) in yieldingCoroutines:
+		if task.cancel():
+			cancelledCoroutines.add((task, description))
+		justTasks.add(task)
+	await asyncio.wait(justTasks)
+	yieldingCoroutines -= cancelledCoroutines
+	return [description for (_, description) in cancelledCoroutines]
+
+# Stops and interrupts all ongoing coroutines
+# Returns a list of descriptions of all the cancelled tasks
+async def stopCoroutines():
+	return await asyncio.create_task(stopCoroutines2())
+
+
 # Shuts down the server after optionally displaying and sending the specified message
 async def shutdownServer(websocket, text = None):
 	if (text is not None) and len(text) > 0:
 		await serverCommands.Request(websocket, "SERVER").senddebug(-1, "\n" + text, False)
 
+	stopCoroutines()
+
+	# Interrupt all coroutines now before waiting for them to finish
+	asyncio.get_event_loop().stop()
+	
+	# Slower, safer alternative:
 	# Close the connection and stop all asyncio loop execution
 	# This might take some times and wait for threads to finish
-	await websocket.close()
-	asyncio.get_event_loop().stop()
+	#await websocket.close()
+	#asyncio.get_event_loop().stop()

@@ -35,10 +35,14 @@ class connections:
 ITERATIONS = 1200
 
 class layouting:
+	# Dimensions as single numbers or tuples: one value = uniform scaling,
+	# two values = (xz axes, y axis), three values (x, z, y) in unreal
+	# y axis is the horizontal layouting axis, in whose direction the information flows
 	scaleLayerSizes = (50, 1)
 	addToLayerSizes = (100, 20) # takes place after scaling
 	minLayerDimensions = None # as hard cutoff after scaling and adding
 	maxLayerDimensions = None # as hard cutoff after scaling and adding
+	# specify desired spacing. buffer zone gets added to space between ungrouped layers
 	horizontalSpaceBetweenGroupedLayers = 100
 	bufferZone = 500
 	horizontalSpaceBetweenLayers = 500
@@ -47,8 +51,9 @@ class layouting:
 	# SETTINGS FOR THE FORCE ALGORITHM:
 	iterations = ITERATIONS # exclusive this one, starting at 0, ending one below
 	class debug:
-		drawPlots = 12 # number of plots to draw
-		# You need to close the drawn plot window on the server before the layout can be sent. Put a 0 to not draw any plots
+		drawPlots = 0 # number of plots to draw during layouting. Set to 0 or False to deactivate
+		# You need to close the drawn plot window on the server before the layout can be sent.
+		# With this enabled, the layouting cannot run in an async thread and will block the server
 		saveAsGif = False # needs drawPlots > 1
 		gifSizeInches = (20, 10) # determines the resolution of the gif, might depend on your screens dpi
 		gifFps = 10
