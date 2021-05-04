@@ -64,22 +64,22 @@ LOGFILE_PATH +=	R"\session " + datetime.now().strftime("on %Y-%m-%d at %H %M") +
 #LOGFILE_PATH = None# This deactivates logging entirely. Not recommended.
 
 # Desired level of debugging verbosity in console and debug. The lower you go the more verbose
-# debug info gets printed. -11 = all debug, 0 = only warnings and errors, 1 = ignore mild warnings,
-# 9 = ignore all warnings, 10 = ignore mild errors, 19 = don't print any non-critical errors.
+# debug info gets printed. -10 = all debug, 0 = only warnings and errors, 3 = ignore mild warnings,
+# 10 = ignore all warnings, 13 = ignore mild errors, 20 = don't print any non-critical errors.
 # Also changes what is stored in the logfile.
-DESIRED_VERBOSITY = -11
+DESIRED_VERBOSITY = -10
 
 # Prints colored output in the console. Nevertheless, ansi color codes will be emitted from the log
 PRINT_COLOR_ANSI_CODES = True
 # Respond with color-formatted debug and status strings to the client.
 RESPOND_WITH_COLOR_ANSI_CODES = False
 # Change this value if you can see a text in the console that recommends you to.
-ONLY_USE_SIMPLE_CODES = True
+ONLY_USE_SIMPLE_ANSI_CODES = True
 
 # Append new timestamp in the logfile if last log entry is older than ___ seconds:
 LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S = 1
 
-# parameters that signify a negation or deactivation of some sort
+# parameters that signify an affirmation or activation of some sort
 POSITIVE_PARAMETERS = ["true", "1", "yes", "some", "accept", "t", "y", "pos", "positive", "yup",
 	"j", "yeah", "sure", "active", "activate", "activated", "+", "affirm", "confirm", "confirmed",
 	"confirmation", "affirmation"]
@@ -97,7 +97,7 @@ def checkSettings():
 	SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER, AMPERSAND_CHAINS_COMMANDS, \
 	EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE, ALLOW_REMOTE_CODE_EXECUTION, \
 	AVAILABLE_NN_PATHS, DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
-	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, ONLY_USE_SIMPLE_CODES, \
+	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, ONLY_USE_SIMPLE_ANSI_CODES, \
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS
 	
 	# to be able to retrieve SCRIPT_PATH()
@@ -176,15 +176,16 @@ def checkSettings():
 		addServerScriptPath(DEFAULT_LOAD_NN_PATH)
 
 	if PRINT_COLOR_ANSI_CODES:
-		if ONLY_USE_SIMPLE_CODES:
+		if ONLY_USE_SIMPLE_ANSI_CODES:
 			print('\u001b[40m' + beautifulDebug.ansicode(30) + beautifulDebug.ansicode(120, False) + # green text on black background
-			"You can disable ONLY_USE_SIMPLE_CODES in the server settings for more " +
+			"You can disable ONLY_USE_SIMPLE_ANSI_CODES in the server settings for more " +
 			"nuanced colors in the console output.\n" + beautifulDebug.RESET)
 		else:
 			print('\u001b[40m' + beautifulDebug.YELLOW + beautifulDebug.ansicode(232, False) + # green text on black background
-			"Please enable ONLY_USE_SIMPLE_CODES in the server settings for correct colors in " +
+			"Please enable ONLY_USE_SIMPLE_ANSI_CODES in the server settings for correct colors in " +
 			"the console output!\nOtherwise, warnings and errors could be overlooked easily." +
 			beautifulDebug.RESET)
+
 
 
 	# ^ ^ ^ ^ ^ ADD NEW SETTINGS CHECKS ABOVE THIS LINE ^ ^ ^ ^ ^

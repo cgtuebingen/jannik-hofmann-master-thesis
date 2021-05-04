@@ -45,7 +45,7 @@ RESET = ansicode(0) #+ '\u001b[48;5;235m' + '\u001b[38;5;252m'
 def special(r, g, b, text = None):
 	if text is not None:
 		return special(r, g, b) + text + RESET
-	if not setting.ONLY_USE_SIMPLE_CODES:
+	if not setting.ONLY_USE_SIMPLE_ANSI_CODES:
 		return ansicode(16 + 36*r + 6*g + b, False)
 	else:
 		r //= 3
@@ -121,19 +121,19 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 
 	# warning rgb value from 2,2,0 via 5,5,3 via 5,5,0 to 5,3,0 (5 is max.)
 	elif (level <= 4):
-		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_CODES else special(level+1, level+1, level-1) + BOLD
+		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(level+1, level+1, level-1) + BOLD
 	elif (level <= 7):
-		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_CODES else special(5, 5, 7-level) + BOLD
+		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 5, 7-level) + BOLD
 	elif (level <= 9):
-		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_CODES else special(5, 12-level, 0) + BOLD
+		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 12-level, 0) + BOLD
 
 	# error rgb value from 2,0,0 to 5,0,0 (5 is max.)
 	elif (level < 20):
-		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_CODES else special(int(round(2 + (level-10)/3, 0)), 0, 0) + BOLD
+		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(int(round(2 + (level-10)/3, 0)), 0, 0) + BOLD
 	
 	# critical failure
 	else: # level >= 20
-		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_CODES else special(4, 0, 0) + BOLD + NEGATIVE
+		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(4, 0, 0) + BOLD + NEGATIVE
 
 	# If no text has been specified, just return the colorcode corresponding to that level
 	if (text == ""):

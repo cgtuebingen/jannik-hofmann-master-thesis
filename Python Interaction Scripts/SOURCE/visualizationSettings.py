@@ -8,7 +8,8 @@ import loggingFunctions
 
 # Colors of different DNN layers, specified by their type as it appears in the model summary
 # (spaces and capitalization will be ignored and reversed)
-# Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255, or as string containing hex code
+# Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255,
+# Also accepting strings containing hex code
 layerColors = {
 	"input layer": (0, .5, .6),
 	"zero padding 2d": (.3, .3, .4),
@@ -23,7 +24,7 @@ layerColors = {
 	"dense": (0, .2, .9),
 	"flatten": (0, .7, .1),
 
-	# For anything unknown / unspecified. This "default" value always needs to be kept!
+	# For anything unknown / unspecified. This "default" value always needs to exist!
 	"default": .4,
 }
 
@@ -32,16 +33,15 @@ class connections:
 	strength = 70
 	color = .3
 
-ITERATIONS = 1200
-
 class layouting:
 	# Dimensions as single numbers or tuples: one value = uniform scaling,
 	# two values = (xz axes, y axis), three values (x, z, y) in unreal
 	# y axis is the horizontal layouting axis, in whose direction the information flows
 	scaleLayerSizes = (50, 1)
 	addToLayerSizes = (100, 20) # takes place after scaling
-	minLayerDimensions = None # as hard cutoff after scaling and adding
-	maxLayerDimensions = None # as hard cutoff after scaling and adding
+	# hard size cutoffs after scaling and adding
+	minLayerDimensions = None
+	maxLayerDimensions = None
 	# specify desired spacing. buffer zone gets added to space between ungrouped layers
 	horizontalSpaceBetweenGroupedLayers = 100
 	bufferZone = 500
@@ -49,7 +49,7 @@ class layouting:
 	verticalSpaceBetweenLayers = -400
 
 	# SETTINGS FOR THE FORCE ALGORITHM:
-	iterations = ITERATIONS # exclusive this one, starting at 0, ending one below
+	iterations = 1200 # starting at 0, ending one below
 	class debug:
 		drawPlots = 0 # number of plots to draw during layouting. Set to 0 or False to deactivate
 		# You need to close the drawn plot window on the server before the layout can be sent.
@@ -97,12 +97,13 @@ class layouting:
 
 
 
-# INITIALIZATIONS
+# INITIALIZATIONS AND SETTINGS CHECKS
 
 def checkSettings():
 	global layerColors
 	# revert capitalization and spaces, this is done to facilitate a more human-readable specification above.
 	layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}
+	# Convert iterations from numbers into ranges, and multiply floats with the absolute number of iterations
 	def fixAndCheckWithinIterations(rule):
 		if not hasattr(rule, 'withinIterations'):
 			return
@@ -120,6 +121,7 @@ def checkSettings():
 			elif len(rule.withinIterations) > 2:
 				rule.withinIterations = range(rule.withinIterations[0], rule.withinIterations[1],
 					rule.withinIterations[2])
+		# Also warn if anything of that range is outside of the number of specified iterations
 		if min(rule.withinIterations) < 0 or max(rule.withinIterations) > layouting.iterations:
 				loggingFunctions.warn("Visualization settings, layouting: withinIterations of " +
 					f'{rule=}'.split('=')[0] + " contains values outside of the iterations range, " +

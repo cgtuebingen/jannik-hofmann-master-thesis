@@ -613,8 +613,8 @@ class Request:
 		'Without parameter, it displays the current verbosity level of the server.\nA parameter ' +
 		'changes the servers verbosity level of debug and status information. Will affect which ' +
 		'messages are printed in the console and stored in the logfile.\nThe lower you go the ' +
-		'more verbose debug info gets printed. -10 = all debug, 1 = only warnings and errors, ' +
-		'3 = ignore mild warnings, 10 = ignore all warnings, 11 = ignore mild errors, 20 = ' +
+		'more verbose debug info gets printed. -10 = all debug, 0 = only warnings and errors, ' +
+		'3 = ignore mild warnings, 10 = ignore all warnings, 13 = ignore mild errors, 20 = ' +
 		'don''t print any non-critical errors.')
 	commandList["verbosity"] = commandAlias("set verbosity")
 
