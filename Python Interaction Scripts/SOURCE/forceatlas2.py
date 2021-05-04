@@ -266,10 +266,8 @@ class ForceAtlas2:
             return 0
 
         #for _i in niters:
-        async def execute_once(i):
+        def execute_once(i):
             nonlocal speed, speedEfficiency, nodes, edges, outboundAttCompensation, barneshut_timer, repulsion_timer, overlap_repulsion_timer, gravity_timer, attraction_timer, applyforces_timer, quadsizes
-
-            await server.sleep(0.001, f"Layouting at iteration {i} of {iterations}")
 
             for n in nodes:
                 n.old_dx = n.dx
@@ -330,6 +328,10 @@ class ForceAtlas2:
             speed = values['speed']
             speedEfficiency = values['speedEfficiency']
             applyforces_timer.stop()
+        
+        async def execute_once_async(i):
+            await server.sleep(0.001, f"Layouting at iteration {i} of {iterations}")
+            execute_once(i)
 
         if self.debugDisplayPlot == 0: self.debugDisplayPlot = False
         if self.debugDisplayPlot == True: self.debugDisplayPlot = 1
@@ -401,7 +403,7 @@ class ForceAtlas2:
                 goUntil = min(goUntil, iterations)
                 while iterationCounter < goUntil:
                     iterationCounter += 1
-                    asyncio.run(execute_once(iterationCounter))
+                    execute_once(iterationCounter)
                     if self.verbose: nonlocal pbar
                     if self.verbose: pbar.update(1)
                 draw(iterationCounter)
@@ -428,7 +430,7 @@ class ForceAtlas2:
             if self.verbose:
                 niters = tqdm(niters)
             for i in niters:
-                await execute_once(i)
+                await execute_once_async(i)
         
         if self.verbose:
             if self.barnesHutOptimize:

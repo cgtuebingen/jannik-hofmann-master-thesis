@@ -30,6 +30,7 @@ layerColors = {
 
 class connections:
 	display = True
+	displayBetweenGroupedLayers = False
 	strength = 70
 	color = .3
 
@@ -51,12 +52,13 @@ class layouting:
 	# SETTINGS FOR THE FORCE ALGORITHM:
 	iterations = 1200 # starting at 0, ending one below
 	class debug:
-		drawPlots = 0 # number of plots to draw during layouting. Set to 0 or False to deactivate
-		# You need to close the drawn plot window on the server before the layout can be sent.
+		drawPlots = True # If this is False, this whole debug section will be deactivated
 		# With this enabled, the layouting cannot run in an async thread and will block the server
-		saveAsGif = False # needs drawPlots > 1
+		# You need to close the drawn plot window on the server before the layout can be sent
+		numberOfPlots = 20 # number of plots to draw during layouting iterations
+		saveAsGif = False # needs drawPlots True and numberOfPlots > 1
 		gifSizeInches = (20, 10) # determines the resolution of the gif, might depend on your screens dpi
-		gifFps = 10
+		gifFps = 10 # How fast the gif will play. Also depends on the number of plots defined above
 
 	class classicRepulsion:
 		strength = 1
@@ -73,9 +75,9 @@ class layouting:
 		exponentialCurveFactor = 1
 	class shiftOnAxisToOrderByIndex:
 		strength = 140
+		#withinIterations = (0, 0.9)
 		importance = 'increasing'
 		#importance = 'midway'
-		#withinIterations = (0, 0.9)
 		exponentialCurveFactor = -3
 	class overlapRepulsion:
 		strength = 3
@@ -83,16 +85,18 @@ class layouting:
 		exponentialCurveFactor = 3
 	# Finetune importance of certain rules during force algorithm iterations.
 	# withinIterations can be a single number or a tuple defining a range ([inclusive start,] exclusive end[, steps])
-	# Also accepts floats, which will automatically multiply with iterations
-	# importance can be 'constant' (default, always 1), 'increasing' (0 to 1), 'decreasing' (1 to 0),
-	# 'midway' (0 at start and end, 1 in the middle, mirrored, recommended with negative factor,
-	# factor = 0: /\, factor higher = strong peak _/\_, negative factor = round, convex shape /°°\)
-	# 'outsides' (mirrored exactly opposite to midway, 1 at start and end, 0 in the middle,
-	# factor = 0: \/, factor higher = \__/ round in the middle with strong peaks outside,
-	# negative factor = °\/° strong downward peak in the middle)
+	#     Also accepts floats, which will automatically multiply with iterations
+	# importance can be
+	#     'constant' (default, always 1),
+	#     'increasing' (0 to 1, factor positive = curved downward, factor negative = curved upward),
+	#     'decreasing' (1 to 0, factor positive = curved downward, factor negative = curved upward),
+	#     'midway' (mirrored, 0 at start and end, 1 in the middle, recommended with negative factor,
+	#         factor = 0: /\, factor higher = strong peak _/\_, negative factor = round, convex shape /°°\)
+	#     'outsides' (mirrored exactly opposite to midway, 1 at start and end, 0 in the middle,
+	#         factor = 0: \/, factor higher = \__/ round in the middle with strong peaks outside,
+	#         negative factor = °\/° strong downward peak in the middle)
 	# exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
-	# positive: curved downward, negative: curved upward. example with factor 5:
-	# https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
+	#     example with factor 5: https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
 	# Use importance = 'disabled', strength = 0 or withinIterations = None to disable a rule
 
 
@@ -103,7 +107,7 @@ def checkSettings():
 	global layerColors
 	# revert capitalization and spaces, this is done to facilitate a more human-readable specification above.
 	layerColors = {key.lower().replace(" ", ""):value for (key, value) in layerColors.items()}
-	# Convert iterations from numbers into ranges, and multiply floats with the absolute number of iterations
+	# Convert withinIterations from numbers into ranges, and multiply floats with the absolute number of iterations
 	def fixAndCheckWithinIterations(rule):
 		if not hasattr(rule, 'withinIterations'):
 			return

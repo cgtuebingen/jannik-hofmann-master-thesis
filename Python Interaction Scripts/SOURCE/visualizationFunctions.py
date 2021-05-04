@@ -707,25 +707,29 @@ async def drawLayout(connection, positions):
 	
 	for current in Layer.layerList:
 		await spawnCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
-		for parent in current.parents:
-			y = parent.position.y
-			z = parent.position.z
-			yy = current.position.y
-			zz = current.position.z
-			deltay = yy-y
-			deltaz = zz-z
-			drawIt = True
-			thickness = min(design.connections.strength,
-				parent.size.x/2, parent.size.y/2,
-				current.size.x/2, current.size.y/2)
-			if deltay == 0:
-				#drawIt = False
-				alpha = math.pi/2
-				long = deltaz
-			else:
-				alpha = math.atan(deltaz/deltay)
-				long = deltay / math.cos(alpha)
-			if drawIt:
+		if design.connections.display:
+			for parent in current.parents:
+				y = parent.position.y
+				z = parent.position.z
+				yy = current.position.y
+				zz = current.position.z
+				deltay = yy-y
+				deltaz = zz-z
+				if math.isclose(deltaz, 0) and \
+					math.isclose(deltay - current.size.y/2 - parent.size.y/2,
+					design.layouting.horizontalSpaceBetweenGroupedLayers) and \
+					not design.connections.displayBetweenGroupedLayers:
+						continue # connection between grouped layers should not be drawn
+				thickness = min(design.connections.strength,
+					parent.size.x/2, parent.size.y/2,
+					current.size.x/2, current.size.y/2)
+				if deltay == 0:
+					#drawIt = False
+					alpha = math.pi/2
+					long = deltaz
+				else:
+					alpha = math.atan(deltaz/deltay)
+					long = deltay / math.cos(alpha)
 				await spawnCuboid(connection,
 					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
 					Coordinates(thickness, z = long),
@@ -777,7 +781,7 @@ async def drawstructureForceLayout(connection = None):
 
 		# Layouting instructions for modified forceatlas2-algorithm
 		NUMBER_OF_ITERATIONS = design.layouting.iterations
-		NUMBER_OF_PLOTS = design.layouting.debug.drawPlots
+		NUMBER_OF_PLOTS = design.layouting.debug.drawPlots * design.layouting.debug.numberOfPlots
 		forceatlas2 = ForceAtlas2(
 			# Behavior alternatives
 			outboundAttractionDistribution=True, # Dissuade hubs
