@@ -313,7 +313,7 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		await asyncio.sleep(0.2) # TODO: Find way to spawn all in the same frame
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
-def sizeFromLayerDimensions(layerDims, scaleDims=None, addToDims=None, minDims=None, maxDims=None):
+def sizeFromLayerDimensions(layerDims):
 	size = []
 	for dim in layerDims:
 		# Append useful dim values to size-list until we have 3
@@ -322,6 +322,10 @@ def sizeFromLayerDimensions(layerDims, scaleDims=None, addToDims=None, minDims=N
 	# If we have less, just put 1 in the front a few times
 	while (len(size) < 3):
 		size = [1] + size
+	scaleDims = getattr(design.layouting, 'scaleLayerSizes', None)
+	addToDims = getattr(design.layouting, 'addToLayerSizes', None)
+	minDims = getattr(design.layouting, 'minLayerDimensions', None)
+	maxDims = getattr(design.layouting, 'maxLayerDimensions', None)
 	if scaleDims is None:
 		scaleDims = [1, 1, 1]
 	if type(scaleDims) is tuple:
@@ -368,6 +372,7 @@ def sizeFromLayerDimensions(layerDims, scaleDims=None, addToDims=None, minDims=N
 	for i in range(3):
 		size[i] = max(size[i], minDims[i])
 		size[i] = min(size[i], maxDims[i])
+	print(size)
 	return Coordinates(size)
 
 # DEPRECATED
@@ -694,7 +699,7 @@ async def drawLayout(connection, positions):
 		# Create layer instance and append it to layerList
 		Layer.layerList.append(Layer(
 			position = (positionOffset + (0, positions[index][1], positions[index][0])),
-			size = sizeFromLayerDimensions(layer[2]),#.scale(50, 1),
+			size = sizeFromLayerDimensions(layer[2]),
 			parents = layer[4],
 			color = layer[1],
 			index = index,
@@ -753,11 +758,7 @@ async def drawstructureForceLayout(connection = None):
 		sizes = []
 		# Add each layer to the graph
 		for index, layer in enumerate(ai.tfnet.layers):
-			newSize = sizeFromLayerDimensions(layer[2],
-				scaleDims=getattr(design.layouting, 'scaleLayerSizes', None),
-				addToDims=getattr(design.layouting, 'addToLayerSizes', None),
-				minDims=getattr(design.layouting, 'minLayerDimensions', None),
-				maxDims=getattr(design.layouting, 'maxLayerDimensions', None))
+			newSize = sizeFromLayerDimensions(layer[2])
 			# Aligning all layers along the z axis
 			positioning += newSize.z/2
 			# storing the accumulated z position
