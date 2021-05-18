@@ -41,7 +41,7 @@ tf = None
 # Structure of tfnet.layers:
 # (layername, ltype, shape, params, connectedTo, trainableVariables)
 # trainableVariables is a (maybe empty) dict:
-# e.g. {'kernel': ndarray, 'bias': ndarray, 'gamma': ndarray, 'beta': ndarray}
+# e.g. {'kernel': [ndarrays], 'bias': [ndarrays], 'gamma': [ndarrays], 'beta': [ndarrays]}
 
 # Returns the current reference to the model
 def model():
@@ -319,6 +319,7 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 		await connection.sendstatus(17, warningMsg)
 		return False
 
+# Retrieves the name of the layer by index. Just passes strings without looking at them
 def getLayerName(index):
 	if type(index) is str:
 		return index
@@ -327,12 +328,14 @@ def getLayerName(index):
 	assert index >= 0, "index has to be >= 0!"
 	return tfnet.layers[index][0]
 
+# retrieves all trainable variables relating to this layer
 def tfGetTrainableVars(layerIndexOrName = None):
 	if layerIndexOrName is None:
 		return tfnet.trainableVariables
 	layerIndexOrName = getLayerName(layerIndexOrName)
 	return [var for var in model().trainable_variables if var.name.startswith(layerIndexOrName + '/')]
 
+# Refreshes and stores all trainable variables for each layer in layer[5] as a dictionary of lists
 def tfRefreshTrainableVars(connection):
 	tfnet.trainableVariables = model().trainable_variables
 	for layer in tfnet.layers:
