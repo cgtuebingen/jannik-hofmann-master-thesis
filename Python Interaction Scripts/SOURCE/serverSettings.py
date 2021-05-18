@@ -47,6 +47,7 @@ AVAILABLE_NN_PATHS = {
 	"vgg16": R"\..\..\First tests\VGGNet16 Tensorflow\vgg16experimentation.py : model",
 	"resnet": R"\..\..\First tests\ResNet50 Tensorflow\resnet.py : model",
 }
+DEFAULT_NN_VARIABLE_NAME = "model"
 
 # default location of DNN python file. Will be loaded if "loadnn" is received without attributes
 # You can use a key of AVAILABLE_NN_PATHS here.
@@ -98,7 +99,8 @@ def checkSettings():
 	EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE, ALLOW_REMOTE_CODE_EXECUTION, \
 	AVAILABLE_NN_PATHS, DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
 	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, ONLY_USE_SIMPLE_ANSI_CODES, \
-	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS
+	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS, \
+	DEFAULT_NN_VARIABLE_NAME
 	
 	# to be able to retrieve SCRIPT_PATH()
 	import centralController

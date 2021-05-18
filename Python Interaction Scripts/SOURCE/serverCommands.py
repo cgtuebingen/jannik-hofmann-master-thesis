@@ -1200,16 +1200,17 @@ class Request:
 		"Returns a string with the version number")
 
 
-	async def tf_getstructure(self, printStructure=True, **kwargs):
-		if not setting.DEBUG_USE_FAKE_STRUCTURE:
+	async def tf_getstructure(self, printStructure=True, canUseFakeStructure=setting.DEBUG_USE_FAKE_STRUCTURE, **kwargs):
+		if not canUseFakeStructure:
 			if not await self.assertTf(): return False
 		try:
-			if setting.DEBUG_USE_FAKE_STRUCTURE and not ai.tfloaded():
+			if canUseFakeStructure and not ai.tfloaded():
 				structure = debugAndTesting.const_fake_structure
 			else:
 				structure = ai.tfmodelsummary()
-				await self.senddebug(-8, "Structure of the network:\n" +
-					ai.makeModelSummaryReadable(structure))
+				if printStructure:
+					await self.senddebug(-8, "Structure of the network:\n" +
+						ai.makeModelSummaryReadable(structure))
 		except:
 			await self.sendstatus(16, f"Couldn't retrieve tensorflow structure!\n" +
 				traceback.format_exc())
@@ -1295,4 +1296,22 @@ class Request:
 		"known about the tensorflow network",
 		"Returns a map of the continually expanding class type that stores information about the " +
 		"neural network\nThis data is continually expanded by more commands and information requests")
+
+
+	async def tf_refreshtrainablevars(self, **kwargs):
+		if not await self.assertTf(): return False
+		await self.checkParams(0)
+		if not hasattr(ai.tfnet, "validstructure") or ai.tfnet["validstructure"] == False:
+			await self.sendstatus(-10, f"Structure of the network hasn't been retrieved yet. Doing that first...")
+			success = await self.tf_getstructure(False, False)
+			if success == False:
+				await self.sendstatus(17, f"Cannot proceed to trainable variables due to invalid parsing of network structure.")
+				return False
+			
+		ai.tfRefreshTrainableVars(self)
+		await self.sendstatus(-30, f"Trainable variables of the loaded tf network have been retrieved and stored.")
+	commandList["tf get train vars"] = (tf_refreshtrainablevars,
+		"Retrieves and stores all trainable variables available in the network.")
+	commandList["tf get trainable vars"] = commandAlias("tf get train vars")
+	commandList["tf get trainable variables"] = commandAlias("tf get train vars")
 

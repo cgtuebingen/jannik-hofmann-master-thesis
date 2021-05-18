@@ -433,7 +433,7 @@ async def drawstructureLinearly(connection = None):
 							Coordinates(randomPos, csize/2, cposition - design.connections.strength/2),
 							Coordinates(design.connections.strength, y = randomPos - csize/2),
 							design.connections.color)
-					else:
+					else: # direct connections between layers instead of angled ones
 						# define proportion of horizontal bar to angle away on each side
 						deltaz = random.uniform(0, 0.5)
 						deltaz *= (position.z - cposition.z + design.connections.strength)
@@ -836,7 +836,7 @@ async def testVis():
 		await ai.parsestructure(None, structure)
 	await drawstructure()
 
-# call this module as main module, visualisation will be tested and displayed as a grahic
+# call this module as main module, visualization will be tested and displayed as a grahic
 if __name__ == '__main__':
 	loop = asyncio.get_event_loop()
 	loop.run_until_complete(testVis())

@@ -26,6 +26,7 @@ import random
 
 # LOCAL IMPORTS
 import serverCommands
+import serverSettings as setting
 
 # Definitions / initializations
 nnloaded = False
@@ -36,6 +37,15 @@ nn_module = None
 tfnet = SimpleNamespace()
 pytorchnet = SimpleNamespace()
 tf = None
+
+# Structure of tfnet.layers:
+# (layername, ltype, shape, params, connectedTo, trainableVariables)
+# trainableVariables is a (maybe empty) dict:
+# e.g. {'kernel': ndarray, 'bias': ndarray, 'gamma': ndarray, 'beta': ndarray}
+
+# Returns the current reference to the model
+def model():
+	return getattr(nn_module, modelvarname)
 
 # Returns whether a tf network has been loaded and initialized successfully
 def tfloaded():
@@ -52,7 +62,10 @@ def preparemodule(path, allowPreparingNewModuleOnTop = False):
 		path = path.strip()
 		modelvarname = modelvarname.strip()
 	else:
-		modelvarname = 'model'
+		if setting.DEFAULT_NN_VARIABLE_NAME is None:
+			raise AssertionError("No name for the model variable has been defined! Please specify how to acccess the NN model py adding the varname after the AI script path, separated by a colon.")
+		else:
+			modelvarname = setting.DEFAULT_NN_VARIABLE_NAME
 	if not allowPreparingNewModuleOnTop and (nnprepared or nnloaded):
 		raise AssertionError("The ai interface has already loaded a module in the past and should not load another (or the same) nn script on top. You can override this check by setting the flag by calling preparemodule(path, True)")
 	print(path)
@@ -85,8 +98,7 @@ def tfversion():
 # Just returns a model summary. Call parsestructure afterwards.
 def tfmodelsummary():
 	structure = []
-	global nn_module, modelvarname
-	getattr(nn_module, modelvarname).summary(print_fn=lambda x: structure.append(x), line_length=1024)
+	model().summary(print_fn=lambda x: structure.append(x), line_length=1024)
 	return structure
 
 # Converts a model summary of arbitrary line length into a more human-readable format for output
@@ -143,6 +155,7 @@ def tfresetstructure():
 	remove("nontrainableparams")
 	remove("layerCount")
 	remove("layoutPositions")
+	remove("trainableVariables")
 
 # Parses a given tf model summary string as structure and saves relevant information to tfnet
 # Structure should be in the form of the result of tfmodelsummary()
@@ -240,7 +253,7 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 					connectedTo = connectedTo[:-3]
 				connectedTo = [connectedTo] # needs to be an array to add more connections later
 				# repackage to tuple and append to tfnet.layers
-				layer = layername, ltype, shape, params, connectedTo
+				layer = [layername, ltype, shape, params, connectedTo, None]
 				tfnet.layers.append(layer)
 				foundLineMatch = True
 			
@@ -305,3 +318,31 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 		# Tell the client how disappointed we are
 		await connection.sendstatus(17, warningMsg)
 		return False
+
+def getLayerName(index):
+	if type(index) is str:
+		return index
+	assert type(index) is int, "index for getLayerName needs to be int (or already str)!"
+	assert index < len(tfnet.layers), "index larger than number of layers! Maybe the network structure hasn't been loaded yet?"
+	assert index >= 0, "index has to be >= 0!"
+	return tfnet.layers[index][0]
+
+def tfGetTrainableVars(layerIndexOrName = None):
+	if layerIndexOrName is None:
+		return tfnet.trainableVariables
+	layerIndexOrName = getLayerName(layerIndexOrName)
+	return [var for var in model().trainable_variables if var.name.startswith(layerIndexOrName + '/')]
+
+def tfRefreshTrainableVars(connection):
+	tfnet.trainableVariables = model().trainable_variables
+	for layer in tfnet.layers:
+		trainVars = tfGetTrainableVars(layer[0])
+		layerVarDict = dict()
+		for var in trainVars:
+			name = var.name.rsplit('/', 1)[1].split(':')[0]
+			# name is something like "kernel", "bias", "beta" or "gamma"
+			if name in layerVarDict:
+				layerVarDict[name].append(var.numpy())
+			else:
+				layerVarDict[name] = [var.numpy()]
+		layer[5] = layerVarDict

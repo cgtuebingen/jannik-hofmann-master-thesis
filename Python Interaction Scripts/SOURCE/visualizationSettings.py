@@ -11,7 +11,7 @@ import loggingFunctions
 # Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255,
 # Also accepting strings containing hex code
 layerColors = {
-	"input layer": (0, .5, .6),
+	"input layer": (0, .5, .6, .5),
 	"zero padding 2d": (.3, .3, .4),
 
 	"conv 2d": (.8, .3, 0),
