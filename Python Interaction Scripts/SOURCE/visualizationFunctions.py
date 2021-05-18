@@ -821,6 +821,7 @@ async def drawstructure(connection = None):
 
 
 
+
 # FOR DEBUGGING, executed if you start this script directly
 async def testVis():
 	loadRealNN = False
