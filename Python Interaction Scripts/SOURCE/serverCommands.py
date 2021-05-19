@@ -1299,7 +1299,7 @@ class Request:
 		"neural network\nThis data is continually expanded by more commands and information requests")
 
 
-	async def tf_refreshtrainablevars(self, **kwargs):
+	async def tf_refreshtrainablevars(self, returnShapeDict=False, **kwargs):
 		if not await self.assertTf(): return False
 		await self.checkParams(0, 1)
 		printVars = await self.getParam(1, False)
@@ -1315,6 +1315,8 @@ class Request:
 			debugMsg = ["The following trainable variable shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
 			await self.send(debugMsg)
 		await self.sendstatus(-30, f"Trainable variables of the loaded tf network have been retrieved and stored.")
+		if returnShapeDict:
+			return shapeDict
 	commandList["tf get train vars"] = (tf_refreshtrainablevars,
 		"Retrieves and stores all trainable variables available in the network.\n" +
 		"If optional parameter is positive, the var shapes will be sent as response")
@@ -1327,23 +1329,24 @@ class Request:
 		if not await self.checkParams(0, 2): return False
 		index = await self.getParam(1, -1)
 		refresh = await self.getParam(2, False)
-		if index == -1 or refresh or not hasattr(ai.tfnet, "validstructure") or ai.tfnet.validstructure == False:
-			if index == -1 or refresh:
-				await self.sendstatus(-10, f"Refreshing structure of the network first...")
+		if index == -1: # just printing out all kernel shapes without drawing anything
+			await self.sendstatus(-10, f"Refreshing trainable variables of the network...")
+			shapeDict = await self.tf_refreshtrainablevars(returnShapeDict=True)
+			shapeDict = {name.replace('/kernel:0', ''): str(shape) for (name, shape) in shapeDict.items() if '/kernel:0' in name}
+			debugMsg = ["The following kernel shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
+			await self.send(debugMsg)
+			return
+		if refresh or not hasattr(ai.tfnet, "validstructure") or ai.tfnet.validstructure == False:
+			if refresh:
+				await self.sendstatus(-10, f"Refreshing trainable variables of the network first...")
 			else:
-				await self.sendstatus(-10, f"Structure of the network hasn't been retrieved yet. Doing that first...")
+				await self.sendstatus(-10, f"Trainable variables of the network haven't been retrieved yet. Doing that first...")
 			success = await self.tf_refreshtrainablevars()
 			if success == False:
 				await self.sendstatus(17, f"Cannot proceed to drawing kernels due to failure of retrieving trainable variables.")
 				return False
 		try:
-			if index == -1: # just print out all kernel shapes
-				shapeDict = ai.tfRefreshTrainableVars()
-				shapeDict = {name.replace('/kernel:0', ''): str(shape) for (name, shape) in shapeDict.items() if '/kernel:0' in name}
-				debugMsg = ["The following kernel shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
-				await self.send(debugMsg)
-				return
-			await vis.drawKernels(self, index) # Includes layouting calculations
+			await vis.drawKernels(self, index)
 		except asyncio.CancelledError:
 			raise asyncio.CancelledError
 		except:
