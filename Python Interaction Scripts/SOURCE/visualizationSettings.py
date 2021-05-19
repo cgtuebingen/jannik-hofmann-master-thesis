@@ -6,6 +6,11 @@
 # LOCAL IMPORTS
 import loggingFunctions
 
+maxDrawWaitTimeout = .5 # seconds to wait for the command "server draw next" before resuming drawing
+# This avoids getting stuck in infinite loops if the command "server draw next" hasn't been received properly
+recheckDrawReadyInterval = .001 # in seconds, how often the algorithm rechecks if "server draw next" was received
+# should be much smaller than maxDrawWaitTimeout
+
 # Colors of different DNN layers, specified by their type as it appears in the model summary
 # (spaces and capitalization will be ignored and reversed)
 # Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255,

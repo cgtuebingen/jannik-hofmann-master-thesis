@@ -825,6 +825,15 @@ class Request:
 		'It is recommended to reinitialize the server afterwards with the command "server reset"')
 
 
+	async def serverDraw(self, **kwargs):
+		vis.readyToDraw = True
+	commandList["server draw next"] = (serverDraw,
+		"Signals to the server that the client is ready to receive the next drawing instruction\n" +
+		"This is used as to not overload the client with too many cuboids at the same time, " +
+		"as then drawing instructions might be dropped and ignored.\n" +
+		"For performance reasons and to reduce connection overload, this command trigerrs no response!")
+
+
 	async def sendalot(self, **kwargs):
 		await self.checkParams(0, 1)
 		await self.sendstatus(-30, "#" * await self.getParam(1, 10))

@@ -35,6 +35,9 @@ import serverSettings as setting
 import debugAndTesting
 from forceatlas2 import ForceAtlas2
 
+# Singal to see whether client is ready to receive the next drawing instruction
+readyToDraw = True
+
 # Coordinates class stored 3 floats x, y, z
 class Coordinates:
 	# You can initialize Coordinates in the following ways:
@@ -292,7 +295,13 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 			processDescription = "Spawning cuboids in the virtual world"
 		else:
 			processDescription = "Spawning cuboids in the virtual world for " + processDescription
-		await server.sleep(0.2, processDescription) # TODO: Find way to spawn all in the same frame
+		global readyToDraw
+		readyToDraw = False
+		await server.sleep(0, processDescription)
+		for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
+			if readyToDraw:
+				return
+			await server.sleep(design.recheckDrawReadyInterval, processDescription)
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
 def sizeFromLayerDimensions(layerDims):
