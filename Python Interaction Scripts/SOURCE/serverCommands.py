@@ -86,6 +86,7 @@ class Request:
 				"py": ["python"],
 				"eval": ["evaluate"],
 				"serverip": ["serveripport"],
+				"tfdrawkernel": ["tfdrawkernels"],
 			}
 
 			for key in list(commandList.keys()):
@@ -1300,18 +1301,60 @@ class Request:
 
 	async def tf_refreshtrainablevars(self, **kwargs):
 		if not await self.assertTf(): return False
-		await self.checkParams(0)
-		if not hasattr(ai.tfnet, "validstructure") or ai.tfnet["validstructure"] == False:
+		await self.checkParams(0, 1)
+		printVars = await self.getParam(1, False)
+		if not hasattr(ai.tfnet, "validstructure") or ai.tfnet.validstructure == False:
 			await self.sendstatus(-10, f"Structure of the network hasn't been retrieved yet. Doing that first...")
 			success = await self.tf_getstructure(False, False)
 			if success == False:
 				await self.sendstatus(17, f"Cannot proceed to trainable variables due to invalid parsing of network structure.")
 				return False
 			
-		ai.tfRefreshTrainableVars(self)
+		shapeDict = ai.tfRefreshTrainableVars()
+		if printVars:
+			debugMsg = ["The following trainable variable shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
+			await self.send(debugMsg)
 		await self.sendstatus(-30, f"Trainable variables of the loaded tf network have been retrieved and stored.")
 	commandList["tf get train vars"] = (tf_refreshtrainablevars,
-		"Retrieves and stores all trainable variables available in the network.")
+		"Retrieves and stores all trainable variables available in the network.\n" +
+		"If optional parameter is positive, the var shapes will be sent as response")
 	commandList["tf get trainable vars"] = commandAlias("tf get train vars")
 	commandList["tf get trainable variables"] = commandAlias("tf get train vars")
+
+
+	async def tf_drawkernel(self, **kwargs):
+		if not await self.assertTf(): return False
+		if not await self.checkParams(0, 2): return False
+		index = await self.getParam(1, -1)
+		refresh = await self.getParam(2, False)
+		if index == -1 or refresh or not hasattr(ai.tfnet, "validstructure") or ai.tfnet.validstructure == False:
+			if index == -1 or refresh:
+				await self.sendstatus(-10, f"Refreshing structure of the network first...")
+			else:
+				await self.sendstatus(-10, f"Structure of the network hasn't been retrieved yet. Doing that first...")
+			success = await self.tf_refreshtrainablevars()
+			if success == False:
+				await self.sendstatus(17, f"Cannot proceed to drawing kernels due to failure of retrieving trainable variables.")
+				return False
+		try:
+			if index == -1: # just print out all kernel shapes
+				shapeDict = ai.tfRefreshTrainableVars()
+				shapeDict = {name.replace('/kernel:0', ''): str(shape) for (name, shape) in shapeDict.items() if '/kernel:0' in name}
+				debugMsg = ["The following kernel shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
+				await self.send(debugMsg)
+				return
+			await vis.drawKernels(self, index) # Includes layouting calculations
+		except asyncio.CancelledError:
+			raise asyncio.CancelledError
+		except:
+			await self.sendstatus(17, f"Couldn't draw kernel data!\n" +
+				traceback.format_exc())
+			return False
+	commandList["tf draw kernel"] = (tf_drawkernel, "Creates quads for tensorflow network kernels",
+		'Will send a quad drawing instruction for all kernel data of the neural network to display it ' +
+		'in the game engine.\n' +
+		'Needs one parameter (index as int) specifying which layer wants their kernels drawn.\n' +
+		'If optional second parameter is positive or no kernel data can be found, data of trainable variables will be refreshed first.\n' +
+		'If no parameter is given, trainable vars will be refreshed and all kernel shapes will be printed out without drawing anything.')
+	commandList["tf draw kernels"] = commandAlias("tf draw kernel")
 

@@ -336,12 +336,14 @@ def tfGetTrainableVars(layerIndexOrName = None):
 	return [var for var in model().trainable_variables if var.name.startswith(layerIndexOrName + '/')]
 
 # Refreshes and stores all trainable variables for each layer in layer[5] as a dictionary of lists
-def tfRefreshTrainableVars(connection):
+def tfRefreshTrainableVars():
+	shapeDict = dict()
 	tfnet.trainableVariables = model().trainable_variables
-	for layer in tfnet.layers:
+	for index, layer in enumerate(tfnet.layers):
 		trainVars = tfGetTrainableVars(layer[0])
 		layerVarDict = dict()
 		for var in trainVars:
+			shapeDict[str(index) + ": " + var.name] = var.numpy().shape
 			name = var.name.rsplit('/', 1)[1].split(':')[0]
 			# name is something like "kernel", "bias", "beta" or "gamma"
 			if name in layerVarDict:
@@ -349,3 +351,4 @@ def tfRefreshTrainableVars(connection):
 			else:
 				layerVarDict[name] = [var.numpy()]
 		layer[5] = layerVarDict
+	return shapeDict

@@ -819,6 +819,21 @@ async def drawstructureForceLayout(connection = None):
 async def drawstructure(connection = None):
 	await drawstructureForceLayout(connection)
 
+# Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
+async def drawKernels(connection, layerIndex, refreshTrainVars=False):
+	if refreshTrainVars:
+		ai.tfRefreshTrainableVars()
+	trainableVars = ai.tfnet.layers[layerIndex][5]
+	if not 'kernel' in trainableVars or len(trainableVars['kernel']) == 0:
+		# No kernel found for this layer. Let's try to refresh
+		if not refreshTrainVars:
+			return await drawKernels(connection, layerIndex, True)
+		# Still no kernel found. Output error msg and return
+		await connection.sendstatus(16, f"Layer {layerIndex} does not have any kernels that could be visualized!")
+		return False
+	kernel = trainableVars['kernel'][0]
+	await connection.sendstatus(-10, f"Now drawing kernels with dimensions {kernel.shape} of layer {layerIndex}...")
+
 
 
 
