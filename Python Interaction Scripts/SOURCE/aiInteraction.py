@@ -253,7 +253,7 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 					connectedTo = connectedTo[:-3]
 				connectedTo = [connectedTo] # needs to be an array to add more connections later
 				# repackage to tuple and append to tfnet.layers
-				layer = [layername, ltype, shape, params, connectedTo, None]
+				layer = [layername, ltype, shape, params, connectedTo, dict()]
 				tfnet.layers.append(layer)
 				foundLineMatch = True
 			

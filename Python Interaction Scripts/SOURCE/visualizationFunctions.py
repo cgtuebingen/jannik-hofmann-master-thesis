@@ -203,36 +203,16 @@ def transformCoordinates(originalposition = None, originalsize = None, positionI
 # Format a color to always have three float values between 0 and 1
 def formatColor(color):
 	if (type(color) is str):
-		# what different lengths mean:
-		# empty => black
-		#x => #xxxxxxff
-		#xy => #xyxyxyff
-		#rgb => rrggbbff
-		#rgba => rrggbbaa
-		#rgbxy => rrggbbxy
-		#rrggbb => #rrggbbff
-		#rrggbba => #rrggbbaa
-		#rrggbbaa => #rrggbbaa
-		if color[0] == '#':
-			color = color[1:]
-		if len(color) == 0:
-			color = '0' * 6 + 'ff'
-		elif len(color) == 1:
-			color = color * 6 + 'ff'
-		elif len(color) == 2:
-			color = color * 3 + 'ff'
-		elif len(color) == 3:
-			color = color[0]*2 + color[1]*2 + color[2]*2 + 'ff'
-		elif len(color) == 4:
-			color = color[0]*2 + color[1]*2 + color[2]*2 + color[3]*2
-		elif len(color) == 5:
-			color = color[0]*2 + color[1]*2 + color[2]*2 + color[3:]
-		elif len(color) == 6:
-			color = color + 'ff'
-		elif len(color) == 7:
-			color = color + color[-1]
-		elif len(color) > 8:
-			color = color[:8]
+		if color[0] == '#':   color = color[1:]
+		if len(color) == 0:   color = '0' * 6 + 'ff' # empty => black
+		elif len(color) == 1: color = color * 6 + 'ff' #x => #xxxxxxff
+		elif len(color) == 2: color = color * 3 + 'ff' #xy => #xyxyxyff
+		elif len(color) == 3: color = color[0]*2 + color[1]*2 + color[2]*2 + 'ff' #rgb => rrggbbff
+		elif len(color) == 4: color = color[0]*2 + color[1]*2 + color[2]*2 + color[3]*2 #rgba => rrggbbaa
+		elif len(color) == 5: color = color[0]*2 + color[1]*2 + color[2]*2 + color[3:] #rgbxy => rrggbbxy
+		elif len(color) == 6: color = color + 'ff' #rrggbb => #rrggbbff
+		elif len(color) == 7: color = color + color[-1] #rrggbba => #rrggbbaa
+		elif len(color) > 8:  color = color[:8] #rrggbbaax* => #rrggbbaa
 		converted = []
 		for i in range(4):
 			hex = color[i*2:i*2+2]
@@ -241,20 +221,17 @@ def formatColor(color):
 		return converted
 	
 	# Tuple to list
-	if (type(color) is tuple):
-		color = list(color)
+	if (type(color) is tuple): color = list(color)
 	# Make a single number into a list
-	if type(color) is not list:
-		color = [color]
+	if type(color) is not list: color = [color]
 	# Make sure we have 3 values in that list
-	while (len(color) < 3):
-		color.append(color[0])
+	while (len(color) < 3): color.append(color[0])
 	# In case anyone was fancy and specified numbers in the 0-255 range
 	if any(value > 1 for value in color):
 		for i in range(3):
 			color[i] = color[i] / 255
-	if len(color) < 4:
-		color.append(1) # alpha
+	# append alpha:
+	if len(color) < 4: color.append(1)
 	return color
 
 def colorToHex(color):
@@ -268,7 +245,7 @@ def colorToHex(color):
 	return hex
 
 # Spawns a cuboid at the specified coordinates with the specified color via a client-connection
-async def spawnCuboid(connection, position, size, color, rotator = None, positionIsCenterPoint = False):
+async def spawnCuboid(connection, position, size, color, rotator = None, positionIsCenterPoint = False, processDescription = None):
 	if type(position) is not Coordinates:
 		position = Coordinates(position)
 	if type(size) is not Coordinates:
@@ -311,7 +288,11 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		posSizeColor = [float(i) for i in
 			position.list() + size.list() + formatColor(color) + rotator.list()]
 		await connection.send(("SPAWN CUBOID pos size color opacity rot", posSizeColor))
-		await server.sleep(0.2, "Spawning cuboids in the virtual world") # TODO: Find way to spawn all in the same frame
+		if processDescription is None:
+			processDescription = "Spawning cuboids in the virtual world"
+		else:
+			processDescription = "Spawning cuboids in the virtual world for " + processDescription
+		await server.sleep(0.2, processDescription) # TODO: Find way to spawn all in the same frame
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
 def sizeFromLayerDimensions(layerDims):
@@ -705,8 +686,10 @@ async def drawLayout(connection, positions):
 			index = index,
 		))
 	
-	for current in Layer.layerList:
-		await spawnCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
+	for index, current in enumerate(Layer.layerList):
+		await spawnCuboid(connection, current.position, current.size, current.color,
+			positionIsCenterPoint = True,
+			processDescription = f"layer {index} of {len(Layer.layerList)}")
 		if design.connections.display:
 			for parent in current.parents:
 				y = parent.position.y
@@ -735,7 +718,8 @@ async def drawLayout(connection, positions):
 					Coordinates(thickness, z = long),
 					color = design.connections.color,
 					rotator = Coordinates(x = 90-math.degrees(-alpha)),
-					positionIsCenterPoint = True)
+					positionIsCenterPoint = True,
+					processDescription = f"connections to layer {index} of {len(Layer.layerList)}")
 
 	# Displaying plot if no client connection was given
 	if connection is None:
@@ -821,6 +805,8 @@ async def drawstructure(connection = None):
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False):
+	if len(Layer.layerList) <= layerIndex:
+		await connection.sendstatus(16, f"tf draw structure needs to be called before any kernel can be drawn!")
 	if refreshTrainVars:
 		ai.tfRefreshTrainableVars()
 	trainableVars = ai.tfnet.layers[layerIndex][5]
@@ -833,8 +819,92 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 		return False
 	kernel = trainableVars['kernel'][0]
 	await connection.sendstatus(-10, f"Now drawing kernels with dimensions {kernel.shape} of layer {layerIndex}...")
-
-
+	colored = (layerIndex == 1 and kernel.shape[2] == 3)
+	pixelsPerGroup = kernel.shape[:2]
+	if colored:
+		if len(kernel.shape) < 4:
+			groups = (1, 1)
+		elif len(kernel.shape) == 4:
+			groups = (kernel.shape[3], 1)
+		elif len(kernel.shape) == 5:
+			groups = kernel.shape[3:5]
+	else:
+		if len(kernel.shape) < 3:
+			groups = (1, 1)
+		elif len(kernel.shape) == 3:
+			groups = (kernel.shape[2], 1)
+		elif len(kernel.shape) == 4:
+			groups = kernel.shape[2:4]
+	size = Coordinates(design.kernels.defaultPixelDimensions, z = design.kernels.thickness)
+	if size.z <= 1:
+		size.z *= size.x
+	# -- here you could add responsive calculations that adjust the pixel size
+	#    depending on how many there and how large everything would be.
+	if design.kernels.minPixelDimensions is not None:
+		size.x = max(size.x, design.kernels.minPixelDimensions[0])
+		size.y = max(size.y, design.kernels.minPixelDimensions[1])
+	if design.kernels.maxPixelDimensions is not None:
+		size.x = min(size.x, design.kernels.maxPixelDimensions[0])
+		size.y = min(size.y, design.kernels.maxPixelDimensions[1])
+	spacing = Coordinates(design.kernels.spacingBetweenKernels, z = 0)
+	if spacing.x <= 1 or spacing.y <= 1:
+		spacing.x *= size.x
+		spacing.y *= size.y
+	structureWidth = groups[0] * pixelsPerGroup[0] * size.x + (groups[0]-1) * spacing.x
+	structureHeight = groups[1] * pixelsPerGroup[1] * size.y + (groups[1]-1) * spacing.y
+	progress = 0
+	for groupy in range(groups[1]):
+		for groupx in range(groups[0]):
+			for pixely in range(pixelsPerGroup[1]):
+				for pixelx in range(pixelsPerGroup[0]):
+					if not colored:
+						nplocation = [1] * len(kernel.shape)
+						if len(kernel.shape) > 0: nplocation[0] = pixelx
+						if len(kernel.shape) > 1: nplocation[1] = pixely
+						if len(kernel.shape) > 2: nplocation[2] = groupx
+						if len(kernel.shape) > 3: nplocation[3] = groupy
+						color = kernel[tuple(nplocation)]
+						# normalize color
+						color -= np.min(kernel)
+						color /= np.max(kernel) - np.min(kernel)
+					else: # colored
+						nplocation = [1] * len(kernel.shape)
+						if len(kernel.shape) > 0: nplocation[0] = pixelx
+						if len(kernel.shape) > 1: nplocation[1] = pixely
+						if len(kernel.shape) > 3: nplocation[3] = groupx
+						if len(kernel.shape) > 4: nplocation[4] = groupy
+						color = []
+						for rgb in range(3):
+							nplocation[2] = rgb
+							color.append(kernel[tuple(nplocation)])
+							# normalize color
+							color[rgb] -= np.min(kernel)
+							color[rgb] /= np.max(kernel) - np.min(kernel)
+					position = Coordinates(
+						# x
+						+ Layer.layerList[layerIndex].position.x
+						- Layer.layerList[layerIndex].size.x / 2
+						- design.kernels.spacingFromLayer
+						- structureWidth
+						+ groupx * pixelsPerGroup[0] * size.x
+						+ groupx * spacing.x
+						+ pixelx * size.x
+					, # y
+						+ Layer.layerList[layerIndex].position.y
+						- structureHeight / 2
+						+ groupy * pixelsPerGroup[1] * size.y
+						+ groupy * spacing.y
+						+ pixely * size.y
+					, # z
+						+ Layer.layerList[layerIndex].position.z
+						- Layer.layerList[layerIndex].size.z / 2
+						- size.z / 2
+					)
+					progress += 1
+					processDescription = f"kernels of layer {layerIndex} at pixel {progress} " + \
+						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
+					await spawnCuboid(connection, position, size, color,
+						processDescription = processDescription)
 
 
 # FOR DEBUGGING, executed if you start this script directly

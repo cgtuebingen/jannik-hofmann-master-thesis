@@ -34,6 +34,14 @@ class connections:
 	strength = 70
 	color = .3
 
+class kernels:
+	defaultPixelDimensions = (50, 50)
+	minPixelDimensions = None
+	maxPixelDimensions = None
+	spacingBetweenKernels = (.2, .2) # if values <= 1, interpreted as percentage of pixel dimensions
+	spacingFromLayer = 50 # scalar, horizontal spacing as kernels are to the side of layers
+	thickness = .1 # if value <= 1, intepreted as percentage of pixel width
+
 class layouting:
 	# Dimensions as single numbers or tuples: one value = uniform scaling,
 	# two values = (xz axes, y axis), three values (x, z, y) in unreal
