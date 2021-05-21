@@ -12,6 +12,8 @@ from datetime import datetime
 import loggingFunctions
 import beautifulDebug
 
+def onModuleReload(): checkSettings()
+
 # TEMPORARY DEBUGGING SETTINGS
 DEBUG_USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary
 # This allows the server to draw a precached structure without loading any model

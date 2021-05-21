@@ -21,7 +21,9 @@ lastlogwrite = None
 
 # appends the text into the logfile specified by setting.LOGFILE_PATH
 # returns whether the text could be successfully appended
-def log(text):
+def log(text, tryToCreateNewFile = True):
+	global lastlogwrite
+	
 	# abort if no logfile path or path couldn't be accessed previously
 	if (setting.LOGFILE_PATH is None or
 		setting.LOGFILE_PATH == "ERROR" or
@@ -38,9 +40,8 @@ def log(text):
 		# append to logfile
 		file = open(setting.LOGFILE_PATH, 'a')
 
-		global lastlogwrite
 		dateTimeObj = datetime.now()
-		if (lastlogwrite == None):
+		if lastlogwrite is None:
 			# to be able to retrieve SCRIPT_PATH()
 			import centralController
 			# Nothing was written yet in the logfile this session. Let's start with something nice:
@@ -62,6 +63,17 @@ def log(text):
 
 		return True
 
+	except FileNotFoundError:
+		if tryToCreateNewFile:
+			lastlogwrite = None
+			return log(text, tryToCreateNewFile = False) # this avoids infinite recursion
+		else:
+			# uh oh, something went wrong... Let's warn the user, but only once this time
+			print(beautifulDebug.special(5, 3, 0) +
+				f"ERROR finding logfile at {setting.LOGFILE_PATH}:\n" +
+				traceback.format_exc() + beautifulDebug.RESET)
+			setting.LOGFILE_PATH = "ERROR"
+			return False
 	except IOError:
 		# uh oh, something went wrong... Let's warn the user, but only once this time
 		print(beautifulDebug.special(5, 3, 0) +

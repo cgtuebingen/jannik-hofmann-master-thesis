@@ -181,10 +181,17 @@ class Coordinates:
 	def list(self):
 		return [self.x, self.y, self.z]
 
-	# Switch x and y axes because of how Unreal Engine works
+	# Switch y and z axes because of how Unreal Engine works
 	# (Here in python, z is horizontal and y the vertical one, in UE the other way around)
 	def switchYZ(self):
 		self.y, self.z = self.z, self.y
+		return self
+	# The other two functions for easier access in case it's needed:
+	def switchXY(self):
+		self.x, self.y = self.y, self.x
+		return self
+	def switchXZ(self):
+		self.x, self.z = self.z, self.x
 		return self
 
 # Transform coordinates to representation that makes sense for Unreal Engine viewing
@@ -247,8 +254,8 @@ def colorToHex(color):
 	print (hex)
 	return hex
 
-# Spawns a cuboid at the specified coordinates with the specified color via a client-connection
-async def spawnCuboid(connection, position, size, color, rotator = None, positionIsCenterPoint = False, processDescription = None):
+# Packs cuboid drawing instructions into a list, that can be sent alone or in a batch via websocket later
+async def packCuboid(position, size, color, rotator = None, positionIsCenterPoint = False):
 	if type(position) is not Coordinates:
 		position = Coordinates(position)
 	if type(size) is not Coordinates:
@@ -258,50 +265,164 @@ async def spawnCuboid(connection, position, size, color, rotator = None, positio
 		rotator = 0
 	if type(rotator) is not Coordinates:
 		rotator = Coordinates(rotator)
-	if connection is None:
-		# Just log what we would be doing
-		loggingFunctions.log(f"Would be spawning a cuboid at position {position} " +
-		f" with size {size}{', rotation ' + str(rotator) if rotator != 0 else ''} and color {color}.")
-		if (rotator.x == 0):
-			rectangle = plt.Rectangle(
-				(position.z - size.z/2, position.y - size.y/2),
-				size.z, size.y,
-				color = list(color),
-				linewidth = 0)
-			plt.gca().add_patch(rectangle)
-		else:
-			rectangle = plt.Rectangle(
-				(position.z, position.y),
-				size.z/2, size.y/2,
-				color = list(color),
-				linewidth = 0,
-				angle=-rotator.x)
-			plt.gca().add_patch(rectangle)
-			rectangle = plt.Rectangle(
-				(position.z, position.y),
-				size.z/2, size.y/2,
-				color = list(color),
-				linewidth = 0,
-				angle=180-rotator.x)
-			plt.gca().add_patch(rectangle)
+	# Transform coordinates to UE
+	position, size = transformCoordinates(position, size, positionIsCenterPoint)
+	# Append them into one large array and send them away as instruction
+	posSizeColor = [float(i) for i in
+		position.list() + size.list() + formatColor(color) + rotator.list()]
+	return ("SPAWN CUBOID pos size color opacity rot", posSizeColor)
+
+# Spawns a cuboid at the specified coordinates with the specified color via a client-connection
+# Rotations might not work perfectly yet, especially with axis switching...
+async def debugDrawCuboidInPlot(position, size, color, rotator = None, ignoreAxis = 'z'):
+	if type(position) is not Coordinates:
+		position = Coordinates(position)
+	if type(size) is not Coordinates:
+		size = Coordinates(size)
+	color = formatColor(color)
+	if rotator is None:
+		rotator = 0
+	if type(rotator) is not Coordinates:
+		rotator = Coordinates(rotator)
+	# Just log what we would be doing
+	loggingFunctions.log(f"Would be spawning a cuboid at position {position} " +
+	f" with size {size}{', rotation ' + str(rotator) if rotator != 0 else ''} and color {color}.")
+	if ignoreAxis in ('x', 0):
+		position.switchXZ()
+		size.switchXZ()
+		rotator.switchXZ()
+	elif ignoreAxis in ('y', 1):
+		position.switchYZ()
+		size.switchYZ()
+		rotator.switchYZ()
+	if (rotator.z == 0):
+		rectangle = plt.Rectangle(
+			(position.x - size.x/2, position.y - size.y/2),
+			size.x, size.y,
+			color = list(color),
+			linewidth = 0)
+		plt.gca().add_patch(rectangle)
 	else:
-		# Transform coordinates to UE
-		position, size = transformCoordinates(position, size, positionIsCenterPoint)
-		# Append them into one large array and send them away as instruction
-		posSizeColor = [float(i) for i in
-			position.list() + size.list() + formatColor(color) + rotator.list()]
-		await connection.send(("SPAWN CUBOID pos size color opacity rot", posSizeColor))
-		if processDescription is None:
-			processDescription = "Spawning cuboids in the virtual world"
-		else:
-			processDescription = "Spawning cuboids in the virtual world for " + processDescription
+		rectangle = plt.Rectangle(
+			(position.x, position.y),
+			size.x/2, size.y/2,
+			color = list(color),
+			linewidth = 0,
+			angle=-rotator.z)
+		plt.gca().add_patch(rectangle)
+		rectangle = plt.Rectangle(
+			(position.x, position.y),
+			size.x/2, size.y/2,
+			color = list(color),
+			linewidth = 0,
+			angle=180-rotator.z)
+		plt.gca().add_patch(rectangle)
+
+# Spawns a cuboid at the specified coordinates with the specified color via a client-connection
+# Ignores batches and just spawns it directly.
+async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
+	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True):
+
+	if connection is None:
+		await debugDrawCuboidInPlot(position, size, color, rotator)
+		return
+
+	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
+	await connection.send(drawResponse)
+	if processDescription is None:
+		processDescription = "Spawning cuboids in the virtual world"
+	else:
+		processDescription = "Spawning cuboids in the virtual world for " + processDescription
+	if waitAfterwardsForServerDrawNext:
 		global readyToDraw
 		readyToDraw = False
 		await server.sleep(0, processDescription)
 		for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
 			if readyToDraw:
 				return
-			await server.sleep(design.recheckDrawReadyInterval, processDescription)
+			await server.sleep(design.recheckDrawReadyInterval,
+				'Waiting for "server draw next" request by client after ' + processDescription)
+
+# Contains all of the drawing instructions that have been queued into batches
+cuboidQueue = []
+lastCheckEmptyQueue = None
+lastQueueEmptiedAt = None
+def resetCuboidQueue():
+	global cuboidQueue, lastQueueEmptiedAt
+	cuboidQueue = []
+	lastQueueEmptiedAt = time.time()
+
+# Sends the whole cuboidQueue as batch or drawing instructions to the client
+async def sendCuboidBatch(connection, processDescription, waitAfterwardsForServerDrawNext=True):
+	await connection.send(("SPAWN CUBOID BATCH", cuboidQueue),
+		printText=f"SPAWN CUBOID BATCH containing {len(cuboidQueue)} objects up to {processDescription}.")
+	resetCuboidQueue()
+	if processDescription is None:
+		processDescription = "Spawning cuboids in the virtual world"
+	else:
+		processDescription = "Spawning cuboids in the virtual world for " + processDescription
+	await server.sleep(0, processDescription)
+	if waitAfterwardsForServerDrawNext:
+		global readyToDraw
+		readyToDraw = False
+		sleepInterval = design.maxDrawWaitTimeout
+		while sleepInterval > 0.01: sleepInterval /= 2
+		for i in range(design.maxDrawWaitTimeout / sleepInterval):
+			if readyToDraw:
+				return
+			await server.sleep(sleepInterval,
+				'Waiting for "server draw next" request by client after ' + processDescription)
+		readyToDraw = True
+
+# checks if the cuboidQueue is empty after the specified number of seconds
+# after the last queueCuboid call. This ensures that the user didn't forget
+# to do call sendCuboidBatch() after queueing the last instructions
+sleepInterval = design.checkSentBatchAfter
+while sleepInterval > 0.05: sleepInterval /= 2
+async def checkEmptyQueue(connection, processDescription):
+	global lastCheckEmptyQueue, sleepInterval
+	lastCheckEmptyQueue = time.time()
+	startTime = time.time()
+	while time.time() < startTime + design.checkSentBatchAfter:
+		await server.sleep(sleepInterval, "Queueing cuboid spawn instructions")
+		if lastCheckEmptyQueue != startTime:
+			# checkEmptyQueue has been called again in the meantime and is running in a later instance.
+			# Therefore we can safely terminate this instance
+			return
+		if len(cuboidQueue) == 0:
+			# queue is empty, batch has been cleared, everything is fine
+			return
+		if lastQueueEmptiedAt > startTime:
+			# queue has been emptied in the meantime, our cuboid has beent sent out
+			return
+	# No new checkEmptyQueues running and there is something in the queue
+	try:
+		await connection.senddebug(17, "It appears, sendCuboidBatch() hasn't been called after " +
+			"queueing the last cuboid draw instructions! Batch will be left alone, probably not " +
+			"all desired objects are shown in the virtual world.\n" +
+			"Please call sendCuboidBatch() after drawing " + processDescription)
+	except: # can't send warning over connection, doing it in the python server console instead
+		loggingFunctions.warn("It appears, sendCuboidBatch() hasn't been called after " +
+			"queueing the last cuboid draw instructions! Batch will be left alone, probably not " +
+			"all desired objects are shown in the virtual world.\n" +
+			"Please call sendCuboidBatch() after drawing " + processDescription)
+	
+
+# Queues a cuboid to be spawned at the specified coordinates with the specified color via a client-connection
+# Uses batch size as specified in visualization settings
+# You have to call sendCuboidBatch to finally clear the queue after sending the last cuboid!
+async def queueCuboid(connection, position, size, color, rotator = None, positionIsCenterPoint = False, processDescription = None):
+	if connection is None:
+		return await debugDrawCuboidInPlot(position, size, color, rotator)
+	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
+	cuboidQueue.append(drawResponse)
+	# Give other asyncio threads a chance to pass through
+	await server.sleep(0, "Creating cuboid spawn instructions for " + processDescription)
+	if len(cuboidQueue) >= design.objectBatchSize:
+		await sendCuboidBatch(connection, processDescription)
+	else:
+		asyncio.create_task(checkEmptyQueue(connection, processDescription))
+
 
 # From AI layer dimensions, calculate a reasonable size for visual representation
 def sizeFromLayerDimensions(layerDims):
@@ -390,10 +511,9 @@ async def drawstructureLinearly(connection = None):
 		if not ai.tfnet.layers[index-1][0] in layer[4]:
 				position.add(z = 1000) # increase distance between unconnected layers
 		# Retrieve color for this layer type
-		color = design.layerColors.get(layer[1].lower(),
-			design.layerColors.get("default"))
+		color = getLayerColor(layer[1])
 		# Spawn that thing and append it to drawnLayers
-		await spawnCuboid(connection, position, size, color, positionIsCenterPoint = True)
+		await queueCuboid(connection, position, size, color, positionIsCenterPoint = True)
 		drawnLayers.append([position.copy(), size.copy(), color])
 		# Draw connections between layers if applicable
 		if design.connections.display and \
@@ -411,15 +531,15 @@ async def drawstructureLinearly(connection = None):
 						x = random.uniform(-minval * 0.8, minval * 0.8),
 						y = random.uniform(maxval * 1.3, maxval * 2))
 					if True:#not design.angledConnections:
-						await spawnCuboid(connection,
+						await queueCuboid(connection,
 							Coordinates(randomPos, size/2, position - design.connections.strength/2),
 							Coordinates(design.connections.strength, y = randomPos - size/2),
 							design.connections.color)
-						await spawnCuboid(connection,
+						await queueCuboid(connection,
 							Coordinates(randomPos, randomPos, cposition - design.connections.strength/2),
 							Coordinates(design.connections.strength, z = position - cposition + design.connections.strength),
 							design.connections.color)
-						await spawnCuboid(connection,
+						await queueCuboid(connection,
 							Coordinates(randomPos, csize/2, cposition - design.connections.strength/2),
 							Coordinates(design.connections.strength, y = randomPos - csize/2),
 							design.connections.color)
@@ -435,7 +555,7 @@ async def drawstructureLinearly(connection = None):
 						posz = position - deltaz/2
 						origsizey = randomPos - size/2
 						sizey = origsizey / math.cos(alpha(size, False))
-						await spawnCuboid(connection,
+						await queueCuboid(connection,
 							Coordinates(randomPos, size/2 + origsizey/2, posz),
 							Coordinates(design.connections.strength, y = sizey),
 							design.connections.color,
@@ -444,7 +564,7 @@ async def drawstructureLinearly(connection = None):
 						
 						posz = cposition - design.connections.strength/2 + deltaz
 						sizez = position - cposition + design.connections.strength - deltaz * 2
-						await spawnCuboid(connection,
+						await queueCuboid(connection,
 							Coordinates(randomPos, randomPos, posz + sizez/2),
 							Coordinates(design.connections.strength, z = sizez),
 							design.connections.color,
@@ -453,13 +573,14 @@ async def drawstructureLinearly(connection = None):
 						posz = cposition + deltaz/2
 						origsizey = randomPos - csize/2
 						sizey = origsizey / math.cos(alpha(csize, False))
-						await spawnCuboid(connection,
+						await queueCuboid(connection,
 							Coordinates(randomPos, csize/2 + origsizey/2, posz),
 							Coordinates(design.connections.strength, y = sizey),
 							design.connections.color,
 							rotator = Coordinates(x = alpha(csize)),
 							positionIsCenterPoint = True)
 		position.add(z = size/2 + design.layouting.horizontalSpaceBetweenLayers)
+	await sendCuboidBatch(connection, "structure", False)
 	
 	# Displaying plot if no client connection was given
 	if connection is None:
@@ -468,18 +589,32 @@ async def drawstructureLinearly(connection = None):
 
 	return True
 
+# retrieves the layer color based on its type description
+# Tries first with the whole name ignoring spaces,
+# then removes any "2D" at the end and tries again
+def getLayerColor(layerType, defaultValue = design.layerColors.get("default")):
+	layerType = layerType.lower()
+	result = design.layerColors.get(layerType, "NOT FOUND")
+	if result != "NOT FOUND":
+		return result
+	if layerType.endswith("2d"):
+		layerType = layerType[:-2]
+	result = design.layerColors.get(layerType, "NOT FOUND")
+	if result != "NOT FOUND":
+		return result
+	return defaultValue
+
 class Layer:
 	layerList = []
-
-	def __init__(self, position = 0, size = 0, color = "default", parents = [], activeAreaAbove = 0, activeAreaBelow = 0, index = None):
+	def __init__(self, position = 0, size = 0, type = "unknown", parents = [], activeAreaAbove = 0, activeAreaBelow = 0, index = None):
 		if index is None:
 			index = len(Layer.layerList)
 		self.position = Coordinates(position)
 		self.size = Coordinates(size)
 		self.activeAreaAbove = Coordinates(activeAreaAbove)
 		self.activeAreaBelow = Coordinates(activeAreaBelow)
-		self.color = design.layerColors.get(color.lower(),
-			design.layerColors.get("default"))
+		self.type = type
+		self.color = getLayerColor(type)
 		self.index = index
 		self.parents = []
 		self.findParents(parents)
@@ -641,7 +776,7 @@ async def drawstructureTreeBasic(connection = None):
 				current.position.y - current.size.y/2)
 
 	for current in Layer.layerList:
-		await spawnCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
+		await queueCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
 		for parent in current.parents:
 			y = parent.position.y
 			z = parent.position.z
@@ -658,12 +793,14 @@ async def drawstructureTreeBasic(connection = None):
 				alpha = math.atan(deltaz/deltay)
 				long = deltay / math.cos(alpha)
 			if drawIt:
-				await spawnCuboid(connection,
+				await queueCuboid(connection,
 					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
 					Coordinates(design.connections.strength, z = long),
 					color = design.connections.color,
 					rotator = Coordinates(x = 90-math.degrees(-alpha)),
 					positionIsCenterPoint = True)
+
+	await sendCuboidBatch(connection, "structure", False)
 
 	# Displaying plot if no client connection was given
 	if connection is None:
@@ -677,7 +814,7 @@ async def drawstructureTreeBasic(connection = None):
 # Positions are given in an array as parameter, the other info is retrieved from ai.tfnet.layers
 async def drawLayout(connection, positions):
 	positionOffset = Coordinates(0, positions[0][1], positions[0][0]).scale(-1)
-	drawnLayers = [] # For later reference for drawing layer connections
+	typeCount = dict()
 
 	# If no connection has been given, initialize matplotlib
 	if connection is None:
@@ -686,19 +823,27 @@ async def drawLayout(connection, positions):
 	Layer.resetAllLayers()
 
 	for index, layer in enumerate(ai.tfnet.layers):
+		layerType = layer[1]
 		# Create layer instance and append it to layerList
 		Layer.layerList.append(Layer(
 			position = (positionOffset + (0, positions[index][1], positions[index][0])),
 			size = sizeFromLayerDimensions(layer[2]),
 			parents = layer[4],
-			color = layer[1],
+			type = layerType,
 			index = index,
 		))
+		if layerType in typeCount:
+			typeCount[layerType] += 1
+		else:
+			typeCount[layerType] = 1
 	
+	connectionCount = hiddenConnectionCount = 0
 	for index, current in enumerate(Layer.layerList):
-		await spawnCuboid(connection, current.position, current.size, current.color,
+		await queueCuboid(connection, current.position, current.size, current.color,
 			positionIsCenterPoint = True,
 			processDescription = f"layer {index} of {len(Layer.layerList)}")
+		
+		# connections:
 		if design.connections.display:
 			for parent in current.parents:
 				y = parent.position.y
@@ -711,6 +856,7 @@ async def drawLayout(connection, positions):
 					if math.isclose(deltaz - current.size.z/2 - parent.size.z/2,
 						design.layouting.horizontalSpaceBetweenGroupedLayers) and \
 						math.isclose(deltay, 0):
+							hiddenConnectionCount += 1
 							continue # connection between grouped layers should not be drawn
 				thickness = min(design.connections.strength,
 					parent.size.x/2, parent.size.y/2,
@@ -722,13 +868,36 @@ async def drawLayout(connection, positions):
 				else:
 					alpha = math.atan(deltaz/deltay)
 					long = deltay / math.cos(alpha)
-				await spawnCuboid(connection,
+				await queueCuboid(connection,
 					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
 					Coordinates(thickness, z = long),
 					color = design.connections.color,
 					rotator = Coordinates(x = 90-math.degrees(-alpha)),
 					positionIsCenterPoint = True,
 					processDescription = f"connections to layer {index} of {len(Layer.layerList)}")
+				connectionCount += 1
+
+	await sendCuboidBatch(connection, "last layers of structure", False)
+	successMsg = f"Successfully drew the neural network with {len(Layer.layerList)} layers.\n" + \
+		f"Composition: " + ', '.join([f"{n} {desc}" for (desc, n) in typeCount.items()])
+	if design.connections.displayBetweenGroupedLayers:
+		successMsg += f", {connectionCount} connections" 
+	else:
+		successMsg += f", {connectionCount} visible connections, {hiddenConnectionCount} hidden connections"
+	warningMsg = ""
+	for layerType in typeCount.keys():
+		if getLayerColor(layerType, None) is None:
+			# This layer type has no specified color!
+			if warningMsg == "":
+				warningMsg = "Some layer types could not be recognized and are displayed in " + \
+					"default color! Please check your visualization settings and add a " + \
+					"layerColor for the following layer types: " + layerType
+			else:
+				warningMsg += ", " + layerType
+	
+	if warningMsg != "":
+		await connection.sendstatus(3, warningMsg)
+	await connection.sendstatus(-30, successMsg)
 
 	# Displaying plot if no client connection was given
 	if connection is None:
@@ -741,7 +910,7 @@ async def drawLayout(connection, positions):
 # Returns whether we could successfully draw the architecture
 # If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
 # Using modified forceatlas2-algorithm for layouting
-async def drawstructureForceLayout(connection = None):
+async def drawstructure(connection = None):
 	if not hasattr(ai.tfnet, "layoutPositions") or ai.tfnet.layoutPositions is None:
 		# layouting hasn't been calculated yet, so we need to do the force layout from scratch
 
@@ -808,14 +977,22 @@ async def drawstructureForceLayout(connection = None):
 	# draw layers at the resulting positions
 	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
-# Choose which one to use by default
-async def drawstructure(connection = None):
-	await drawstructureForceLayout(connection)
-
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False):
+	# If no connection has been given, initialize matplotlib
+	if connection is None or design.kernels.debugPlotOnServer:
+		plt.axes()
+	async def status(verbosity, text):
+		if connection is None:
+			if verbosity < 0: loggingFunctions.printlog(text)
+			else: loggingFunctions.warn(text)
+		else:
+			await connection.sendstatus(verbosity, text)
+	
 	if len(Layer.layerList) <= layerIndex:
-		await connection.sendstatus(16, f"tf draw structure needs to be called before any kernel can be drawn!")
+		await status(16, f"Layer {layerIndex} doesn't exist! The index {layerIndex} is higher " +
+			"than the number of {len(Layer.layerList)} drawn layers in this network.")
+		return
 	if refreshTrainVars:
 		ai.tfRefreshTrainableVars()
 	trainableVars = ai.tfnet.layers[layerIndex][5]
@@ -824,11 +1001,11 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 		if not refreshTrainVars:
 			return await drawKernels(connection, layerIndex, True)
 		# Still no kernel found. Output error msg and return
-		await connection.sendstatus(16, f"Layer {layerIndex} does not have any kernels that could be visualized!")
+		await status(16, f"Layer {layerIndex} does not have any kernels that could be visualized!")
 		return False
 	kernel = trainableVars['kernel'][0]
-	await connection.sendstatus(-10, f"Now drawing kernels with dimensions {kernel.shape} of layer {layerIndex}...")
-	colored = (layerIndex == 1 and kernel.shape[2] == 3)
+	await status(-10, f"Now drawing kernels with dimensions {kernel.shape} of layer {layerIndex}...")
+	colored = (len(kernel.shape) > 2 and kernel.shape[2] == 3)
 	pixelsPerGroup = kernel.shape[:2]
 	if colored:
 		if len(kernel.shape) < 4:
@@ -844,11 +1021,16 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 			groups = (kernel.shape[2], 1)
 		elif len(kernel.shape) == 4:
 			groups = kernel.shape[2:4]
+	wrapping = False
+	if groups[1] == 1 and design.kernels.wrapIfDimLeftover:
+		wrapping = True
+		newGroupy = math.floor(math.sqrt(groups[0]))
+		groups = (math.ceil(groups[0] / newGroupy), newGroupy)
 	size = Coordinates(design.kernels.defaultPixelDimensions, z = design.kernels.thickness)
 	if size.z <= 1:
 		size.z *= size.x
 	# -- here you could add responsive calculations that adjust the pixel size
-	#    depending on how many there and how large everything would be.
+	#    depending on how many there are and how large everything should be.
 	if design.kernels.minPixelDimensions is not None:
 		size.x = max(size.x, design.kernels.minPixelDimensions[0])
 		size.y = max(size.y, design.kernels.minPixelDimensions[1])
@@ -861,36 +1043,61 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 		spacing.y *= size.y
 	structureWidth = groups[0] * pixelsPerGroup[0] * size.x + (groups[0]-1) * spacing.x
 	structureHeight = groups[1] * pixelsPerGroup[1] * size.y + (groups[1]-1) * spacing.y
+	
+	def makeExponent(value): # takes a value from 0 to 100
+		if math.isclose(value, 50): return 1
+		elif value > 50: return 1 / (1 - (50 - value) / 50)
+		else: return 1 / makeExponent(100 - value)
+	brightnessExponent = makeExponent(design.kernels.brightness)
+	contrastExponent = makeExponent(design.kernels.contrast)
+	
+	def normalizeColor(value):
+		value /= max(np.max(kernel), -np.min(kernel))
+		if value >= 0: value **= contrastExponent
+		else: value = -(-value)**contrastExponent
+		value = value / 2 + 0.5
+		value **= brightnessExponent
+		return value
+	
 	progress = 0
 	for groupy in range(groups[1]):
 		for groupx in range(groups[0]):
 			for pixely in range(pixelsPerGroup[1]):
 				for pixelx in range(pixelsPerGroup[0]):
-					if not colored:
+					try:
 						nplocation = [1] * len(kernel.shape)
 						if len(kernel.shape) > 0: nplocation[0] = pixelx
 						if len(kernel.shape) > 1: nplocation[1] = pixely
-						if len(kernel.shape) > 2: nplocation[2] = groupx
-						if len(kernel.shape) > 3: nplocation[3] = groupy
-						color = kernel[tuple(nplocation)]
-						# normalize color
-						color -= np.min(kernel)
-						color /= np.max(kernel) - np.min(kernel)
-					else: # colored
-						nplocation = [1] * len(kernel.shape)
-						if len(kernel.shape) > 0: nplocation[0] = pixelx
-						if len(kernel.shape) > 1: nplocation[1] = pixely
-						if len(kernel.shape) > 3: nplocation[3] = groupx
-						if len(kernel.shape) > 4: nplocation[4] = groupy
-						color = []
-						for rgb in range(3):
-							nplocation[2] = rgb
-							color.append(kernel[tuple(nplocation)])
-							# normalize color
-							color[rgb] -= np.min(kernel)
-							color[rgb] /= np.max(kernel) - np.min(kernel)
+						if not colored:
+							if wrapping:
+								nplocation[2] = groupx + groupy * groups[0]
+							else:
+								if len(kernel.shape) > 2: nplocation[2] = groupx
+								if len(kernel.shape) > 3: nplocation[3] = groupy
+							color = normalizeColor(kernel[tuple(nplocation)])
+						
+						else: # colored
+							if wrapping:
+								nplocation[3] = groupx + groupy * groups[0]
+							else:
+								if len(kernel.shape) > 3: nplocation[3] = groupx
+								if len(kernel.shape) > 4: nplocation[4] = groupy
+							color = []
+							for nplocation[2] in range(3):
+								color.append(normalizeColor(kernel[tuple(nplocation)]))
+					except IndexError:
+						# Can't be pixelx or pixely due to groups intialization from kernel.shape
+						# So we definitely need to break out of the pixelx, pixely and groupx loops
+						pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
+						# Now decide on whether we need to break out of all of the loops...
+						if wrapping:
+							if groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
+						else:
+							if groupy > kernel.shape[3+colored]: groupy = math.inf
+						break # breaking out
+
 					position = Coordinates(
-						# x
+					# x
 						+ Layer.layerList[layerIndex].position.x
 						- Layer.layerList[layerIndex].size.x / 2
 						- design.kernels.spacingFromLayer
@@ -912,8 +1119,18 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 					progress += 1
 					processDescription = f"kernels of layer {layerIndex} at pixel {progress} " + \
 						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
-					await spawnCuboid(connection, position, size, color,
+					await queueCuboid(connection, position, size, color,
 						processDescription = processDescription)
+					if design.kernels.debugPlotOnServer and connection is not None:
+						await queueCuboid(None, position, size, color,
+							processDescription = processDescription)
+
+	if connection is not None:
+		await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
+	# Displaying plot if no client connection was given
+	if connection is None or design.kernels.debugPlotOnServer:
+		plt.axis('auto')
+		plt.show()
 
 
 # FOR DEBUGGING, executed if you start this script directly
@@ -926,6 +1143,10 @@ async def testVis():
 		path = setting.AVAILABLE_NN_PATHS.get(path, path)
 		ai.preparemodule(path)
 		ai.importtf()
+		# await ai.tf_getstructure(printStructure=False)
+		# await drawstructure(None)
+		# await ai.tf_refreshtrainablevars()
+		# await drawKernels(None, 2)
 	else:
 		structure = debugAndTesting.const_fake_structure
 		await ai.parsestructure(None, structure)

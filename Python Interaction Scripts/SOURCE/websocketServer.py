@@ -347,7 +347,9 @@ def startServer():
 yieldingCoroutines = set()
 
 # Sleeps in an asynchronous manner while yielding other threads, can be cancelled with stopCoroutines
-async def sleep(delay, description):
+async def sleep(delay, description, hideInServerInfo = False):
+	if hideInServerInfo:
+		description = "#HIDDEN\n" + description
 	global yieldingCoroutines
 	task = asyncio.ensure_future(asyncio.sleep(delay))
 	yieldingCoroutines.add((task, description))

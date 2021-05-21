@@ -18,11 +18,13 @@ import math
 import msgpack
 from aioconsole import ainput
 import re
+import importlib
 import importlib.util
 import numpy as np
 from types import SimpleNamespace
 import ast
 import random
+import types
 
 # LOCAL IMPORTS
 import serverSettings as setting
@@ -35,6 +37,7 @@ import loggingFunctions
 import debugAndTesting
 import visualizationSettings as design
 
+def onModuleReload(): Request(None, None) # initialize command list
 
 # Seeding random library
 random.seed()
@@ -146,7 +149,7 @@ class Request:
 	# Sends the specified message to the websocket client and prints it in console
 	# utilizing messagepack and projects data specification.
 	# Returns a boolean that signals whether the message was small enough to be sent properly
-	async def send(self, data, printhere=True, forceDataSerializable = False):
+	async def send(self, data, printhere = True, forceDataSerializable = False, printText = None):
 		if forceDataSerializable:
 			data = self.makeDataSerializable(data)
 		
@@ -182,8 +185,11 @@ class Request:
 		
 		if (message_size_too_large is False): # message can be sent
 			await self.websocket.send(packed) # actually send it via websocket
-			if (printhere): # and print it in the console
-				loggingFunctions.printlog("> " + str(data), -3)
+			if printhere: # and print it in the console and debug
+				if printText is None:
+					loggingFunctions.printlog("> " + str(data), -3)
+				else:
+					loggingFunctions.printlog("> " + str(printText), -3)
 			return True
 		else: # message too large to be sent properly!
 			# Caution when changing this debug message! The content of this message needs to stay
@@ -333,7 +339,7 @@ class Request:
 		actualCount = len(self.command.split()) - 1 # actual command doesn't count as parameter
 		if (actualCount >= minCount and actualCount <= maxCount):
 			return True # all well
-		elif (warnUser):
+		elif warnUser:
 			# uh oh!
 			warningMsg = f"WARNING: Command {self.command.split()[0]} takes "
 			if (maxCount == math.inf):
@@ -348,9 +354,7 @@ class Request:
 			else:
 				warningMsg += " Additional parameters will be ignored!"
 			await self.senddebug(2, warningMsg)
-			return False
-		else:
-			return False
+		return False
 
 	# Retrieves parameter at specified position from whitespace-serparated command.
 	# Casts it to specified type (or type of specified default value)
@@ -358,24 +362,25 @@ class Request:
 	# Only raises exception if parameter not found/not castable and flag is enabled
 	# defaultOrType being a type itself would always raise exception if can't be casted
 	# for position=-1 (or no position specified) getParam will return the rest of command as str
-	async def getParam(self, position=-1, defaultOrType=str, raiseException=False):
-		if(position == -1):
-			assert (defaultOrType is str) or (type(defaultOrType) is str)
-			if (len(self.command.split()) < 2) and (type(defaultOrType) is str):
+	async def getParam(self, position=-1, defaultOrType=str, raiseException=False, warnOnEmptyString=True):
+		if position == -1:
+			assert (defaultOrType is str or type(defaultOrType) is str)
+			if len(self.command.split()) < 2 and type(defaultOrType) is str:
 				return defaultOrType
 			try:
 				return self.command.split(None, 1)[1]
 			except:
-				await self.senddebug(5, f"TYPE WARNING! Couldn't return rest of command {self.command}" +
-				" as there don't seem to be any more parameters available! " +
-				"getParam will return an empty string.")
+				if warnOnEmptyString:
+					await self.senddebug(5, f"TYPE WARNING! Couldn't return rest of command {self.command}" +
+						" as there don't seem to be any more parameters available! " +
+						"getParam will return an empty string.")
 				return ""
 
 		actualCount = len(self.command.split()) - 1 # actual command doesn't count as parameter
 
 		try:
 			# retrieve type of defaultOrType
-			if (type(defaultOrType) is type):
+			if type(defaultOrType) is type:
 				castToType = defaultOrType
 			else:
 				castToType = type(defaultOrType)
@@ -384,7 +389,7 @@ class Request:
 				f"Command {self.command.split()[0]}, position {position}, " +
 				f"defaultOrType {defaultOrType} of type {defaultOrType.type()}")
 
-		if (position > actualCount):
+		if position > actualCount:
 			# too few parameters in command arguments
 			if (type(defaultOrType) is type or raiseException):
 				raise RuntimeError("Not enough parameters given for command " +str(self.command.split()[0])+
@@ -666,19 +671,18 @@ class Request:
 	# should be for debug only. deactivated on connections outside of localhost
 	# do not rely on this function for production code via unencrypted connections
 	async def python(self, **kwargs):
-		if (setting.ALLOW_REMOTE_CODE_EXECUTION):
-			if(not(await self.checkParams(1, math.inf))):
-				return False
-			try:
-				result = exec(await self.getParam(), globals())
-				await self.sendstatus(-30, str(result))
-			except:
-				await self.sendstatus(13, f"ERROR executing command {self.command} in python:\n" +
-					traceback.format_exc())
-				return False
-		else:
+		if not setting.ALLOW_REMOTE_CODE_EXECUTION:
 			await self.senddebug(15, f"Cannot execute {await self.getParam()}. " +
 				"Remote code execution is disabled by python websocket server.")
+			return False
+		if(not(await self.checkParams(1, math.inf))):
+			return False
+		try:
+			result = exec(await self.getParam(), globals())
+			await self.sendstatus(-30, str(result))
+		except:
+			await self.sendstatus(13, f"ERROR executing command {self.command} in python:\n" +
+				traceback.format_exc())
 			return False
 	commandList["python"] = (python, "Executes the specified string as python code" +
 		("" if setting.ALLOW_REMOTE_CODE_EXECUTION else " (DISABLED)"),
@@ -692,19 +696,18 @@ class Request:
 	# should be for debug only. deactivated on connections outside of localhost
 	# do not rely on this function for production code via unencrypted connections
 	async def pythoneval(self, **kwargs):
-		if (setting.ALLOW_REMOTE_CODE_EXECUTION):
-			if(not(await self.checkParams(1, math.inf))):
-				return False
-			try:
-				result = eval(await self.getParam())
-				await self.sendstatus(-30, str(result))
-			except:
-				await self.sendstatus(13, f"ERROR evaluating command {self.command} in python:\n" +
-					traceback.format_exc())
-				return False
-		else:
+		if not setting.ALLOW_REMOTE_CODE_EXECUTION:
 			await self.senddebug(15, f"Cannot evaluate {await self.getParam()}. " +
 				"Remote code execution is disabled by python websocket server.")
+			return False
+		if(not(await self.checkParams(1, math.inf))):
+			return False
+		try:
+			result = eval(await self.getParam())
+			await self.sendstatus(-30, str(result))
+		except:
+			await self.sendstatus(13, f"ERROR evaluating command {self.command} in python:\n" +
+				traceback.format_exc())
 			return False
 	commandList["eval"] = (pythoneval, "Evaluates the specified string as python expression and " +
 			"responds with the result" + ("" if setting.ALLOW_REMOTE_CODE_EXECUTION else " (DISABLED)"),
@@ -715,15 +718,28 @@ class Request:
 	commandList["evaluate"] = commandAlias("eval")
 
 
+	def listCoroutines(self, coroutines = None):
+		if coroutines is None:
+			coroutines = [desc for (_, desc) in server.yieldingCoroutines]
+		result = ""
+		alreadyVisited = set()
+		for desc in coroutines:
+			if not desc.startswith("#HIDDEN\n") and desc not in alreadyVisited:
+				if coroutines.count(desc) > 1:
+					result += f'\n      {coroutines.count(desc)}x {desc}'
+					alreadyVisited.add(desc)
+				else:
+					result += '\n      ' + desc
+		return result
+
 	async def serverInfo(self, **kwargs):
 		await self.checkParams(0)
 		text = f"You are connected to the python interaction server, " + \
 			f"which is located on {setting.SERVER_IP}:{setting.SERVER_PORT}"
-		if len(server.yieldingCoroutines) == 0:
+		if len([desc for (_, desc) in server.yieldingCoroutines if not desc.startswith("#HIDDEN\n")]) == 0:
 			text += f'\n(No other command coroutines are currently running on the server)'
 		else:
-			text += f'\nCurrently running command coroutines:\n      ' + \
-				'\n      '.join(desc for (_, desc) in server.yieldingCoroutines)
+			text += f'\nCurrently running command coroutines:' + self.listCoroutines()
 		finaloutput = text
 		#await self.sendstatus(-30, text, False)
 		if not(ai.tfloaded()):
@@ -792,7 +808,7 @@ class Request:
 
 
 	async def restart(self, **kwargs):
-		await self.checkParams(0)
+		await self.checkParams(0, 1)
 		await server.shutdownServer(self.websocket, "Websocket server is being restarted due to request by client.\n" +
 			"All running processes and active client connections will be forcibly terminated.\n" +
 			"The server will unload any neural network and reset its state to the initial server state.\n"+
@@ -809,14 +825,94 @@ class Request:
 	commandList["server reset"] = commandAlias("server restart")
 
 
+	async def reload(self, **kwargs):
+		if not setting.ALLOW_REMOTE_CODE_EXECUTION:
+			await self.senddebug(15, f"Cannot reload modules! " +
+				"Remote code execution is disabled by python websocket server.")
+			return False
+		modules = await self.getParam(warnOnEmptyString=False)
+		modules = modules.split(' ')
+		modules = [m.strip() for m in modules if len(m) > 0]
+
+		excludePathFragments = ["\\site-packages\\", "\\lib\\"]
+		globalVarModules = dict()
+		for (name, variable) in globals().items():
+			if type(variable) is types.ModuleType and \
+				hasattr(variable, "__file__") and \
+				all(exclude not in variable.__file__ for exclude in excludePathFragments):
+					globalVarModules[name] = variable.__file__
+		
+		if len(modules) == 0:
+			availableModules = globalVarModules
+			pythonFiles = os.listdir(os.path.dirname(os.path.realpath(__file__)))
+			for file in pythonFiles:
+				if file.endswith('.py'):
+					availableModules[file[:-3]] = importlib.util.find_spec(file[:-3]).origin
+			availableModulesCompact = []
+			alreadyCovered = []
+			for (name, path) in availableModules.items():
+				if name not in alreadyCovered:
+					aliases = [name]
+					for (name2, path2) in availableModules.items():
+						if name != name2 and path == path2:
+							# Found same module under different names
+							aliases.append(name2)
+							alreadyCovered.append(name2)
+					availableModulesCompact.append(' = '.join(aliases))
+			availableModulesCompact = sorted(availableModulesCompact)
+			await self.senddebug(-5, "The following modules have been found and can be reloaded:\n" +
+				', '.join(availableModulesCompact))
+		else:
+			async def reloadByRef(moduleRef):
+				importlib.reload(moduleRef)
+				if 'onModuleReload' in dir(moduleRef):
+					moduleRef.onModuleReload()
+				await self.sendstatus(-30, f"Successfully reloaded the {module} module.")
+			
+			errorsEncountered = False
+			for module in modules:
+				if module in globalVarModules or importlib.util.find_spec(module) is not None:
+					try: # using import_module to receive a module reference from a string
+						await reloadByRef(importlib.import_module(module))
+					except ModuleNotFoundError:
+						try: # Trying again with the eval method...
+							await reloadByRef(eval(module))
+						except ModuleNotFoundError:
+							await self.sendstatus(10, f"Python cannot find any module named {module}! " +
+								'Please type "server reload" to see a list of available modules.')
+							errorsEncountered = True
+					except:
+						await self.sendstatus(11, f"ERROR loading module {module}!\n" +
+							traceback.format_exc())
+						errorsEncountered = True
+				else:
+					await self.sendstatus(10, f"Python cannot find any module named {module}! " +
+						'Please type "server reload" to see a list of available modules.')
+					errorsEncountered = True
+			if errorsEncountered:
+				return False
+
+	commandList["server reload"] = (reload, "Reloads certain modules of the server",
+		"Without parameters, it will list all the modules that can be reloaded.\n" +
+		"With parameters, name as many modules as you want, separated by spaces.\n" +
+		"These will then be reloaded by importlib. Note that the loaded AI network " +
+		'is located in ai, therefore reloading this module requires again the "nn load" command\n' +
+		"Note: When reloading the module serverCommands you cannot chain any other commands " +
+		"behind the reload with a & due to the nature of command processing checks" +
+		"\nPlease be aware that reloading modules this way might lead to undefined behaviour! " +
+		'It is recommended to completely reinitialize the server with "server reset"')
+
 	async def stopCoroutines(self, **kwargs):
 		await self.checkParams(0)
 		stopped = await server.stopCoroutines()
 		if len(stopped) == 0:
 			await self.senddebug(10, f"Nothing to stop. No stoppable coroutines are currently running or yielding to be stopped")
+		elif self.listCoroutines(stopped) == "":
+			await self.senddebug(-30, f"Successfullly stopped {len(stopped)} hidden subroutines, nothing major.")
 		else:
-			await self.sendstatus(-30, f"Successfully interrupted these processes:\n      " + '\n      '.join(stopped) +
-				"\nPlease be aware that stopping coroutines this way might lead to undefined behaviour! " +
+			await self.sendstatus(-30, f"Successfully interrupted these processes:" +
+				self.listCoroutines(stopped) +
+				"\n\nPlease be aware that stopping coroutines this way might lead to undefined behaviour! " +
 				'It is recommended to reinitialize the server with "server reset"')
 	commandList["server stop"] = (stopCoroutines, "Interrupts all running coroutines",
 		"Interrupts all running coroutines that yield to be stopped. This can be used " +
@@ -1190,7 +1286,8 @@ class Request:
 	#if not await self.assertTf(): return False
 	async def assertTf(self, **kwargs):
 		if not ai.nnloaded:
-			await self.sendstatus(18, f"Network hasn't been loaded and initialized yet!")
+			await self.sendstatus(18, f"Network hasn't been loaded and initialized yet!\n" +
+			'Use "nn load" to initialize a network. See "help nn load" for more info.')
 			return False
 		if not ai.tfloaded:
 			await self.sendstatus(18, f"Network is not Tensorflow, tf-specific functions can't be used!")
@@ -1260,7 +1357,7 @@ class Request:
 			await self.sendstatus(-10, f"Layouting for the network structure is being calculated.\n" +
 				"This might take a minute... (you can see a progress bar in the python server console)")
 			if design.layouting.debug.drawPlots * design.layouting.debug.numberOfPlots > 0:
-				await self.sendstatus(1, "Visualization functions have debug.drawPlots enabled.\n" +
+				await self.sendstatus(1, "Visualization settings have debug.drawPlots enabled.\n" +
 					"That means, the layouting algorithm opens an animated plot on the python server,\n" +
 					"which needs to be closed manually after completion, before the layout can be sent via websocket.")
 		try:
@@ -1345,7 +1442,7 @@ class Request:
 			debugMsg = ["The following kernel shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
 			await self.send(debugMsg)
 			return
-		if refresh or not hasattr(ai.tfnet, "validstructure") or ai.tfnet.validstructure == False:
+		if refresh or not hasattr(ai.tfnet, "validstructure"):
 			if refresh:
 				await self.sendstatus(-10, f"Refreshing trainable variables of the network first...")
 			else:
@@ -1354,7 +1451,15 @@ class Request:
 			if success == False:
 				await self.sendstatus(17, f"Cannot proceed to drawing kernels due to failure of retrieving trainable variables.")
 				return False
+		if ai.tfnet.validstructure == False or len(vis.Layer.layerList) == 0:
+			await self.sendstatus(17, f"The structure of the network hasn't even been drawn yet!\n" +
+			'Use "tf draw structure" to render the network itself before any kernels can be visualized.')
+			return False
 		try:
+			if design.kernels.debugPlotOnServer:
+				await self.sendstatus(1, "Visualization settings have debug.kernels.debugPlotOnServer enabled.\n" +
+					"That means, the kernel layout algorithm opens a plot window on the python server,\n" +
+					"which needs to be closed manually after completion, before the websocket server can receive any other commands.")
 			await vis.drawKernels(self, index)
 		except asyncio.CancelledError:
 			raise asyncio.CancelledError

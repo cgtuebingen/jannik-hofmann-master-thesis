@@ -6,26 +6,28 @@
 # LOCAL IMPORTS
 import loggingFunctions
 
-maxDrawWaitTimeout = .5 # seconds to wait for the command "server draw next" before resuming drawing
+def onModuleReload(): checkSettings()
+
+maxDrawWaitTimeout = 60 # seconds to wait for the command "server draw next" before resuming drawing
 # This avoids getting stuck in infinite loops if the command "server draw next" hasn't been received properly
-recheckDrawReadyInterval = .001 # in seconds, how often the algorithm rechecks if "server draw next" was received
-# should be much smaller than maxDrawWaitTimeout
+objectBatchSize = 1000 # how many objects/cuboids will be sent to the client in one batch via websocket response
+checkSentBatchAfter = 120 # checks this number of seconds after the last queueCuboid call, that the batch has been sent
 
 # Colors of different DNN layers, specified by their type as it appears in the model summary
-# (spaces and capitalization will be ignored and reversed)
+# Spaces and capitalization will be ignored and reversed, also a "2d" at the end can be omitted
 # Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255,
 # Also accepting strings containing hex code
 layerColors = {
 	"input layer": (0, .5, .6, .5),
-	"zero padding 2d": (.3, .3, .4),
+	"zero padding": (.3, .3, .4),
 
-	"conv 2d": (.8, .3, 0),
+	"conv": (.8, .3, 0),
 	"batch normalization": (.4, 0, .9),
 	"activation": (.2, .3, .2),
 	"add": (.5, .1, 0),
-	"max pooling 2d": (.6, .6, .0),
+	"max pooling": (.6, .6, .0),
 
-	"global average pooling 2d": (.6, .8, .1),
+	"global average pooling": (.6, .8, .1),
 	"dense": (0, .2, .9),
 	"flatten": (0, .7, .1),
 
@@ -43,9 +45,15 @@ class kernels:
 	defaultPixelDimensions = (50, 50)
 	minPixelDimensions = None
 	maxPixelDimensions = None
-	spacingBetweenKernels = (.2, .2) # if values <= 1, interpreted as percentage of pixel dimensions
+	spacingBetweenKernels = (.5, .5) # if values <= 1, interpreted as percentage of pixel dimensions
 	spacingFromLayer = 50 # scalar, horizontal spacing as kernels are to the side of layers
 	thickness = .1 # if value <= 1, intepreted as percentage of pixel width
+	wrapIfDimLeftover = True # when there are dimensions left over, the algorithm can wrap the kernel groups
+	brightness = 45 # default 50, black 0, white 100, changes the color brightness of kernels
+	contrast = 70 # default 50, grey 0, black/white 100, changes kernel contrast and saturation at the same time
+	debugPlotOnServer = True # After creating drawing instructions to the (UE4) client, plot the 
+	# kernels on a matplotlib drawing and open a window on the server
+	# (this also blocks other processes from running until the window is closed!)
 
 class layouting:
 	# Dimensions as single numbers or tuples: one value = uniform scaling,

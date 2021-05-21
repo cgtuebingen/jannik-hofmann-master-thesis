@@ -330,7 +330,7 @@ class ForceAtlas2:
             applyforces_timer.stop()
         
         async def execute_once_async(i):
-            await server.sleep(0.001, f"Layouting at iteration {i} of {iterations}")
+            await server.sleep(0, f"Layouting at iteration {i} of {iterations}")
             execute_once(i)
 
         if self.debugDisplayPlot == 0: self.debugDisplayPlot = False
