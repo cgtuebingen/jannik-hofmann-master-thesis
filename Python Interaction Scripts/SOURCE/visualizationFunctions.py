@@ -52,14 +52,9 @@ class Coordinates:
 			self.z = default.z if type(default) is Coordinates else float(default)
 		# By a tuple or list which acts the same way as one, two or three parameters
 		elif type(a) is tuple or type(a) is list:
-			if a is tuple:
+			if type(a) is tuple:
 				a = list(a)
-			if len(a) == 1:
-				self.x, self.y, self.z = float(a[0]), float(a[0]), float(a[0])
-			if len(a) == 2:
-				self.x, self.y, self.z = float(a[0]), float(a[0]), float(a[1])
-			if len(a) > 2:
-				self.x, self.y, self.z = float(a[0]), float(a[1]), float(a[2])
+			self.x, self.y, self.z = float(a[0]), float(a[len(a)//3]), float(a[len(a)-1])
 		# One parameter: All the same
 		else:
 			self.x, self.y, self.z = float(a), float(a), float(a)
@@ -73,47 +68,42 @@ class Coordinates:
 			self.z = c.z if type(c) is Coordinates else float(c)
 		
 		# Or specify/override parameters x, y, z by name
-		if (x is not None): self.x = x.x if type(x) is Coordinates else float(x)
-		if (y is not None): self.y = y.y if type(y) is Coordinates else float(y)
-		if (z is not None): self.z = z.z if type(z) is Coordinates else float(z)
+		if x is not None: self.x = x.x if type(x) is Coordinates else float(x)
+		if y is not None: self.y = y.y if type(y) is Coordinates else float(y)
+		if z is not None: self.z = z.z if type(z) is Coordinates else float(z)
 
 	# String representations
 	def __str__(self):
 		return f"({self.x:.2f}, {self.y:.2f}, {self.z:.2f})".replace(".00", "")
 	def __repr__(self):
-		return f"({self.x:.2f}, {self.y:.2f}, {self.z:.2f})".replace(".00", "")
+		return self.__str__()
 
 	# Overloading operators
 	def __add__(self, other):
 		if type(other) is not Coordinates:
 			other = Coordinates(other, default = 0)
-		new = self.copy()
-		new.add(other)
-		return new
+		return self.copy().add(other)
+
 	def __sub__(self, other):
 		if type(other) is not Coordinates:
 			other = Coordinates(other, default = 0)
-		new = self.copy()
-		new.sub(other)
-		return new
+		return self.copy().sub(other)
+
 	def __mul__(self, other):
 		if type(other) is not Coordinates:
 			other = Coordinates(other, default = 1)
-		new = self.copy()
-		new.scale(other)
-		return new
+		return self.copy().scale(other)
+
 	def __truediv__(self, other):
 		if type(other) is not Coordinates:
 			other = Coordinates(other, default = 1)
-		new = self.copy()
-		new.scale(1/other.x, 1/other.y, 1/other.z)
-		return new
+		return self.copy().scale(1/other.x, 1/other.y, 1/other.z)
+
 	def __or__(self, other): # | returns the average between two points
 		if type(other) is not Coordinates:
 			other = Coordinates(other, default = self)
-		new = self.copy()
-		new.avg(other)
-		return new
+		return self.copy().avg(other)
+
 	def __eq__(self, other):
 		if type(other) is not Coordinates:
 			other = Coordinates(other)
@@ -125,13 +115,10 @@ class Coordinates:
 	def copy(self):
 		copy = Coordinates(self)
 		return copy
-
+	
 	# Multiply it with other Coordinates, same structure as __init__()
 	def scale(self, *args, x = None, y = None, z = None):
-		factor = Coordinates(*args, default = 1)
-		if (x is not None): factor.x = x.x if type(x) is Coordinates else float(x)
-		if (y is not None): factor.y = y.y if type(y) is Coordinates else float(y)
-		if (z is not None): factor.z = z.z if type(z) is Coordinates else float(z)
+		factor = Coordinates(*args, default = 1, x = x, y = y, z = z)
 		self.x *= factor.x
 		self.y *= factor.y
 		self.z *= factor.z
@@ -139,10 +126,7 @@ class Coordinates:
 
 	# Add it with other Coordinates, same structure as __init__()
 	def add(self, *args, x = None, y = None, z = None):
-		factor = Coordinates(*args)
-		if (x is not None): factor.x = x.x if type(x) is Coordinates else float(x)
-		if (y is not None): factor.y = y.y if type(y) is Coordinates else float(y)
-		if (z is not None): factor.z = z.z if type(z) is Coordinates else float(z)
+		factor = Coordinates(*args, x = x, y = y, z = z)
 		self.x += factor.x
 		self.y += factor.y
 		self.z += factor.z
@@ -150,10 +134,7 @@ class Coordinates:
 
 	# Add it with other Coordinates, same structure as __init__()
 	def sub(self, *args, x = None, y = None, z = None):
-		factor = Coordinates(*args)
-		if (x is not None): factor.x = x.x if type(x) is Coordinates else float(x)
-		if (y is not None): factor.y = y.y if type(y) is Coordinates else float(y)
-		if (z is not None): factor.z = z.z if type(z) is Coordinates else float(z)
+		factor = Coordinates(*args, x = x, y = y, z = z)
 		self.x -= factor.x
 		self.y -= factor.y
 		self.z -= factor.z
@@ -161,23 +142,16 @@ class Coordinates:
 
 	# Middle between two Coordinates, same structure as __init__()
 	def avg(self, *args, x = None, y = None, z = None):
-		factor = Coordinates(*args, default = self)
-		if (x is not None): factor.x = x.x if type(x) is Coordinates else float(x)
-		if (y is not None): factor.y = y.y if type(y) is Coordinates else float(y)
-		if (z is not None): factor.z = z.z if type(z) is Coordinates else float(z)
-		self.x += factor.x
-		self.y += factor.y
-		self.z += factor.z
-		self.x /= 2
-		self.y /= 2
-		self.z /= 2
-		return self
+		factor = Coordinates(*args, default = self, x = x, y = y, z = z)
+		return (self + factor) / 2
 
-	# Convert x, y, z to tuples
-	def xyz(self):
-		return (self.x, self.y, self.z)
+	# Convert Coordinates to tuples
+	def xy(self): return self.x, self.y
+	def yz(self): return self.y, self.z
+	def xz(self): return self.x, self.z
+	def xyz(self): return self.x, self.y, self.z
 
-	# Convert x, y, z to a list
+	# Convert Coordinates to a list
 	def list(self):
 		return [self.x, self.y, self.z]
 
@@ -196,23 +170,25 @@ class Coordinates:
 
 # Transform coordinates to representation that makes sense for Unreal Engine viewing
 def transformCoordinates(originalposition = None, originalsize = None, positionIsCenterPoint = False):
-	position = Coordinates(originalposition)
-	size = Coordinates(originalsize)
-	if position is not None:
-		#position.scale(z = 1/5)
+	if originalposition is not None:
+		position = Coordinates(originalposition)
 		position.add(10000, 0, -10000)
 		position.switchYZ()
-	if size is None: return position
-	size.switchYZ()
-	if not positionIsCenterPoint:
-		position += size/2
-	size.scale(1/100)
-	if position is None: return size
+	if originalsize is not None:
+		size = Coordinates(originalsize)
+		size.switchYZ()
+		if not positionIsCenterPoint:
+			position += size/2
+		size.scale(1/100)
+	if originalposition is None:
+		return size
+	if originalsize is None:
+		return position
 	return position, size
 
 # Format a color to always have three float values between 0 and 1
 def formatColor(color):
-	if (type(color) is str):
+	if type(color) is str:
 		if color[0] == '#':   color = color[1:]
 		if len(color) == 0:   color = '0' * 6 + 'ff' # empty => black
 		elif len(color) == 1: color = color * 6 + 'ff' #x => #xxxxxxff
@@ -225,13 +201,13 @@ def formatColor(color):
 		elif len(color) > 8:  color = color[:8] #rrggbbaax* => #rrggbbaa
 		converted = []
 		for i in range(4):
-			hex = color[i*2:i*2+2]
+			hex = color[i*2 : i*2 + 2]
 			val = int(hex, 16)
-			converted.append(val/256)
+			converted.append(val / 255)
 		return converted
 	
 	# Tuple to list
-	if (type(color) is tuple): color = list(color)
+	if type(color) is tuple: color = list(color)
 	# Make a single number into a list
 	if type(color) is not list: color = [color]
 	# Make sure we have 3 values in that list
@@ -248,21 +224,17 @@ def colorToHex(color):
 	color = formatColor(color)
 	hex = "#"
 	for part in color:
-		part *= 255
-		part = int(round(part))
+		part = int(round(part * 255))
 		hex += "%0.2X" % part
-	print (hex)
 	return hex
 
 # Packs cuboid drawing instructions into a list, that can be sent alone or in a batch via websocket later
-async def packCuboid(position, size, color, rotator = None, positionIsCenterPoint = False):
+async def packCuboid(position, size, color, rotator = 0, positionIsCenterPoint = False):
 	if type(position) is not Coordinates:
 		position = Coordinates(position)
 	if type(size) is not Coordinates:
 		size = Coordinates(size)
 	color = formatColor(color)
-	if rotator is None:
-		rotator = 0
 	if type(rotator) is not Coordinates:
 		rotator = Coordinates(rotator)
 	# Transform coordinates to UE
@@ -274,14 +246,12 @@ async def packCuboid(position, size, color, rotator = None, positionIsCenterPoin
 
 # Spawns a cuboid at the specified coordinates with the specified color via a client-connection
 # Rotations might not work perfectly yet, especially with axis switching...
-async def debugDrawCuboidInPlot(position, size, color, rotator = None, ignoreAxis = 'z'):
+async def debugDrawCuboidInPlot(position, size, color, rotator = 0, ignoreAxis = 'z'):
 	if type(position) is not Coordinates:
 		position = Coordinates(position)
 	if type(size) is not Coordinates:
 		size = Coordinates(size)
 	color = formatColor(color)
-	if rotator is None:
-		rotator = 0
 	if type(rotator) is not Coordinates:
 		rotator = Coordinates(rotator)
 	# Just log what we would be doing
@@ -295,7 +265,7 @@ async def debugDrawCuboidInPlot(position, size, color, rotator = None, ignoreAxi
 		position.switchYZ()
 		size.switchYZ()
 		rotator.switchYZ()
-	if (rotator.z == 0):
+	if rotator.z == 0:
 		rectangle = plt.Rectangle(
 			(position.x - size.x/2, position.y - size.y/2),
 			size.x, size.y,
@@ -308,14 +278,14 @@ async def debugDrawCuboidInPlot(position, size, color, rotator = None, ignoreAxi
 			size.x/2, size.y/2,
 			color = list(color),
 			linewidth = 0,
-			angle=-rotator.z)
+			angle = -rotator.z)
 		plt.gca().add_patch(rectangle)
 		rectangle = plt.Rectangle(
 			(position.x, position.y),
 			size.x/2, size.y/2,
 			color = list(color),
 			linewidth = 0,
-			angle=180-rotator.z)
+			angle = 180-rotator.z)
 		plt.gca().add_patch(rectangle)
 
 # Spawns a cuboid at the specified coordinates with the specified color via a client-connection
@@ -324,8 +294,7 @@ async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
 	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True):
 
 	if connection is None:
-		await debugDrawCuboidInPlot(position, size, color, rotator)
-		return
+		return await debugDrawCuboidInPlot(position, size, color, rotator)
 
 	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
 	await connection.send(drawResponse)
@@ -374,11 +343,11 @@ async def sendCuboidBatch(connection, processDescription, waitAfterwardsForServe
 				'Waiting for "server draw next" request by client after ' + processDescription)
 		readyToDraw = True
 
+sleepInterval = design.checkSentBatchAfter
+while sleepInterval > 0.05: sleepInterval /= 2
 # checks if the cuboidQueue is empty after the specified number of seconds
 # after the last queueCuboid call. This ensures that the user didn't forget
 # to do call sendCuboidBatch() after queueing the last instructions
-sleepInterval = design.checkSentBatchAfter
-while sleepInterval > 0.05: sleepInterval /= 2
 async def checkEmptyQueue(connection, processDescription):
 	global lastCheckEmptyQueue, sleepInterval
 	lastCheckEmptyQueue = time.time()
@@ -411,7 +380,8 @@ async def checkEmptyQueue(connection, processDescription):
 # Queues a cuboid to be spawned at the specified coordinates with the specified color via a client-connection
 # Uses batch size as specified in visualization settings
 # You have to call sendCuboidBatch to finally clear the queue after sending the last cuboid!
-async def queueCuboid(connection, position, size, color, rotator = None, positionIsCenterPoint = False, processDescription = None):
+async def queueCuboid(connection, position, size, color, rotator = None,
+	positionIsCenterPoint = False, processDescription = None):
 	if connection is None:
 		return await debugDrawCuboidInPlot(position, size, color, rotator)
 	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
@@ -432,58 +402,25 @@ def sizeFromLayerDimensions(layerDims):
 		if dim is not None and dim > 0 and len(size) < 3:
 			size.append(dim)
 	# If we have less, just put 1 in the front a few times
-	while (len(size) < 3):
+	while len(size) < 3:
 		size = [1] + size
-	scaleDims = getattr(design.layouting, 'scaleLayerSizes', None)
-	addToDims = getattr(design.layouting, 'addToLayerSizes', None)
-	minDims = getattr(design.layouting, 'minLayerDimensions', None)
-	maxDims = getattr(design.layouting, 'maxLayerDimensions', None)
-	if scaleDims is None:
-		scaleDims = [1, 1, 1]
-	if type(scaleDims) is tuple:
-		scaleDims = list(scaleDims)
-	if type(scaleDims) is not list:
-		scaleDims = [scaleDims]
-	if len(scaleDims) == 1:
-		scaleDims *= 3
-	if len(scaleDims) == 2:
-		scaleDims = [scaleDims[0]] + scaleDims
-	if addToDims is None:
-		addToDims = [1, 1, 1]
-	if type(addToDims) is tuple:
-		addToDims = list(addToDims)
-	if type(addToDims) is not list:
-		addToDims = [addToDims]
-	if len(addToDims) == 1:
-		addToDims *= 3
-	if len(addToDims) == 2:
-		addToDims = [addToDims[0]] + addToDims
+	def getDims(designName, default):
+		dims = getattr(design.layouting, designName, default)
+		if type(dims) is tuple: dims = list(dims)
+		elif type(dims) is not list: dims = [dims]
+		if len(dims) == 1: dims *= 3
+		elif len(dims) == 2: dims = [dims[0]] + dims
+		return dims
+	scaleDims = getDims('scaleLayerSizes', [1, 1, 1])
+	addToDims = getDims('addToLayerSizes', [0, 0, 0])
 	for i in range(3):
 		size[i] *= scaleDims[i]
 		size[i] += addToDims[i]
-	if minDims is None:
-		minDims = size
-	if type(minDims) is tuple:
-		minDims = list(minDims)
-	if type(minDims) is not list:
-		minDims = [minDims]
-	if len(minDims) == 1:
-		minDims *= 3
-	if len(minDims) == 2:
-		minDims = [minDims[0]] + minDims
-	if maxDims is None:
-		maxDims = size
-	if type(maxDims) is tuple:
-		maxDims = list(maxDims)
-	if type(maxDims) is not list:
-		maxDims = [maxDims]
-	if len(maxDims) == 1:
-		maxDims *= 3
-	if len(maxDims) == 2:
-		maxDims = [maxDims[0]] + maxDims
+	minDims = getDims('minLayerDimensions', size)
+	maxDims = getDims('maxLayerDimensions', size)
 	for i in range(3):
-		size[i] = max(size[i], minDims[i])
 		size[i] = min(size[i], maxDims[i])
+		size[i] = max(size[i], minDims[i])
 	return Coordinates(size)
 
 # DEPRECATED
@@ -594,28 +531,28 @@ async def drawstructureLinearly(connection = None):
 # then removes any "2D" at the end and tries again
 def getLayerColor(layerType, defaultValue = design.layerColors.get("default")):
 	layerType = layerType.lower()
-	result = design.layerColors.get(layerType, "NOT FOUND")
-	if result != "NOT FOUND":
+	result = design.layerColors.get(layerType, None)
+	if result is not None:
 		return result
 	if layerType.endswith("2d"):
 		layerType = layerType[:-2]
-	result = design.layerColors.get(layerType, "NOT FOUND")
-	if result != "NOT FOUND":
-		return result
+		result = design.layerColors.get(layerType, None)
+		if result is not None:
+			return result
 	return defaultValue
 
 class Layer:
 	layerList = []
-	def __init__(self, position = 0, size = 0, type = "unknown", parents = [], activeAreaAbove = 0, activeAreaBelow = 0, index = None):
-		if index is None:
-			index = len(Layer.layerList)
+	def __init__(self, position = 0, size = 0, type = "unknown", parents = [],
+		activeAreaAbove = 0, activeAreaBelow = 0, index = None):
+
 		self.position = Coordinates(position)
 		self.size = Coordinates(size)
 		self.activeAreaAbove = Coordinates(activeAreaAbove)
 		self.activeAreaBelow = Coordinates(activeAreaBelow)
 		self.type = type
 		self.color = getLayerColor(type)
-		self.index = index
+		self.index = len(Layer.layerList) if index is None else index
 		self.parents = []
 		self.findParents(parents)
 		self.justmoved = []
@@ -689,10 +626,13 @@ class Layer:
 	def whoOverlaps(self):
 		badOnes = []
 		for layer in Layer.layerList:
-			if (self.index > layer.index) \
-			and self.doesItOverlap(self.position - self.size/2, self.position + self.size/2, layer.position - layer.size/2, layer.position + layer.size/2):
-				badOnes.append(layer)
+			if self.index > layer.index and \
+				self.doesItOverlap(self.position - self.size/2, self.position + self.size/2,
+					layer.position - layer.size/2, layer.position + layer.size/2):
+
+						badOnes.append(layer)
 		return badOnes
+
 		
 # DEPRECATED
 # Draws the tfnet.layer structure via the client-connection
@@ -815,13 +755,12 @@ async def drawstructureTreeBasic(connection = None):
 async def drawLayout(connection, positions):
 	positionOffset = Coordinates(0, positions[0][1], positions[0][0]).scale(-1)
 	typeCount = dict()
+	Layer.resetAllLayers()
 
 	# If no connection has been given, initialize matplotlib
 	if connection is None:
 		plt.axes()
 	
-	Layer.resetAllLayers()
-
 	for index, layer in enumerate(ai.tfnet.layers):
 		layerType = layer[1]
 		# Create layer instance and append it to layerList
@@ -884,19 +823,19 @@ async def drawLayout(connection, positions):
 		successMsg += f", {connectionCount} connections" 
 	else:
 		successMsg += f", {connectionCount} visible connections, {hiddenConnectionCount} hidden connections"
-	warningMsg = ""
+	warningMsg = False
 	for layerType in typeCount.keys():
 		if getLayerColor(layerType, None) is None:
 			# This layer type has no specified color!
-			if warningMsg == "":
+			if not warningMsg:
 				warningMsg = "Some layer types could not be recognized and are displayed in " + \
 					"default color! Please check your visualization settings and add a " + \
 					"layerColor for the following layer types: " + layerType
 			else:
 				warningMsg += ", " + layerType
-	
-	if warningMsg != "":
+	if warningMsg:
 		await connection.sendstatus(3, warningMsg)
+	
 	await connection.sendstatus(-30, successMsg)
 
 	# Displaying plot if no client connection was given

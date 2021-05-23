@@ -142,7 +142,7 @@ tfStructureTypes = [
 def tfresetstructure():
 	# removes attributes from a class whether they exist or not
 	def remove(attribute):
-		if (hasattr(tfnet, attribute)):
+		if hasattr(tfnet, attribute):
 			delattr(tfnet, attribute)
 	
 	global tfnet
@@ -192,7 +192,7 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 		# part 0 contains the model info and header
 		elif mainStructurePart == 0:
 			# Retrieve model name
-			if (line.startswith("Model: \"")):
+			if line.startswith("Model: \""):
 				tfnet.modelname = line.replace("Model: ", "").replace('"', '')
 				foundLineMatch = True
 			else:
@@ -243,7 +243,7 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 				layername = layername.strip()
 				ltype = ltype.replace(")", "")
 				# process shape
-				if (shape.startswith("[") and shape.endswith("]")):
+				if shape.startswith("[") and shape.endswith("]"):
 					shape = shape[1:-1]
 				shape = ast.literal_eval(shape)
 				# process params
@@ -276,13 +276,13 @@ async def parsestructure(connection, structure = None, quitParsingOnUnknownLine 
 			#lineToInt = int(re.sub(r"[a-zA-Z\:\, ]", "", line)) # old implementation
 			lineToInt = int(line.split(":")[1].strip().replace(",", ""))
 			# Self explanatory retrieval and storage of values
-			if (line.startswith("Total param")):
+			if line.startswith("Total param"):
 				tfnet.totalparams = lineToInt
 				foundLineMatch = True
-			elif (line.startswith("Trainable param")):
+			elif line.startswith("Trainable param"):
 				tfnet.trainableparams = lineToInt
 				foundLineMatch = True
-			elif (line.startswith("Non-trainable param")):
+			elif line.startswith("Non-trainable param"):
 				tfnet.nontrainableparams = lineToInt
 				foundLineMatch = True
 		# If the line has not been recognized...

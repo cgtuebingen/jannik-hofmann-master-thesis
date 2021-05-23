@@ -83,7 +83,7 @@ def underlinetext(text, withintext = None, precedingWords = None):
 		return withintext.replace(text, underlinetext(text))
 	
 	else:
-		if (type(precedingWords) is str):
+		if type(precedingWords) is str:
 			precedingWords = [precedingWords]
 		for word in precedingWords:
 			if not word.endswith(" "):
@@ -105,30 +105,30 @@ def removeAnsiEscapeCharacters(text):
 # to be used for formatting
 def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline = ""):
 	# debug info from dark gray to bright gray
-	if (levelIsDebugLevel and level < 0):
+	if levelIsDebugLevel and level < 0:
 		colorcode = grayscale(max(14 + level, 4))
 	# negative status values
-	elif (level == -30): # success / completed
+	elif level == -30: # success / completd
 		colorcode = B_GREEN
-	elif (level == -20): # idle / waiting for input
+	elif level == -20: # idle / waiting for inpt
 		colorcode = CYAN
-	elif (level == -10): # processing
+	elif level == -10: # processig
 		colorcode = B_BLUE
 
 	# undefined for debug level 0 and status values <= 0 (except -10, -20, -30)
-	elif (level <= 0):
+	elif level <= 0:
 		colorcode = B_YELLOW + NEGATIVE
 
 	# warning rgb value from 2,2,0 via 5,5,3 via 5,5,0 to 5,3,0 (5 is max.)
-	elif (level <= 4):
+	elif level <= 4:
 		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(level+1, level+1, level-1) + BOLD
-	elif (level <= 7):
+	elif level <= 7:
 		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 5, 7-level) + BOLD
-	elif (level <= 9):
+	elif level <= 9:
 		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 12-level, 0) + BOLD
 
 	# error rgb value from 2,0,0 to 5,0,0 (5 is max.)
-	elif (level < 20):
+	elif level < 20:
 		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(int(round(2 + (level-10)/3, 0)), 0, 0) + BOLD
 	
 	# critical failure
@@ -136,13 +136,13 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(4, 0, 0) + BOLD + NEGATIVE
 
 	# If no text has been specified, just return the colorcode corresponding to that level
-	if (text == ""):
+	if text == "":
 		return colorcode
 	
 	# Underline the command if there was one given and it's not just whitespace
-	if (commandToUnderline is not None and
-		len(commandToUnderline) > 0 and
-		len(commandToUnderline.split()) > 0):
+	if commandToUnderline is not None and \
+		len(commandToUnderline) > 0 and \
+		len(commandToUnderline.split()) > 0:
 
 		text = underlinetext(commandToUnderline, text, [" about", " with", "command", "Command"])
 		# The replace function might underline parts of the text that contain the command in a

@@ -25,9 +25,9 @@ def log(text, tryToCreateNewFile = True):
 	global lastlogwrite
 	
 	# abort if no logfile path or path couldn't be accessed previously
-	if (setting.LOGFILE_PATH is None or
-		setting.LOGFILE_PATH == "ERROR" or
-		setting.LOGFILE_PATH == ""):
+	if setting.LOGFILE_PATH is None or \
+		setting.LOGFILE_PATH == "ERROR" or \
+		setting.LOGFILE_PATH == "":
 		
 		return False
 
@@ -50,7 +50,7 @@ def log(text, tryToCreateNewFile = True):
 				centralController.SCRIPT_PATH() + "\nVerbosity level set to" +
 				str(setting.DESIRED_VERBOSITY) + "\n\n")
 		# If there is a lastlogwrite value, check if it older than specified in the settings file
-		elif (time.time() - lastlogwrite >= setting.LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S):
+		elif time.time() - lastlogwrite >= setting.LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S:
 			# If so, attach the current timestamp
 			file.write("\n" + dateTimeObj.strftime("%H:%M:%S (%Y-%m-%d)") + "\n")
 		
@@ -94,7 +94,7 @@ def warn(text, verbosity = 5):
 # Prints and logs a specified text, optionally according to specified verbosity preferences
 def printlog(text, verbosity = None):
 	if verbosity is not None:
-		if (verbosity < setting.DESIRED_VERBOSITY):
+		if verbosity < setting.DESIRED_VERBOSITY:
 			# Not important enough for the user, discard
 			return True
 

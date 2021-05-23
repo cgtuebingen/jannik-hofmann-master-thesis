@@ -44,8 +44,8 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 
 	# loop while the client stays connected,
 	# so that this server does not prematurely close the connection
-	while (True):
-		if (commandInstance.command is None):
+	while True:
+		if commandInstance.command is None:
 			# No command was given. Wait and listen for an incoming command
 			try:
 				# Wait for next command by client
@@ -82,9 +82,9 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			#await serverCommands.senddebug(w, c, -10, f"Received command {command}")
 
 			# check if command is empty
-			if (len(commandInstance.command) == 0 or
-				commandInstance.command == " " or
-				len(commandInstance.command.split()) == 0):
+			if len(commandInstance.command) == 0 or \
+				commandInstance.command == " " or \
+				len(commandInstance.command.split()) == 0:
 				
 				await commandInstance.senddebug(10, "Empty command is invalid, cannot be processed")
 				if debugDisconnect:
@@ -112,11 +112,11 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 				func = findCommand(commandInstance.command.split()[0])
 			
 			# If no command could be found, restore it with whitespaces to avoid user confusion
-			if (func is COMMAND_NOT_FOUND_FUNCTION):
+			if func is COMMAND_NOT_FOUND_FUNCTION:
 				commandInstance.command = originalCommand
 
 			# Now check for chained commands
-			if (setting.AMPERSAND_CHAINS_COMMANDS):
+			if setting.AMPERSAND_CHAINS_COMMANDS:
 				# Matching single ampersands near you
 				if "&" in commandInstance.command.replace("&&", ""):
 					# Temporarily replace escaped double ampersands before splitting the commands
@@ -125,9 +125,9 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 					# Split command into first command and all the rest of the chain
 					commandInstance.command, chainedCommands = commandInstance.command.split("&", 1)
 					# Eliminating leading and trailing whitespaces with the first command
-					if (commandInstance.command.endswith(" ")):
+					if commandInstance.command.endswith(" "):
 						commandInstance.command = commandInstance.command[:-1]
-					if (chainedCommands.startswith(" ")):
+					if chainedCommands.startswith(" "):
 						chainedCommands = chainedCommands[1:]
 					# And restore the escaped && to a single & in the first command
 					commandInstance.command = commandInstance.command.replace(tmpReplaceString, "&")
@@ -155,9 +155,9 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			assert(shouldBeKeptOpen is None or type(shouldBeKeptOpen) is bool)
 
 			# If the load function returned any prepared commands, put them into chainedCommands
-			if (len(loadedCommand) > 0):
+			if len(loadedCommand) > 0:
 				assert(type(loadedCommand[0]) is str)
-				if (chainedCommands.strip() == ""):
+				if chainedCommands.strip() == "":
 					chainedCommands = loadedCommand[0]
 				else:
 					chainedCommands = loadedCommand[0] + " & " + chainedCommands
@@ -167,8 +167,8 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			# If more chained commands are left over for processing, but func returned False and
 			# settings require to close the connection in that case, print a debug message and
 			# clear chained commands
-			if (setting.AMPERSAND_CHAINS_COMMANDS and len(chainedCommands) > 0):
-				if (shouldBeKeptOpen is False) and \
+			if setting.AMPERSAND_CHAINS_COMMANDS and len(chainedCommands) > 0:
+				if shouldBeKeptOpen is False and \
 					not setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
 					# Executed server command function returned False
 					# and the settings specified to close the connection in this case
@@ -182,7 +182,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 					chainedCommands = ""
 			
 			# We have more chained (or loaded) commands to be executed:
-			if (len(chainedCommands) > 0):
+			if len(chainedCommands) > 0:
 				commandInstance.command = chainedCommands
 				shouldBeKeptOpen = True
 
@@ -209,7 +209,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			# Give other threads a chance to pass through. This should have a negligible effect
 			# on performance exclusively on &-chained commands.
 			if not setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
-				if (len(chainedCommands) > 0):
+				if len(chainedCommands) > 0:
 					await sleep(0.001, "Chained commands " + str(chainedCommands))
 				else:
 					await sleep(0.001, "websocket connection that has been left open")
@@ -303,7 +303,7 @@ def startServer():
 			# OSError means probably that the server couldn't bind to the specified address
 			errorMsg = beautifulDebug.special(5, 3, 0) + \
 				"Cannot bind websocket server to desired address and port!\n"
-			if (errorMsg.find("OSError: ") > -1):
+			if errorMsg.find("OSError: ") > -1:
 				# Generate a shorter error message with only the relevant parts
 				errorMsg += errorMsg[errorMsg.find("OSError: "):]
 			else:
@@ -320,10 +320,10 @@ def startServer():
 			errorMsg = beautifulDebug.special(5, 3, 0) + \
 				"Unexpected error occurred trying to establish the server!\n" + traceback.format_exc()
 		
-		if (errorMsg is not None) and (len(errorMsg) > 0):
+		if errorMsg is not None and len(errorMsg) > 0:
 			errorMsg += "\n"
 			# Telling the user how often we try again or that we give up:
-			if (triesLeft > 0):
+			if triesLeft > 0:
 				errorMsg += f"Trying {triesLeft} more times in " + \
 				f"{setting.SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER} seconds.\n" + beautifulDebug.RESET
 			else:
@@ -336,7 +336,7 @@ def startServer():
 			# Print and log this error message on high, almost critical error level
 			loggingFunctions.printlog(errorMsg, verbosity = 19)
 
-			if (triesLeft == 0):
+			if triesLeft == 0:
 				# If out of tries, shut down the whole script before unspecified behaviour occurs
 				sys.exit()
 			else:
@@ -384,7 +384,7 @@ async def stopCoroutines():
 
 # Shuts down the server after optionally displaying and sending the specified message
 async def shutdownServer(websocket, text = None):
-	if (text is not None) and len(text) > 0:
+	if text is not None and len(text) > 0:
 		await serverCommands.Request(websocket, "SERVER").senddebug(-1, "\n" + text, False)
 
 	await stopCoroutines()

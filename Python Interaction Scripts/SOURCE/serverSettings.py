@@ -114,8 +114,9 @@ def checkSettings():
 	POSITIVE_PARAMETERS = sorted(POSITIVE_PARAMETERS)
 	NEGATIVE_PARAMETERS = sorted(NEGATIVE_PARAMETERS)
 
-	if (SERVER_IP != "localhost" and SERVER_IP != "127.0.0.1" and
-		SERVER_IP != "::1" and ALLOW_REMOTE_CODE_EXECUTION):
+	if SERVER_IP != "localhost" and SERVER_IP != "127.0.0.1" and \
+		SERVER_IP != "::1" and ALLOW_REMOTE_CODE_EXECUTION:
+
 		msg = "SECURITY WARNING: Remote code execution over " + \
 			"unencrypted connections is not recommended and will be disabled!"
 		loggingFunctions.warn(msg, 9)
@@ -125,24 +126,24 @@ def checkSettings():
 	assert((type(LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S) is float) or
 		(type(LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S) is int))
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S = max(0, LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S)
-	if (LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S < 0.01):
+	if LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S < 0.01:
 		msg = "LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S lower than 0.01 is not recommended for " + \
 			"easily readable log files. New lines might printed with individual timestamps!"
 		loggingFunctions.warn(msg, 1)
 
 	assert(type(MAX_MESSAGE_SIZE) is int)
-	if (MAX_MESSAGE_SIZE < 256):
+	if MAX_MESSAGE_SIZE < 256:
 		msg = "MAX_MESSAGE_SIZE cannot be smaller than 256, otherwise unexpected behaviour " + \
 			"and recursion loops will occur! Setting MAX_MESSAGE_SIZE to 256."
 		loggingFunctions.warn(msg, 8)
 		MAX_MESSAGE_SIZE = 256
-	if (MAX_MESSAGE_SIZE < 2**12):
+	if MAX_MESSAGE_SIZE < 2**12:
 		msg = f"MAX_MESSAGE_SIZE smaller than {2**10} is not recommended as responses might not " + \
 			"get passed through than its current value of {MAX_MESSAGE_SIZE} bytes."
 		loggingFunctions.warn(msg, 7)
 
 	assert(type(TIMES_TO_RETRY_ESTABLISHING_SERVER) is int)
-	if (TIMES_TO_RETRY_ESTABLISHING_SERVER < 1):
+	if TIMES_TO_RETRY_ESTABLISHING_SERVER < 1:
 		msg = "TIMES_TO_RETRY_ESTABLISHING_SERVER has to be at least 1, otherwise the server " + \
 			"cannot be started. Setting TIMES_TO_RETRY_ESTABLISHING_SERVER to 1."
 		loggingFunctions.warn(msg, 8)
@@ -150,12 +151,12 @@ def checkSettings():
 
 	assert(type(SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER) is int or
 		type(SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER) is float)
-	if (SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER <= 0):
+	if SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER <= 0:
 		msg = "SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER cannot be smaller than or equal to 0!\n" + \
 			"Setting SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER to 0.1"
 		loggingFunctions.warn(msg, 8)
 		SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER = 0.1
-	elif (SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER < 0.1):
+	elif SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER < 0.1:
 		msg = "SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER should be at least 0.1"
 		loggingFunctions.warn(msg, 8)
 
@@ -166,7 +167,7 @@ def checkSettings():
 		else:
 			return filepath
 
-	if (LOGFILE_PATH is None or LOGFILE_PATH == ""):
+	if LOGFILE_PATH is None or LOGFILE_PATH == "":
 		msg = "No valid logpath given in settings. Logging will be disabled. This is not recommended"
 		loggingFunctions.warn(msg, 4)
 	else:
@@ -176,7 +177,7 @@ def checkSettings():
 	AVAILABLE_NN_PATHS = {keyword:addServerScriptPath(path) for (keyword, path) in AVAILABLE_NN_PATHS.items()}
 
 	assert(type(DEFAULT_LOAD_NN_PATH) is str)
-	if (DEFAULT_LOAD_NN_PATH not in AVAILABLE_NN_PATHS.keys()):
+	if DEFAULT_LOAD_NN_PATH not in AVAILABLE_NN_PATHS.keys():
 		addServerScriptPath(DEFAULT_LOAD_NN_PATH)
 
 	if PRINT_COLOR_ANSI_CODES:
@@ -204,7 +205,7 @@ def checkSettings():
 		varname[0] != '_' and
 		varname in globals().keys()
 	}
-	if (len(localVariables) > 0):
+	if len(localVariables) > 0:
 		msg = f"Namespace problem found in settings check!\n" + \
 		f"The variable{'s' if len(localVariables) > 1 else ''} " + \
 		f"{', '.join(localVariables)} in settings check is treated as a local variable! " + \

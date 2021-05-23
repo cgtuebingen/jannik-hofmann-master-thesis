@@ -287,7 +287,7 @@ class ForceAtlas2:
                 ax.set_xticks([])
                 ax.set_yticks([])
                 fig.suptitle(f'Iteration {i} of {iterations}', fontsize=15, va='top')
-                # if (i > 0):
+                # if i > 0:
                 #     from time import sleep
                 #     initialFrameTime = 1 # seconds
                 #     accelerationFactor = 0.2

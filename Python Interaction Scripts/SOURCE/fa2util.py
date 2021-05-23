@@ -222,7 +222,7 @@ def apply_repulsion(nodes, coefficient):
 # instead of the main file because Python is slow with loops.
 # Optimized using numpy and optionally checked against the original algorithm.
 def apply_repulsion_fast(nodes, coefficient, debugAlgorithm = False):
-    if (debugAlgorithm):
+    if debugAlgorithm:
         i = 0
         for n1 in nodes:
             j = i
@@ -262,7 +262,7 @@ def apply_repulsion_fast(nodes, coefficient, debugAlgorithm = False):
     dx = n1x - n2x
     dy = n1y - n2y
     for i, n in enumerate(nodes):
-        if (debugAlgorithm):
+        if debugAlgorithm:
             reltol = 0.000001
             abstol = reltol
             if not math.isclose(n.dx, dx[i], rel_tol=reltol, abs_tol=abstol):

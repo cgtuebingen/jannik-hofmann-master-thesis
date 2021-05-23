@@ -95,9 +95,9 @@ class Request:
 
 			for key in list(commandList.keys()):
 				clashingCommands = [matches for matches in list(commandList.keys()) if matches.startswith(key) and matches != key]
-				if (len(clashingCommands) > 0):
+				if len(clashingCommands) > 0:
 					if not(ignoreSameBeginningInTheseKeys.get(key, []) == clashingCommands):
-						if (len(clashingCommands) == 1):
+						if len(clashingCommands) == 1:
 							warnText = f'Unexpected command clash! Command "{key}" starts in the same way as command "{clashingCommands[0]}"'
 						else:
 							joinedCommands = '"' + '", "'.join(clashingCommands) + '"'
@@ -167,7 +167,7 @@ class Request:
 			return False
 
 		message_size_too_large = False
-		if (len(str(data)) > setting.MAX_MESSAGE_SIZE):
+		if len(str(data)) > setting.MAX_MESSAGE_SIZE:
 			# nope, too large to even try packing it. might cause buffer overflow otherwise
 			message_size_too_large = len(str(data))
 			packed = None
@@ -180,11 +180,11 @@ class Request:
 					return await self.send(data, printhere, True)
 				else: # basically raising that error itself again
 					packed = msgpack.packb(data)
-			if (len(packed) > setting.MAX_MESSAGE_SIZE):
+			if len(packed) > setting.MAX_MESSAGE_SIZE:
 				# still larger than expected
 				message_size_too_large = len(packed)
 		
-		if (message_size_too_large is False): # message can be sent
+		if message_size_too_large is False: # message can be sent
 			await self.websocket.send(packed) # actually send it via websocket
 			if printhere: # and print it in the console and debug
 				if printText is None:
@@ -214,7 +214,7 @@ class Request:
 				data = file.read()
 				file.close()
 			else:
-				if (type(data) is str):
+				if type(data) is str:
 					raise NotImplementedError("You need to pass binary data to sendfile, " +
 						"strings are not accepted due to unspecified encoding standard!")
 		except:
@@ -228,7 +228,7 @@ class Request:
 		# Structure of a sent file tuple:
 		struct = ("FILE", filename, data)
 		sentSuccessfully = await self.send(struct, False)
-		if (sentSuccessfully):
+		if sentSuccessfully:
 			# Some formatting fun
 			filename = filename.replace("_",
 				beautifulDebug.DISABLE_UNDERLINE + "_" + beautifulDebug.UNDERLINE)
@@ -263,7 +263,7 @@ class Request:
 				struct = struct[:-1]
 			while (struct[0].isspace()):
 				struct = struct[1:]
-		if (setting.RESPOND_WITH_COLOR_ANSI_CODES):
+		if setting.RESPOND_WITH_COLOR_ANSI_CODES:
 			struct = beautifulDebug.formatLevel(level, struct, False, self.command)
 		else:
 			struct = beautifulDebug.removeAnsiEscapeCharacters(struct)
@@ -271,12 +271,12 @@ class Request:
 		struct = ("STATUS", level, struct)
 		sentSuccessfully = await self.send(struct, False)
 
-		if (sentSuccessfully):
+		if sentSuccessfully:
 			loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 				f"> Status (lvl {level}) about {self.command}:\n  {info}", False, self.command), verbosity = -2)
 
 		# if chosen, automatically generate error message on encountering a critical error
-		if (errorOnCriticalFailure and level >= 20):
+		if errorOnCriticalFailure and level >= 20:
 			await self.senddebug(level, info, shutdownByCriticalFailure)
 
 	# Sends a debug message to the client.
@@ -289,12 +289,12 @@ class Request:
 		if sendToClient:
 			# create structure according to data specification and send it packed by msgpack
 			struct = info
-			if (removeOutsideWhitespace):
+			if removeOutsideWhitespace:
 				while (struct[-1].isspace()):
 					struct = struct[:-1]
 				while (struct[0].isspace()):
 					struct = struct[1:]
-			if (setting.RESPOND_WITH_COLOR_ANSI_CODES):
+			if setting.RESPOND_WITH_COLOR_ANSI_CODES:
 				struct = beautifulDebug.formatLevel(level, struct, True, self.command)
 			else:
 				struct = beautifulDebug.removeAnsiEscapeCharacters(struct)
@@ -305,17 +305,17 @@ class Request:
 			sentSuccessfully = True
 
 		# print if user chosen verbosity level demands it
-		if (sentSuccessfully and (level >= setting.DESIRED_VERBOSITY or level == 0)):
-			if (level >= 20): # critical error / failure. shuts down the client system
+		if sentSuccessfully and (level >= setting.DESIRED_VERBOSITY or level == 0):
+			if level >= 20: # critical error / failure. shuts down the client system
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 					f"\n> CRITICAL ERROR (lvl {level}) with {self.command}!\nX {info}\n", True, self.command))
-			elif (level >= 10): # error / non-critical exception
+			elif level >= 10: # error / non-critical exception
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 					f"\n> EXCEPTION (lvl {level}) with {self.command}!\nX {info}\n", True, self.command))
-			elif (level >= 1): # warning
+			elif level >= 1: # warning
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 					f"\n> WARNING (lvl {level}) about {self.command}!\n! {info}\n", True, self.command))
-			elif (level == 0): # undefined
+			elif level == 0: # undefined
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 					f"> Undefined debug message with {self.command}:\n  {info}", True, self.command))
 			else: # debug
@@ -323,7 +323,7 @@ class Request:
 					f"> Debug info (lvl {level}) about {self.command}:\n  {info}", True, self.command))
 
 		# if chosen, automatically shutdown server on encountering a critical error
-		if (autoShutdownOnCriticalError and level >= 20):
+		if autoShutdownOnCriticalError and level >= 20:
 			await server.shutdownServer(self.websocket, "Websocket server is being shut down due to encountering " +
 				"a critical error or failure! Connection will be closed and asnycio will no longer " +
 				"listen for incoming commands.")
@@ -333,24 +333,24 @@ class Request:
 	# and warns user if extra parameters are ignored or if there's too few
 	# Without parameters returns if the command has any parameters
 	async def checkParams(self, minCount=None, maxCount=0, warnUser=True):
-		if (minCount is None):
+		if minCount is None:
 			return await self.checkParams(1, math.inf, warnUser)
 
 		maxCount = max(minCount, maxCount)
 		actualCount = len(self.command.split()) - 1 # actual command doesn't count as parameter
-		if (actualCount >= minCount and actualCount <= maxCount):
+		if actualCount >= minCount and actualCount <= maxCount:
 			return True # all well
 		elif warnUser:
 			# uh oh!
 			warningMsg = f"WARNING: Command {self.command.split()[0]} takes "
-			if (maxCount == math.inf):
+			if maxCount == math.inf:
 				warningMsg += f"at least {minCount} arguments"
-			elif (maxCount > minCount):
+			elif maxCount > minCount:
 				warningMsg += f"between {minCount} and {maxCount} arguments"
 			else:
 				warningMsg += f"{minCount} arguments"
 			warningMsg += f". You provided {actualCount}."
-			if (actualCount < minCount):
+			if actualCount < minCount:
 				warningMsg += " Please specify more arguments for this command!"
 			else:
 				warningMsg += " Additional parameters will be ignored!"
@@ -392,7 +392,7 @@ class Request:
 
 		if position > actualCount:
 			# too few parameters in command arguments
-			if (type(defaultOrType) is type or raiseException):
+			if type(defaultOrType) is type or raiseException:
 				raise RuntimeError("Not enough parameters given for command " +str(self.command.split()[0])+
 					f"! Looking for position {position}, but only found {actualCount} arguments.")
 			else:
@@ -414,7 +414,7 @@ class Request:
 				result = castToType(paramValue)
 			return result
 		except:
-			if (type(defaultOrType) is type or raiseException):
+			if type(defaultOrType) is type or raiseException:
 				raise TypeError(f"Error casting parameter {self.command.split()[position]} to type " +
 					f"{castToType}! No default specified or raiseException was flagged.")
 			else:
@@ -769,7 +769,7 @@ class Request:
 
 
 	async def serverIP(self, **kwargs):
-		if (await self.checkParams(warnUser=False)):
+		if await self.checkParams(warnUser=False):
 			param = await self.getParam(1, str)
 			if param.lower() == "port":
 				return await self.serverIPPort(warnParameters = False)
@@ -957,8 +957,8 @@ class Request:
 
 	async def sendstruct(self, **kwargs):
 		struct = (1, 'text', 5.234, (1, 'more', 3, ()), ('b', 'a', 'c'), None, {"hi": 1, "there": 2})
-		if (await self.checkParams(warnUser=False)):
-			if (setting.ALLOW_REMOTE_CODE_EXECUTION):
+		if await self.checkParams(warnUser=False):
+			if setting.ALLOW_REMOTE_CODE_EXECUTION:
 				try:
 					struct = eval(await self.getParam())
 				except:
@@ -980,7 +980,7 @@ class Request:
 		level = await self.getParam(1, -1)
 		text = f"This is a fake debug message of level {level} as " + \
 			"requested by the client."
-		if (level >= 20):
+		if level >= 20:
 			text += "\nRaising an exception and shutting down the system has been suppressed, " + \
 				"although this would normally happen on level 20+"
 		await self.senddebug(level, text, False)
@@ -994,7 +994,7 @@ class Request:
 			level = await self.getParam(1, -30)
 			text = f"This is a fake status message of level {level} as " + \
 				"requested by the client."
-			if (level >= 20):
+			if level >= 20:
 				text += "\nRaising an exception and shutting down the system has been suppressed, " + \
 					"although this would normally happen on level 20+"
 			await self.sendstatus(level, text, False)
@@ -1048,8 +1048,8 @@ class Request:
 		else:
 			param = await self.getParam()
 			param = param.strip()
-			if (param == "clear" or param=="reset"):
-				if (len(preparedCommands) == 0):
+			if param == "clear" or param=="reset":
+				if len(preparedCommands) == 0:
 					await self.senddebug(-3, f"List of prepared commands is already empty.")
 				else:
 					preparedCommands = []
@@ -1080,12 +1080,12 @@ class Request:
 	
 
 	async def loadCommand(self, *, loadedCommand = None, **kwargs):
-		if (loadedCommand is None):
+		if loadedCommand is None:
 			raise TypeError("Function loadCommand needs to be given a list as parameter loadedCommands, otherwise it cannot relay the information of the loaded command! Make sure that the function executing commands has a mutable list parameter for loadedCommands.")
 		
 		global preparedCommands
 		await self.checkParams(0, 0)
-		if (len(preparedCommands) == 0):
+		if len(preparedCommands) == 0:
 			await self.senddebug(10, f"List of prepared commands is empty. Nothing to load!")
 			return False
 		else:
@@ -1103,11 +1103,11 @@ class Request:
 	SUPPRESSED_WARNING_LEVEL = 19
 	async def checkScriptVersion(self, **kwargs):
 		await self.checkParams(1, 2)
-		if (not await self.checkParams(warnUser=False)):
+		if not await self.checkParams(warnUser=False):
 			await self.send(("SERVER SCRIPT VERSION",  server.PYTHON_INTERACTION_SCRIPT_VERSION))
 			return
 		criticalWarning = True
-		if (await self.checkParams(2, math.inf, False)):
+		if await self.checkParams(2, math.inf, False):
 			criticalWarning = not((await self.getParam(2, "True")) in setting.NEGATIVE_PARAMETERS)
 		if criticalWarning:
 			warningLevel = self.SEVERE_WARNING_LEVEL
@@ -1117,12 +1117,11 @@ class Request:
 			shutdownText = "Further code execution is not recommended and " + \
 				"might lead to undefined behaviour. Proceed with caution."
 		clientVersion = await self.getParam(1, str)
-		if (re.fullmatch("[\\da-zA-Z]+\\.[\\da-zA-Z]+\\.[\\da-zA-Z]+", clientVersion) is None):
+		if re.fullmatch("[\\da-zA-Z]+\\.[\\da-zA-Z]+\\.[\\da-zA-Z]+", clientVersion) is None:
 			await self.sendstatus(6, f"Client version {clientVersion} does not match the expected " +
 				"version template [major].[minor].[build] Cannot compare versions correctly!")
 			return False
-		if (re.fullmatch("[\\da-zA-Z]+\\.[\\da-zA-Z]+\\.[\\da-zA-Z]+", server.PYTHON_INTERACTION_SCRIPT_VERSION)
-			is None):
+		if re.fullmatch("[\\da-zA-Z]+\\.[\\da-zA-Z]+\\.[\\da-zA-Z]+", server.PYTHON_INTERACTION_SCRIPT_VERSION) is None:
 			await self.sendstatus(6, f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} does not " +
 				"match the expected version template [major].[minor].[build] Cannot compare versions " +
 				"correctly!")
@@ -1130,8 +1129,8 @@ class Request:
 		cmajor, cminor, cbuild = clientVersion.split(".")
 		smajor, sminor, sbuild = server.PYTHON_INTERACTION_SCRIPT_VERSION.split(".")
 		# Compare major version
-		if (cmajor != smajor):
-			if (re.fullmatch("\\d+", cmajor) is None) or (re.fullmatch("\\d+", smajor) is None):
+		if cmajor != smajor:
+			if re.fullmatch("\\d+", cmajor) is None or re.fullmatch("\\d+", smajor) is None:
 				await self.sendstatus(warningLevel,
 					f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} does " +
 					f"not match major of client version {clientVersion}.\n" +
@@ -1140,7 +1139,7 @@ class Request:
 					f"Please use a similar version on both ends.")
 				return False
 			else:
-				if (int(cmajor) > int(smajor)):
+				if int(cmajor) > int(smajor):
 					await self.sendstatus(warningLevel,
 						f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} is " +
 						f"too low for client({clientVersion}).\n" +
@@ -1148,7 +1147,7 @@ class Request:
 						shutdownText + "\n" +
 						f"Please update the server or use a similar client version.")
 					return False
-				if (int(cmajor) < int(smajor)):
+				if int(cmajor) < int(smajor):
 					await self.sendstatus(warningLevel,
 						f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} is " +
 						f"too high for client({clientVersion}).\n" +
@@ -1158,8 +1157,8 @@ class Request:
 						f"Please update the client or use a similar server version.")
 					return False
 		# Compare minor version
-		elif (cminor != sminor):
-			if (re.fullmatch("\\d+", cminor) is None) or (re.fullmatch("\\d+", sminor) is None):
+		elif cminor != sminor:
+			if re.fullmatch("\\d+", cminor) is None or re.fullmatch("\\d+", sminor) is None:
 				await self.sendstatus(warningLevel,
 					f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} does " +
 					f"not match minor of client version {clientVersion}.\n" +
@@ -1171,7 +1170,7 @@ class Request:
 					f"Please use numerical versions if you want to have more flexibility.")
 				return False
 			else:
-				if (int(cminor) > int(sminor)):
+				if int(cminor) > int(sminor):
 					await self.sendstatus(warningLevel,
 						f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} is " +
 						f"too low for client({clientVersion}).\n" +
@@ -1179,28 +1178,28 @@ class Request:
 						shutdownText + "\n" +
 						f"Please update the server or use a similar client version.")
 					return False
-				if (int(cminor) < int(sminor)):
+				if int(cminor) < int(sminor):
 					await self.sendstatus(6,
 						f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} has " +
 						f"higher minor version than client({clientVersion}).\n" +
 						f"This should not be an issue, if only minor features have been added. " +
 						f"However, it is advised to update the client version to a similar build.")
 		# Compare build version
-		elif (cbuild != sbuild):
-			if (re.fullmatch("\\d+", cbuild) is None) or (re.fullmatch("\\d+", sbuild) is None):
+		elif cbuild != sbuild:
+			if re.fullmatch("\\d+", cbuild) is None or re.fullmatch("\\d+", sbuild) is None:
 				await self.sendstatus(4,
 					f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} does " +
 					f"not match build of client version {clientVersion}.\n" +
 					f"This should not be an issue, if only minor details have been changed. " +
 					f"However, it is advised to use matching software versions on both ends.")
 			else:
-				if (int(cbuild) > int(sbuild)):
+				if int(cbuild) > int(sbuild):
 					await self.sendstatus(4,
 						f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} has " +
 						f"a lower build number than client version {clientVersion}.\n" +
 						f"This should not be an issue, if only minor details have been changed. " +
 						f"However, it is advised to update the server to a matching version.")
-				if (int(cbuild) < int(sbuild)):
+				if int(cbuild) < int(sbuild):
 					await self.sendstatus(2,
 						f"Server version {server.PYTHON_INTERACTION_SCRIPT_VERSION} has " +
 						f"a higher build number than client version {clientVersion}.\n" +
@@ -1263,7 +1262,7 @@ class Request:
 		await server.sleep(0.1, "Initializing neural network") # make sure other async tasks have a chance to be executed before
 		# blocking main thread for a while (so that the previous status mesage gets send properly)
 		try:
-			if (ai.preparedModuleIsTf()):
+			if ai.preparedModuleIsTf():
 				ai.importtf()
 			await self.sendstatus(-30, f"Neural network at {path} has been successfully loaded and " +
 				"executed.")
@@ -1393,7 +1392,7 @@ class Request:
 		if not await self.assertTf(): return False
 		await self.checkParams(0, 1)
 		global tfNetwork
-		if (await self.checkParams(1, 1, False)):
+		if await self.checkParams(1, 1, False):
 			attr = await self.getParam(1, str, True)
 			try:
 				await self.send(getattr(ai.tfnet, attr))
@@ -1473,11 +1472,10 @@ class Request:
 				traceback.format_exc())
 			return False
 	commandList["tf draw kernel"] = (tf_drawkernel, "Creates quads for tensorflow network kernels",
-		'Will send a quad drawing instruction for all kernel data of the neural network to display it ' +
-		'in the game engine.\n' +
 		'§§ will just refresh trainable vars print out all kernel shapes without drawing anything.\n' +
-		'§[int:layer]§ specifies which layer wants their kernels drawn.\n' +
-		'§[int:layer] [refresh=False]§ If refresh is true or no kernel data can be found, ' +
+		'§[int:index]§ will respond with drawing instructions for all kernel data of the neural ' +
+		'network layer with that index to display it in the game engine.\n' +
+		'§[int:index] [refresh=False]§ If refresh is true or no kernel data can be found, ' +
 		'data of trainable variables will be refreshed first.\n')
 	commandList["tf draw kernels"] = commandAlias("tf draw kernel")
 
