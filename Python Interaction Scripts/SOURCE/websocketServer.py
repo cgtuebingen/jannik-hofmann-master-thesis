@@ -387,7 +387,7 @@ async def shutdownServer(websocket, text = None):
 	if (text is not None) and len(text) > 0:
 		await serverCommands.Request(websocket, "SERVER").senddebug(-1, "\n" + text, False)
 
-	stopCoroutines()
+	await stopCoroutines()
 
 	# Interrupt all coroutines now before waiting for them to finish
 	asyncio.get_event_loop().stop()

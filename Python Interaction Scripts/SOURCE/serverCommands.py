@@ -71,9 +71,10 @@ class Request:
 				oldCommand = commandList.pop(key)
 				# replace spaces in key
 				newKey = key.replace(" ", "")
-				commandList[newKey] = (oldCommand[0], key) + oldCommand[1:]
 				# New structure: commandList[command_without_spaces] =
 				# 	(function, verbose_command_with_spaces, explanation, details_about_usage)
+				newStructure = [oldCommand[0], key] + list(oldCommand[1:])
+				commandList[newKey] = newStructure
 			
 			# replace aliases with references to original functions
 			for key in list(commandList.keys()):
@@ -82,7 +83,7 @@ class Request:
 				if type(functionRef) is str and functionRef.startswith("ALIAS:"):
 					tmpAliasKey = functionRef[len("ALIAS:"):].replace(" ", "")
 					functionRef = commandList[tmpAliasKey][0]
-				commandList[key] = (functionRef,) + oldCommand[1:]
+				commandList[key] = [functionRef] + oldCommand[1:]
 			commandListInitialized = True
 
 			ignoreSameBeginningInTheseKeys = {
@@ -437,8 +438,8 @@ class Request:
 	async def displayhelp(self, helpString = None, **kwargs):
 		# Note: In main section, structure of all commandList values was automatically changed to
 		# (function, verbose_command_with_spaces, explanation, details_about_usage)
-		if (await self.checkParams(warnUser=False)):
-			if (helpString is None):
+		if await self.checkParams(warnUser=False):
+			if helpString is None:
 				helpString = await self.getParam()
 
 			HELP_VERBOSE = ("verbose", "all")
@@ -448,13 +449,13 @@ class Request:
 			HELP_VERBOSE = tuple(HELP_VERBOSE)
 			HELP_SEARCH = tuple(word + " " for word in HELP_SEARCH)
 			HELP_DEEP_SEARCH = tuple(word + " " for word in HELP_DEEP_SEARCH)
-			if (helpString.startswith(HELP_VERBOSE)):
+			if helpString.startswith(HELP_VERBOSE):
 				result = {value[1]:value[2] for (key,value) in commandList.items()}
 				await self.senddebug(-1, 'Here are all commands recognized by the python interaction ' +
 				'server.\nType "help [command]" for a more detailed explanation of a specific command.\n' +
 				'All commands can also be typed without spaces in the command name.')
 				await self.send(("LIST OF ALL AVAILABLE COMMANDS", result))
-			elif (helpString.startswith(HELP_SEARCH) or helpString.startswith(HELP_DEEP_SEARCH)):
+			elif helpString.startswith(HELP_SEARCH) or helpString.startswith(HELP_DEEP_SEARCH):
 				# Do a search for descriptions containing this word
 				deepSearch = helpString.startswith(HELP_DEEP_SEARCH)
 				for word in HELP_SEARCH + HELP_DEEP_SEARCH:
@@ -467,7 +468,7 @@ class Request:
 				if not deepSearch:
 					result = {value[1]:value[2] for (key,value) in commandList.items()
 						if helpString.lower() in value[1].lower() or helpString.lower() in value[2].lower()}
-				if (len(result) > 0):
+				if len(result) > 0:
 					await self.senddebug(-1,
 					'Here are all commands recognized by the python interaction ' +
 					f'server containing "{helpString}" in their description.\n' +
@@ -481,25 +482,25 @@ class Request:
 					result = {value[1]:value[2] for (key,value) in commandList.items()
 						if helpString.lower().replace(" ", "") in value[1].lower().replace(" ", "") or
 						helpString.lower().replace(" ", "") in value[2].lower().replace(" ", "")}
-					if (len(result) > 0):
+					if len(result) > 0:
 						helpString = helpString.replace(" ", "")
 					else:
 						result = {value[1]:value[2] for (key,value) in commandList.items()
 							if helpString.lower() in value[1].lower() or
 							(helpString.lower() in value[2].lower()) # in case deep skipped this
 							or ((len(value) > 3) and (helpString.lower() in value[3].lower()))}
-					if (len(result) < 1):
+					if len(result) < 1:
 						originalCommand = helpString
 						helpString = helpString.replace(" ", "")
 						result = {value[1]:value[2] for (key,value) in commandList.items()
 						if helpString.lower() in value[1].lower() or
 						(len(value) > 3) and (helpString.lower() in value[3].lower())}
-					if (len(result) < 1):
+					if len(result) < 1:
 						result = {value[1]:value[2] for (key,value) in commandList.items()
 						if helpString.lower() in value[1].lower().replace(" ", "") or
 						(len(value) > 3) and (helpString.lower() in value[3].lower().replace(" ", ""))}
 					
-					if (len(result) > 0):
+					if len(result) > 0:
 						await self.senddebug(-1,
 						'Here are all commands recognized by the python interaction ' +
 						f'server mentioning "{helpString}" in their description or usage.\n' +
@@ -525,12 +526,17 @@ class Request:
 				if result is not None: # Result found. Printing and sending the detailed explanation
 					explanation = 'Detailed explanation for command "' + \
 						beautifulDebug.underlinetext(result[1]) + '":\n' + result[2]
-					if (len(result) > 4):
+					if len(result) > 4:
 						originalCommand = result[4].replace(" ", "")
-						explanation += ":\n" + commandList[originalCommand][2] + \
-							"\nUsage: " + commandList[originalCommand][3]
-					elif (len(result) > 3):
-						explanation += "\nUsage: " + result[3]
+						explanation += ":\n" + commandList[originalCommand][2]
+						usageDescription = commandList[originalCommand][3]
+					elif len(result) > 3:
+						usageDescription = result[3]
+					# Replacing '§§§§' or '§§§§ ' in usage details with '"verbose command"' and
+					usageDescription = usageDescription.replace('§§', f'"{result[1]}"')
+					# Replacing '§§§...§' or '§§§...§ ' in usage details with '"verbose command ..."'
+					usageDescription = re.sub('§([^§]*)§', f'"{result[1]} \\1"', usageDescription)
+					explanation += "\nUsage: " + usageDescription
 					await self.sendstatus(-30, explanation)
 				else: # No specific command found. Let's try to filter the list
 					# If no command could be found, restore it with whitespaces to avoid confusion
@@ -539,7 +545,7 @@ class Request:
 					# Try to list all commands that start with this string
 					result = {value[1]:value[2] for (key,value) in commandList.items()
 						if value[1].startswith(helpString)}
-					if (len(result) > 0):
+					if len(result) > 0:
 						await self.senddebug(-1,
 						'Here are all commands recognized by the python interaction ' +
 						f'server starting with "{helpString}".\n' +
@@ -550,13 +556,13 @@ class Request:
 						# Try to list all commands that contain this string
 						result = {value[1]:value[2] for (key,value) in commandList.items()
 							if helpString.lower() in value[1].lower()}
-						if (len(result) < 1):
+						if len(result) < 1:
 							# Finally let's try eliminating spaces
 							helpString = helpString.replace(" ", "")
 							result = {value[1]:value[2] for (key,value) in commandList.items()
 								if helpString.lower() in value[1].lower().replace(" ", "")}
 
-						if (len(result) > 0):
+						if len(result) > 0:
 							await self.senddebug(-1,
 							'Here are all commands recognized by the python interaction ' +
 							f'server containing "{helpString}".\n' +
@@ -576,7 +582,7 @@ class Request:
 				if ' ' in cmd:
 					firstword = cmd.split(' ')[0]
 					groupCount = allcommands.count('\n' + firstword + ' ')
-					if (groupCount > 1):
+					if groupCount > 1:
 						# firstWord is a group
 						cmd = firstword + " ..."
 						description = f'Group of {groupCount} commands. Type "help {firstword}" for a detailed list'
@@ -589,12 +595,12 @@ class Request:
 			# await self.sendstatus(-30, "Short list of available commands: " + ", ".join(sorted(commandList.keys()))) # don't need that
 	commandList["help"] = (displayhelp,
 		"Displays available commands or detailed info about a certain command",
-		"Without parameters it will return an array of grouped available commands with their explanation.\n" +
-		'Type "help all" for a complete list of all individual available commands.\n' +
-		'Type "help [command]" to get more detailed information about a specific command.\n' +
-		'Use "help search ..." to search for descriptions matching the specified following string\nUse ' +
-		'"help deep ..." to search even the explanations for anything matching the following string\n' +
-		'(If no command is found with a specific search, it automatically searches more broadly, ' +
+		"§§ Without parameters it will return an array of grouped available commands with their explanation.\n" +
+		'Type §all§ for a complete list of all individual available commands.\n' +
+		'Type §[command]§ to get more detailed information about a specific command.\n' +
+		'Use §search [keyword]§ to search for descriptions matching the specified following string\nUse ' +
+		'§deep [keyword]§ to search even the explanations for anything matching the following string\n' +
+		'(If no command is found with a specific search, it automatically searches deeper, ' +
 		'ending up at a deep search in the end.)')
 
 
@@ -605,18 +611,19 @@ class Request:
 			await self.send(setting.DESIRED_VERBOSITY)
 		else:
 			newVerbosity = await self.getParam(1, setting.DESIRED_VERBOSITY)
-			if (setting.DESIRED_VERBOSITY == newVerbosity):
+			if setting.DESIRED_VERBOSITY == newVerbosity:
 				await self.senddebug(-5, f"Server verbosity level is already set at {newVerbosity}.")
 			else:
 				setting.DESIRED_VERBOSITY = newVerbosity
 				infotext = f"Verbosity level of the server has been changed to {newVerbosity}."
 				await self.senddebug(-1, infotext)
-				if (-1 < setting.DESIRED_VERBOSITY):
+				if -1 < setting.DESIRED_VERBOSITY:
 					loggingFunctions.log(infotext)
 					# To make sure that at least the logfile logs this change to avoid confusion
 					# about missing debug info later on
 	commandList["set verbosity"] = (setverbosity, "Displays or sets the desired verbosity level",
-		'Without parameter, it displays the current verbosity level of the server.\nA parameter ' +
+		'§§ without parameter displays the current verbosity level of the server.\n' +
+		'§[new verbosity level]§ ' +
 		'changes the servers verbosity level of debug and status information. Will affect which ' +
 		'messages are printed in the console and stored in the logfile.\nThe lower you go the ' +
 		'more verbose debug info gets printed. -10 = all debug, 0 = only warnings and errors, ' +
@@ -638,21 +645,16 @@ class Request:
 			# cleared window, this yields until the processing of the cls-command has been completed
 		asyncio.get_event_loop().create_task(self.clearScreenInSeconds(seconds))
 	commandList["cls"] = (cls, "Clears the console output screen",
-		'First and only parameter can defined in how many seconds the screen will be cleared, ' +
+		'First and only parameter can define in how many seconds the screen will be cleared, ' +
 		'defaults to 0\nThen sends cls or clear to the server console, depending on the system')
 	commandList["clear"] = commandAlias("cls")
 
 
 	async def echo(self, **kwargs):
 		await self.sendstatus(-30, await self.getParam(-1, "echo"))
-	commandList["test echo"] = (echo, "Echos back with a status message of type successful",
-		'Without parameters, it sends the string "echo", otherwise it sends back all parameters as string')
-
-
-	async def respondtest(self, **kwargs):
-		await self.checkParams(0)
-		await self.senddebug(-5, "Respond test executed. This is your response.")
-	commandList["test respond"] = (respondtest, "Responds with a debug message of level -5")
+	commandList["test echo"] = (echo, "Echos back text",
+		'§§ sends the string "echo", otherwise §[text]§ sends back all text as string' +
+		'contained in a status message of type successful (level -30)')
 
 
 	async def sleeptest(self, **kwargs):
@@ -664,7 +666,7 @@ class Request:
 		#await asyncio.sleep(sleepDuration) # allows other async operations to run
 		await self.senddebug(-9, "Slept successfully for " + str(sleepDuration) + " seconds.")
 	commandList["test sleep"] = (sleeptest, "Sleeps for specified number of seconds",
-		"First and only parameter should be of type float, defaults to 2\n" +
+		"§[float:seconds=2]§ First and only parameter should be of type float, defaults to 2\n" +
 		"Sleeping is asynchronous and allows for other commands to be processed in the meantime")
 
 
@@ -760,7 +762,7 @@ class Request:
 				finaloutput += '\n\n' + text
 				#await self.sendstatus(-30, text, False)
 		await self.sendstatus(-30, finaloutput, False)
-	commandList["server info"] = (serverInfo, "Gives back the IP address and port of the active websocket server as verbose status",
+	commandList["server info"] = (serverInfo, "Returns IP addess and port of this websocket server",
 		'Does not take parameters and responds with a verbose text as status level -30 (successful).\n' +
 		'IP and port are returned according to the python server settings')
 	commandList["server status"] = commandAlias("server info")
@@ -773,7 +775,7 @@ class Request:
 				return await self.serverIPPort(warnParameters = False)
 		await self.checkParams(0)
 		await self.send(setting.SERVER_IP)
-	commandList["server ip"] = (serverIP, "Gives back the IP address of the active websocket server as string",
+	commandList["server ip"] = (serverIP, "Returns IP address of this websocket server",
 		'Does not take parameters and responds with a string.\n' +
 		'IP is returned according to the python server settings')
 
@@ -781,7 +783,7 @@ class Request:
 	async def serverPort(self, **kwargs):
 		await self.checkParams(0)
 		await self.send(setting.SERVER_PORT)
-	commandList["server ip"] = (serverIP, "Gives back the port of the active websocket server as integer",
+	commandList["server ip"] = (serverIP, "Returns port of this websocket server",
 		'Does not take parameters and responds with an integer.\n' +
 		'Port is returned according to the python server settings')
 
@@ -790,7 +792,7 @@ class Request:
 		if warnParameters:
 			await self.checkParams(0)
 		await self.send(setting.SERVER_IP + ":" + str(setting.SERVER_PORT))
-	commandList["server address"] = (serverIPPort, "Gives back the IP address and port of the active websocket server as string",
+	commandList["server address"] = (serverIPPort, "Returns IP address and port of this websocket server",
 		'Does not take parameters and responds with a string.\n' +
 		'IP and port are returned according to the python server settings')
 	commandList["server ipport"] = commandAlias("server address")
@@ -892,15 +894,18 @@ class Request:
 			if errorsEncountered:
 				return False
 
-	commandList["server reload"] = (reload, "Reloads certain modules of the server",
-		"Without parameters, it will list all the modules that can be reloaded.\n" +
-		"With parameters, name as many modules as you want, separated by spaces.\n" +
+	commandList["server reload"] = (reload, "Reloads certain modules on the server",
+		"§§ will list all the modules that can be reloaded and their aliases.\n" +
+		"§[modules]§ name as many modules as you want, separated by spaces.\n" +
 		"These will then be reloaded by importlib. Note that the loaded AI network " +
 		'is located in ai, therefore reloading this module requires again the "nn load" command\n' +
 		"Note: When reloading the module serverCommands you cannot chain any other commands " +
 		"behind the reload with a & due to the nature of command processing checks" +
 		"\nPlease be aware that reloading modules this way might lead to undefined behaviour! " +
-		'It is recommended to completely reinitialize the server with "server reset"')
+		'It is recommended to completely reinitialize the server with "server reset"\n' +
+		"Due to security reasons, this feature is normally disabled when this server is " +
+		"active on the internet via unencrypted connections (outside of localhost)\n" +
+		"This command is currently " + ("ENABLED" if setting.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
 
 	async def stopCoroutines(self, **kwargs):
 		await self.checkParams(0)
@@ -917,13 +922,13 @@ class Request:
 	commandList["server stop"] = (stopCoroutines, "Interrupts all running coroutines",
 		"Interrupts all running coroutines that yield to be stopped. This can be used " +
 		"to stop command processing that has taken much longer than expected.\n" +
-		"Should only be used in emergencies, as it might lead to undefined behaviour. " +
-		'It is recommended to reinitialize the server afterwards with the command "server reset"')
+		"It might lead to undefined behaviour, therefore " +
+		'it is recommended to reinitialize the server afterwards with the command "server reset"')
 
 
 	async def serverDraw(self, **kwargs):
 		vis.readyToDraw = True
-	commandList["server draw next"] = (serverDraw,
+	commandList["server draw next"] = (serverDraw, "Requests the next batch of object draw instructions",
 		"Signals to the server that the client is ready to receive the next drawing instruction\n" +
 		"This is used as to not overload the client with too many cuboids at the same time, " +
 		"as then drawing instructions might be dropped and ignored.\n" +
@@ -933,10 +938,9 @@ class Request:
 	async def sendalot(self, **kwargs):
 		await self.checkParams(0, 1)
 		await self.sendstatus(-30, "#" * await self.getParam(1, 10))
-	commandList["send a lot"] = (sendalot, "Responds with a string of the symbol # repeated many times",
-		"First and only parameter specifies how often this symbol should be repeated, equaling the " +
-		"length of that string. Defaults to 10\nCan be used to test transmission rate of extremely " +
-		"large messages")
+	commandList["send a lot"] = (sendalot, "Responds with a string of specified length",
+		"§[length=10]§ returns a string of the symbol '#' repeated length times.\n" +
+		"Can be used to test transmission rate of extremely large messages")
 
 
 	async def sendfiletest(self, **kwargs):
@@ -946,8 +950,8 @@ class Request:
 		else:
 			path = await self.getParam()
 		await self.sendfile(path)
-	commandList["send file"] = (sendfiletest, "Transmits the file content at specified path as binary data",
-		"Parameters as string determine the path of that file on the server. Absolute paths are " +
+	commandList["send file"] = (sendfiletest, "Transmits a file at specified path as binary data",
+		"§[path]§ path refers to the file location on the server. Absolute paths are " +
 		'preferred\nResponds with a struct of type ["FILE", filename, binarydata]')
 
 
@@ -966,10 +970,9 @@ class Request:
 					"Remote code execution is disabled by python websocket server. " +
 					"Using default structure.")
 		await self.send(struct)
-	commandList["send struct"] = (sendstruct, "Sends a complicated test structure via msgpack",
-		"Parameters as string can define a custom structure to send. If no structure is specified " +
-		"or the provided string cannot be parsed into a structure, " +
-		"a complicated default structure is used")
+	commandList["send struct"] = (sendstruct, "Sends a test structure via msgpack",
+		"§[custom structure]§ can define a custom structure to send. If no structure is specified (§§)" +
+		"or the provided string cannot be parsed into a structure, a default structure is used")
 
 
 	async def testdebug(self, **kwargs):
@@ -982,7 +985,7 @@ class Request:
 				"although this would normally happen on level 20+"
 		await self.senddebug(level, text, False)
 	commandList["send debug"] = (testdebug, "Sends a test debug message",
-		"First and only parameter defines the level (importance) of that debug message. Defaults to -1")
+		"§[level=-1]§ defines the level (importance) of that debug message")
 
 
 	async def teststatus(self, **kwargs):
@@ -1000,8 +1003,7 @@ class Request:
 				f'Type the command "server info" for more information.'
 			await self.sendstatus(-30, text, False)
 	commandList["send status"] = (teststatus, "Sends a test status message",
-		"First and only parameter defines the level (importance) of that debug message. " +
-		"Defaults to -30 (successful)\n" +
+		"§[level=-30]§ the level (importance) of that debug message. Defaults to -30 (successful)\n" +
 		'Not to be confused with the command "server status" which returns the current state of this server.')
 
 
@@ -1009,16 +1011,16 @@ class Request:
 		await self.checkParams(2)
 		await self.send(await self.getParam(1, 2.0) + await self.getParam(2, 3.0))
 	commandList["test add"] = (add, "Adds two float numbers",
-		"Two parameters specify the two numbers to be added up as floats, responds with the result " +
-		"as float\nPar°ameters default to 2 and 3 respectively\nCan be used for testing purposes")
+		"§[float:number=2] [float:number=3]§ responds with the result " +
+		"as float\nCan be used for testing purposes")
 
 
 	async def divide(self, **kwargs):
 		await self.checkParams(2)
 		await self.send(await self.getParam(1, 2.0) / await self.getParam(2, 3.0))
 	commandList["test divide"] = (divide, "Divides two float numbers",
-		"Two parameters specify the two numbers to be added up as floats, responds with the result " +
-		"as float\nParameters default to 2 and 3 respectively\nCan be used for testing purposes")
+		"§[float:number=2] [float:number=3]§ responds with the result " +
+		"as float\nCan be used for testing purposes")
 
 
 	async def console(self, *, loadedCommand, **kwargs):
@@ -1034,7 +1036,7 @@ class Request:
 		'This can be used to inject commands into the pipeline that the server then executes. Waits ' +
 		'for the user to type the command while asynchronously processing other incoming commands\n' +
 		'This request would then be processed on the original thread, so the client that ' +
-		'originally sent the "console" command will receive any debug/status messages and other ' +
+		'originally sent the §§ command will receive any debug/status messages and other ' +
 		'response that is produced by the executing the command that the user typed in\n' +
 		'Type help for a list of available commands')
 
@@ -1064,7 +1066,7 @@ class Request:
 		'executed in the wrong order. Take care when using this in parallel with multiple ' +
 		'asynchronously threaded clients.\nFirst in, first out system for multiple commands ' +
 		'prepared consecutively when loaded.\nWithout parameters, it will return a list of the ' +
-		'currently prepared commands.\nUse "prepare clear" or "prepare reset" to clear the list ' +
+		'currently prepared commands.\nUse §clear§ or §reset§ to clear the list ' +
 		'from any loaded commands.\nWith chained commands ' +
 		('(currently enabled)' if setting.AMPERSAND_CHAINS_COMMANDS else '(currently disabled)') +
 		', a single & will first prepare the command and then execute anything behind it. A ' +
@@ -1092,7 +1094,9 @@ class Request:
 			loadedCommand.append(nextCommand)
 			return True
 	commandList["load"] = (loadCommand, "Loads and executes the oldest prepared command",
-		'Does not take any arguments. Loads the oldest command from the list of prepared commands, executes it on the current client connection and removes it from the list.\nUse "prepare" to check the list. See more info on the prepare and loading mechanism with "help prepare"')
+		'Does not take any arguments. Loads the oldest command from the list of prepared commands, ' +
+		'executes it on the current client connection and removes it from the list.\n' +
+		'Use §§ to check the list. See more info on the prepare and loading mechanism with "help prepare"')
 	
 
 	SEVERE_WARNING_LEVEL = 20
@@ -1206,8 +1210,8 @@ class Request:
 			await self.sendstatus(-30,
 				f"Server and client versions {server.PYTHON_INTERACTION_SCRIPT_VERSION} match perfectly.")
 	commandList["check version"] = (checkScriptVersion, "Compares and checks server and client versions",
-		'If no arguments are passed, this function returns the version of the server script as a string.'+
-		'\nFirst argument is expected to be the client script version for asserting compatibility.\n' +
+		'§§ returns the version of the server script as a string.'+
+		'\n§[version]§ is expected to be the client script version for asserting compatibility.\n' +
 		'The version is passed as a string of type major.minor.build\nmajor, minor and build can ' +
 		'contain only digits or letters.\nIf major version differs or clients minor version is higher ' +
 		'then the servers minor version (or if any minor version contains letters and is different), ' +
@@ -1268,7 +1272,7 @@ class Request:
 				traceback.format_exc())
 			return False
 	commandList["nn load"] = (loadnn, "Loads a neural network at the given path",
-		"Parameters as string specify the location of the python script on the server. " +
+		"§[path]§ specify the location of the python script on the server. " +
 		"This script is then imported and loaded by python.\n" +
 		"Use a keyword as parameter to load one of the networks specified in server settings.\n" +
 		'Available keywords are: "' + '", "'.join(setting.AVAILABLE_NN_PATHS.keys()) + '"')
@@ -1278,8 +1282,9 @@ class Request:
 		await self.send(ai.tfloaded())
 		if not(ai.tfloaded()):
 			return False
-	commandList["nn is loaded"] = (isnnloaded, "Checks if any neural network has been loaded and " +
-		"initialized successfully", "Returns a boolean, can be used for assertion to chain commands")
+	commandList["nn is loaded"] = (isnnloaded, "Checks if any NN is loaded and initialized",
+		"Returns a boolean saying whether any neural network has been " +
+		"loaded and initialized successfully, can be used for assertion to chain commands")
 
 	# For internal use, not a command. Use the following code line in any function to only let
 	# execution continue if a tf has been loaded and initialized successfully:
@@ -1399,8 +1404,8 @@ class Request:
 				return False
 		else:
 			await self.send(vars(ai.tfnet))
-	commandList["tf get vars"] = (tf_getvars, "Returns all variables and information currently loaded and " +
-		"known about the tensorflow network",
+	commandList["tf get vars"] = (tf_getvars, "Returns all tf variables and information currently loaded",
+		"Retrieves any information already known about the loaded tensorflow network.\n" +
 		"Returns a map of the continually expanding class type that stores information about the " +
 		"neural network\nThis data is continually expanded by more commands and information requests")
 
@@ -1425,7 +1430,7 @@ class Request:
 			return shapeDict
 	commandList["tf get train vars"] = (tf_refreshtrainablevars,
 		"Retrieves and stores all trainable variables available in the network.\n" +
-		"If optional parameter is positive, the var shapes will be sent as response")
+		"$[respond=False]$ If respond is positive, the var shapes will be sent as response")
 	commandList["tf get trainable vars"] = commandAlias("tf get train vars")
 	commandList["tf get trainable variables"] = commandAlias("tf get train vars")
 
@@ -1470,8 +1475,9 @@ class Request:
 	commandList["tf draw kernel"] = (tf_drawkernel, "Creates quads for tensorflow network kernels",
 		'Will send a quad drawing instruction for all kernel data of the neural network to display it ' +
 		'in the game engine.\n' +
-		'Needs one parameter (index as int) specifying which layer wants their kernels drawn.\n' +
-		'If optional second parameter is positive or no kernel data can be found, data of trainable variables will be refreshed first.\n' +
-		'If no parameter is given, trainable vars will be refreshed and all kernel shapes will be printed out without drawing anything.')
+		'§§ will just refresh trainable vars print out all kernel shapes without drawing anything.\n' +
+		'§[int:layer]§ specifies which layer wants their kernels drawn.\n' +
+		'§[int:layer] [refresh=False]§ If refresh is true or no kernel data can be found, ' +
+		'data of trainable variables will be refreshed first.\n')
 	commandList["tf draw kernels"] = commandAlias("tf draw kernel")
 
