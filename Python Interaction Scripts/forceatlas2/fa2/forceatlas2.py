@@ -265,7 +265,7 @@ class ForceAtlas2:
             self.debugDisplayPlot = 1
         if self.debugDisplayPlot == 0:
             self.debugDisplayPlot = False
-        if type(self.debugDisplayPlot) is int or type(self.debugDisplayPlot) is float :
+        if self.debugDisplayPlot:
             def draw(i):
                 nonlocal draw_timer, ax, fig
                 draw_timer.start()

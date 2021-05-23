@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import itertools
 import functools
 import networkx as nx
+from PIL import Image
 
 # LOCAL IMPORTS
 import visualizationSettings as design
@@ -336,7 +337,7 @@ async def sendCuboidBatch(connection, processDescription, waitAfterwardsForServe
 		readyToDraw = False
 		sleepInterval = design.maxDrawWaitTimeout
 		while sleepInterval > 0.01: sleepInterval /= 2
-		for i in range(design.maxDrawWaitTimeout / sleepInterval):
+		for i in range(int(design.maxDrawWaitTimeout / sleepInterval)):
 			if readyToDraw:
 				return
 			await server.sleep(sleepInterval,
@@ -406,6 +407,7 @@ def sizeFromLayerDimensions(layerDims):
 		size = [1] + size
 	def getDims(designName, default):
 		dims = getattr(design.layouting, designName, default)
+		if dims is None: return default
 		if type(dims) is tuple: dims = list(dims)
 		elif type(dims) is not list: dims = [dims]
 		if len(dims) == 1: dims *= 3
@@ -529,7 +531,7 @@ async def drawstructureLinearly(connection = None):
 # retrieves the layer color based on its type description
 # Tries first with the whole name ignoring spaces,
 # then removes any "2D" at the end and tries again
-def getLayerColor(layerType, defaultValue = design.layerColors.get("default")):
+def getLayerColor(layerType, defaultValue = design.layerColors.get("default", .4)):
 	layerType = layerType.lower()
 	result = design.layerColors.get(layerType, None)
 	if result is not None:
@@ -882,34 +884,27 @@ async def drawstructure(connection = None):
 
 		# Layouting instructions for modified forceatlas2-algorithm
 		NUMBER_OF_ITERATIONS = design.layouting.iterations
-		NUMBER_OF_PLOTS = design.layouting.debug.drawPlots * design.layouting.debug.numberOfPlots
 		forceatlas2 = ForceAtlas2(
 			# Behavior alternatives
-			outboundAttractionDistribution=True, # Dissuade hubs
-			edgeWeightInfluence=1.0,
-			groupLinearlyConnectedNodes=True, # only available with networkx layout
-			orderconnectedQuadsOnXaxis=True, # orders connected nodes by their index on x axis
+			outboundAttractionDistribution = True, # Dissuade hubs
+			edgeWeightInfluence = 1.0,
+			groupLinearlyConnectedNodes = True, # only available with networkx layout
+			orderconnectedQuadsOnXaxis = True, # orders connected nodes by their index on x axis
 			# spacing between the nodes:
-			desiredHorizontalSpacing=design.layouting.horizontalSpaceBetweenLayers,
-			desiredVerticalSpacing=design.layouting.verticalSpaceBetweenLayers,
-			bufferZone=design.layouting.bufferZone,
-			desiredHorizontalSpacingWithinGroup=design.layouting.horizontalSpaceBetweenGroupedLayers,
-
+			desiredHorizontalSpacing = design.layouting.horizontalSpaceBetweenLayers,
+			desiredVerticalSpacing = design.layouting.verticalSpaceBetweenLayers,
+			bufferZone = design.layouting.bufferZone,
+			desiredHorizontalSpacingWithinGroup = design.layouting.horizontalSpaceBetweenGroupedLayers,
 			# Performance
-			jitterTolerance=1.0, # Tolerance
-			barnesHutOptimize=False,
-			barnesHutTheta=1.2,
-
+			jitterTolerance = 1.0, # Tolerance
+			barnesHutOptimize = False,
 			# Tuning
-			scalingRatio=2.0,
-			strongGravityMode=False,
-			gravity=1.0,
-			randomlyOffsetNodes=(0, design.layouting.bufferZone/20),
-
+			scalingRatio = 2.0,
+			strongGravityMode = False,
+			gravity = 1.0,
+			randomlyOffsetNodes = (0, design.layouting.bufferZone / 20),
 			# Log
-			verbose=True,
-			debugDisplayPlot=NUMBER_OF_PLOTS,
-			addedMsPerFrame=0
+			verbose = True,
 		)
 		# execute force based algorithm
 		ai.tfnet.layoutPositions = await forceatlas2.forceatlas2_networkx_layout_async(graph, pos=positions, quadsizes=sizes, iterations=NUMBER_OF_ITERATIONS)
@@ -918,9 +913,10 @@ async def drawstructure(connection = None):
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False):
-	# If no connection has been given, initialize matplotlib
-	if connection is None or design.kernels.debugPlotOnServer:
-		plt.axes()
+	drawTexture = True # can be changed later if it's not deemed necessary
+	if connection is None: # here definitely necessary, so we can display the kernels to the user
+		drawTexture = True
+
 	async def status(verbosity, text):
 		if connection is None:
 			if verbosity < 0: loggingFunctions.printlog(text)
@@ -977,26 +973,29 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 		size.x = min(size.x, design.kernels.maxPixelDimensions[0])
 		size.y = min(size.y, design.kernels.maxPixelDimensions[1])
 	spacing = Coordinates(design.kernels.spacingBetweenKernels, z = 0)
-	if spacing.x <= 1 or spacing.y <= 1:
+	if spacing.x <= 1 and spacing.y <= 1:
 		spacing.x *= size.x
 		spacing.y *= size.y
 	structureWidth = groups[0] * pixelsPerGroup[0] * size.x + (groups[0]-1) * spacing.x
 	structureHeight = groups[1] * pixelsPerGroup[1] * size.y + (groups[1]-1) * spacing.y
-	
+	resolution = design.kernels.defaultPixelDimensions[0] / design.kernels.renderTexture.defaultPixelResolution
+
+	if drawTexture:
+		render = np.zeros([int(round(structureHeight / resolution)), int(round(structureHeight / resolution)), 4])
+
+	# Some subfunctions for color normalization and editing
 	def makeExponent(value): # takes a value from 0 to 100
 		if math.isclose(value, 50): return 1
 		elif value > 50: return 1 / (1 - (50 - value) / 50)
 		else: return 1 / makeExponent(100 - value)
 	brightnessExponent = makeExponent(design.kernels.brightness)
 	contrastExponent = makeExponent(design.kernels.contrast)
-	
 	def normalizeColor(value):
 		value /= max(np.max(kernel), -np.min(kernel))
 		if value >= 0: value **= contrastExponent
 		else: value = -(-value)**contrastExponent
 		value = value / 2 + 0.5
-		value **= brightnessExponent
-		return value
+		return value ** brightnessExponent
 	
 	progress = 0
 	for groupy in range(groups[1]):
@@ -1034,42 +1033,52 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 						else:
 							if groupy > kernel.shape[3+colored]: groupy = math.inf
 						break # breaking out
-
-					position = Coordinates(
-					# x
-						+ Layer.layerList[layerIndex].position.x
-						- Layer.layerList[layerIndex].size.x / 2
-						- design.kernels.spacingFromLayer
-						- structureWidth
-						+ groupx * pixelsPerGroup[0] * size.x
-						+ groupx * spacing.x
-						+ pixelx * size.x
-					, # y
-						+ Layer.layerList[layerIndex].position.y
-						- structureHeight / 2
-						+ groupy * pixelsPerGroup[1] * size.y
-						+ groupy * spacing.y
-						+ pixely * size.y
-					, # z
-						+ Layer.layerList[layerIndex].position.z
-						- Layer.layerList[layerIndex].size.z / 2
-						- size.z / 2
-					)
+					
+					x = (groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x)
+					y = (groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y)
+					if drawTexture:
+						def treatWithResolution(val):
+							return int(round(val / resolution))
+						render[
+							treatWithResolution(x) : treatWithResolution(x + size.x),
+							treatWithResolution(y) : treatWithResolution(y + size.y)
+						] = color + [design.kernels.renderTexture.opacity]
+					
 					progress += 1
-					processDescription = f"kernels of layer {layerIndex} at pixel {progress} " + \
+					processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
 						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
-					await queueCuboid(connection, position, size, color,
-						processDescription = processDescription)
-					if design.kernels.debugPlotOnServer and connection is not None:
-						await queueCuboid(None, position, size, color,
-							processDescription = processDescription)
+					if connection is None:
+						await server.sleep(0, processDesc)
+					else:
+						position = Coordinates(
+						# x
+							+ Layer.layerList[layerIndex].position.x
+							- Layer.layerList[layerIndex].size.x / 2
+							- design.kernels.spacingFromLayer
+							- structureWidth
+							+ x
+						, # y
+							+ Layer.layerList[layerIndex].position.y
+							- structureHeight / 2
+							+ y
+						, # z
+							+ Layer.layerList[layerIndex].position.z
+							- Layer.layerList[layerIndex].size.z / 2
+							- size.z / 2
+						)
+						await queueCuboid(connection, position, size, color, processDescription = processDesc)
 
 	if connection is not None:
 		await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
-	# Displaying plot if no client connection was given
-	if connection is None or design.kernels.debugPlotOnServer:
-		plt.axis('auto')
-		plt.show()
+	
+	render = (render * 255).astype(np.uint8)
+	filepath = ai.internalCachePath(f"kernels-layer-{layerIndex}.png")
+	Image.fromarray(render).save(filepath)
+	if design.kernels.renderTexture.saveToRendersFolder:
+		filepath = ai.externalImagePath(f"kernels-layer-{layerIndex}.png", True)
+		Image.fromarray(render).save(filepath)
+	if connection is None or design.kernels.renderTexture.displayPlot:
+		os.startfile(filepath)
 
 
 # FOR DEBUGGING, executed if you start this script directly

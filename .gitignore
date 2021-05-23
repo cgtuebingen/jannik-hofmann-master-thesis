@@ -8,6 +8,7 @@
 /Python Interaction Scripts/logs/*.txt
 /Python Interaction Scripts/SOURCE/__pycache__
 /Python Interaction Scripts/filecache/*
+/Python Interaction Scripts/renders/*
 /Python Interaction Scripts/SOURCE/layouting_animation_*
 
 # Include UE4 project

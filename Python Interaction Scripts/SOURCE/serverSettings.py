@@ -64,6 +64,11 @@ LOGFILE_PATH = R"\..\logs"
 # Append logfile name. This should contain some unique datetime-identifier and be easily sortable.
 LOGFILE_PATH +=	R"\session " + datetime.now().strftime("on %Y-%m-%d at %H %M") + ".txt"
 
+# Where to store rendered images from the visualization
+OUTPUT_IMG_PATH = R"\..\renders"
+# Where to temporarily cache images rendered for the Unreal Engine (e.g. textures)
+INTERNAL_IMG_PATH = R"\..\filecache"
+
 #LOGFILE_PATH = None# This deactivates logging entirely. Not recommended.
 
 # Desired level of debugging verbosity in console and debug. The lower you go the more verbose
@@ -92,6 +97,50 @@ NEGATIVE_PARAMETERS = ["false", "0", "no", "none", "ignore", "f", "n", "neg", "n
 	"refuse", "refused", "ignored"]
 
 
+
+# USEFUL FUNCTIONS FOR SETTINGS CHECK AND IN GENERAL
+# Adds the server script path to a given path if it starts with / or \
+def addServerScriptPath(filepath):
+	import centralController
+	# to be able to retrieve SCRIPT_PATH()
+	# needs to be in this function to avoid circular module imports
+	assert(type(filepath) is str)
+	if filepath.startswith(('\\', '/')):
+		return centralController.SCRIPT_PATH() + filepath
+	else:
+		return filepath
+# Ensures that this path ends in a folder path separator
+def ensureFolderEnding(filepath, remove=False):
+	if type(filepath) is list and len(filepath) == 2:
+		return [ensureFolderEnding(filepath[0], remove), filepath[1]]
+	assert(type(filepath) is str)
+	if filepath.endswith(('\\', '/')):
+		if remove:
+			return filepath[:-1]
+		return filepath
+	else:
+		if remove:
+			return filepath
+		return filepath + os.path.sep
+# Returns a tuple of path and filename
+def separateFilename(filepath):
+	result = filepath.rsplit('/', 1)
+	if len(result) == 2:
+		return ensureFolderEnding(result, remove=True)
+	result = filepath.rsplit('\\', 1)
+	if len(result) == 2:
+		return ensureFolderEnding(result, remove=True)
+	return ensureFolderEnding(filepath, remove=True)
+# Checks that the file path exists and create the dir structure if not
+def createFilepath(filepath):
+	assert(type(filepath) is str)
+	if '.' in separateFilename(filepath)[1]:
+		# path ends with a file name, not with a folder
+		filepath = separateFilename(filepath)[0]
+	filepath = ensureFolderEnding(filepath, remove=True)
+	if not os.path.exists(filepath):
+		os.makedirs(filepath)
+
 # Settings checks and warnings. Verifies user settings and gives warnings / recommendations
 # WarningFunction is of type warn(string: message, int: verbosityLevel)
 def checkSettings():
@@ -102,11 +151,8 @@ def checkSettings():
 	AVAILABLE_NN_PATHS, DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
 	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, ONLY_USE_SIMPLE_ANSI_CODES, \
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS, \
-	DEFAULT_NN_VARIABLE_NAME
+	DEFAULT_NN_VARIABLE_NAME, OUTPUT_IMG_PATH, INTERNAL_IMG_PATH
 	
-	# to be able to retrieve SCRIPT_PATH()
-	import centralController
-
 	# The following checks should be self-explanatory,
 	# as they contain a verbose warning describing the issue
 	# Any changes applied to the settings by this function should be broadcasted to the user!
@@ -160,25 +206,23 @@ def checkSettings():
 		msg = "SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER should be at least 0.1"
 		loggingFunctions.warn(msg, 8)
 
-	# Adds the server script path to a given path if it starts with / or \
-	def addServerScriptPath(filepath: str):
-		if filepath.startswith(("\\", "/")):
-			return centralController.SCRIPT_PATH() + filepath
-		else:
-			return filepath
-
 	if LOGFILE_PATH is None or LOGFILE_PATH == "":
 		msg = "No valid logpath given in settings. Logging will be disabled. This is not recommended"
 		loggingFunctions.warn(msg, 4)
 	else:
 		assert(type(LOGFILE_PATH) is str)
 		LOGFILE_PATH = addServerScriptPath(LOGFILE_PATH)
+	createFilepath(LOGFILE_PATH)
 	
 	AVAILABLE_NN_PATHS = {keyword:addServerScriptPath(path) for (keyword, path) in AVAILABLE_NN_PATHS.items()}
 
-	assert(type(DEFAULT_LOAD_NN_PATH) is str)
 	if DEFAULT_LOAD_NN_PATH not in AVAILABLE_NN_PATHS.keys():
-		addServerScriptPath(DEFAULT_LOAD_NN_PATH)
+		DEFAULT_LOAD_NN_PATH = addServerScriptPath(DEFAULT_LOAD_NN_PATH)
+	
+	OUTPUT_IMG_PATH = ensureFolderEnding(addServerScriptPath(OUTPUT_IMG_PATH))
+	createFilepath(OUTPUT_IMG_PATH)
+	INTERNAL_IMG_PATH = ensureFolderEnding(addServerScriptPath(INTERNAL_IMG_PATH))
+	createFilepath(INTERNAL_IMG_PATH)
 
 	if PRINT_COLOR_ANSI_CODES:
 		if ONLY_USE_SIMPLE_ANSI_CODES:
@@ -198,12 +242,13 @@ def checkSettings():
 	# Now checking whether any local variables should've been global references to settings.
 	# This ensures that this function really changes the settings
 	# instead of creating local variables in its function context.
-	localVariables = {varname for varname, value in locals().items() if
-		varname not in [] and # you could add variable names as strings in this array to
-		# override the warning. NOT RECOMMENDED!
-		type(value) not in [types.BuiltinFunctionType, types.ModuleType, types.FunctionType] and
-		varname[0] != '_' and
-		varname in globals().keys()
+	localVariables = {
+		varname for varname, value in locals().items() if
+			varname not in [] and # you could add variable names as strings in this array to
+			# override the warning. NOT RECOMMENDED!
+			type(value) not in [types.BuiltinFunctionType, types.ModuleType, types.FunctionType] and
+			varname[0] != '_' and
+			varname in globals().keys()
 	}
 	if len(localVariables) > 0:
 		msg = f"Namespace problem found in settings check!\n" + \

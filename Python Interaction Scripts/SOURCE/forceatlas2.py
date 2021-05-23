@@ -36,9 +36,11 @@ import itertools
 import math
 import functools
 import asyncio
+import os
 
 from visualizationSettings import layouting
 import websocketServer as server
+import aiInteraction as ai
 
 class Timer:
     def __init__(self, name="Timer"):
@@ -84,7 +86,6 @@ class ForceAtlas2:
 
         # Log
         verbose=True,
-        debugDisplayPlot=False,
         addedMsPerFrame=0
     ):
         assert linLogMode == adjustSizes == multiThreaded == False, "You selected a feature that has not been implemented yet..."
@@ -106,7 +107,6 @@ class ForceAtlas2:
         self.gravity = gravity
         self.randomlyOffsetNodes = randomlyOffsetNodes
         self.verbose = verbose
-        self.debugDisplayPlot = debugDisplayPlot
         self.addedMsPerFrame = addedMsPerFrame
 
     def init(self,
@@ -333,9 +333,7 @@ class ForceAtlas2:
             await server.sleep(0, f"Layouting at iteration {i} of {iterations}")
             execute_once(i)
 
-        if self.debugDisplayPlot == 0: self.debugDisplayPlot = False
-        if self.debugDisplayPlot == True: self.debugDisplayPlot = 1
-        if type(self.debugDisplayPlot) in (int, float):
+        if layouting.renderGif.displayPlot or layouting.renderGif.saveAsGif:
             def draw(i):
                 nonlocal draw_timer, ax, fig
                 draw_timer.start()
@@ -399,7 +397,7 @@ class ForceAtlas2:
             iterationCounter = 0
             def update(i):
                 nonlocal iterationCounter
-                goUntil = int(i * iterations / self.debugDisplayPlot)
+                goUntil = int(i * iterations / layouting.renderGif.framesInAnimation)
                 goUntil = min(goUntil, iterations)
                 while iterationCounter < goUntil:
                     iterationCounter += 1
@@ -412,19 +410,25 @@ class ForceAtlas2:
 
             import matplotlib.pyplot as plt
             from matplotlib.animation import FuncAnimation
-            fig, ax = plt.subplots(figsize=(6,4))
-            if layouting.debug.saveAsGif:
-                fig.set_size_inches(*getattr(layouting.debug, "gifSizeInches", (20, 10)))
+            fig, ax = plt.subplots()
+            fig.set_size_inches(*getattr(layouting.renderGif, "plotSizeInches", (20, 10)))
             draw(0)
-            anim = FuncAnimation(fig, update, frames=self.debugDisplayPlot+1,
+            anim = FuncAnimation(fig, update, frames=layouting.renderGif.framesInAnimation+1,
                 interval=max(self.addedMsPerFrame, 10), repeat=False)
-            if layouting.debug.saveAsGif:
-                filename = 'layouting_animation_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.gif'
-                anim.save(filename, writer='imagemagick', fps=getattr(layouting.debug, "fps", 10))
-            plt.show()
+            if not layouting.renderGif.saveAsGif:
+                plt.show()
+            else:
+                filepath = 'layouting-animation.gif'
+                filepath = ai.externalImagePath(filepath, True)
+                anim.save(filepath,
+                    writer='imagemagick',
+                    fps=layouting.renderGif.framesInAnimation / layouting.renderGif.animationLength,
+                    dpi=getattr(layouting.renderGif, "gifDpi", 100))
+                if layouting.renderGif.displayPlot:
+                    os.startfile(filepath)
             if self.verbose: pbar.close()
 
-        else: # no debugDisplayPlot
+        else: # no plot to be rendered
             # Each iteration of this loop represents a call to goAlgo().
             niters = range(iterations)
             if self.verbose:

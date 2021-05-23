@@ -8,7 +8,7 @@ import loggingFunctions
 
 def onModuleReload(): checkSettings()
 
-maxDrawWaitTimeout = 60 # seconds to wait for the command "server draw next" before resuming drawing
+maxDrawWaitTimeout = 0.5 # seconds to wait for the command "server draw next" before resuming drawing
 # This avoids getting stuck in infinite loops if the command "server draw next" hasn't been received properly
 objectBatchSize = 1000 # how many objects/cuboids will be sent to the client in one batch via websocket response
 checkSentBatchAfter = 120 # checks this number of seconds after the last queueCuboid call, that the batch has been sent
@@ -18,21 +18,21 @@ checkSentBatchAfter = 120 # checks this number of seconds after the last queueCu
 # Colors can be defined as tuple / list / single number (grayscale) using ranges 0-1 or 0-255,
 # Also accepting strings containing hex code
 layerColors = {
-	"input layer": (0, .5, .6, .5),
-	"zero padding": (.3, .3, .4),
+	"input layer": (0, .5, .6), # ocean blue
+	"zero padding": (.3, .3, .4), # dark gray with a bit of violet
 
-	"conv": (.8, .3, 0),
-	"batch normalization": (.4, 0, .9),
-	"activation": (.2, .3, .2),
-	"add": (.5, .1, 0),
-	"max pooling": (.6, .6, .0),
+	"conv": (.8, .3, 0), # bright orange
+	"batch normalization": (.4, 0, .9), # violet
+	"activation": (.2, .3, .2), # dark army gray
+	"add": (.5, .1, 0), # dark red
+	"max pooling": (.6, .6, .0), # dark yellow
 
-	"global average pooling": (.6, .8, .1),
-	"dense": (0, .2, .9),
-	"flatten": (0, .7, .1),
+	"global average pooling": (.6, .8, .1), # very light blue
+	"dense": (0, .2, .9), # blue
+	"flatten": (0, .7, .1), # green
 
-	# For anything unknown / unspecified. This "default" value always needs to exist!
-	"default": .4,
+	# For anything unknown / unspecified
+	"default": .4, # gray
 }
 
 class connections:
@@ -51,9 +51,16 @@ class kernels:
 	wrapIfDimLeftover = True # when there are dimensions left over, the algorithm can wrap the kernel groups
 	brightness = 45 # default 50, black 0, white 100, changes the color brightness of kernels
 	contrast = 70 # default 50, grey 0, black/white 100, changes kernel contrast and saturation at the same time
-	debugPlotOnServer = True # After creating drawing instructions to the (UE4) client, plot the 
-	# kernels on a matplotlib drawing and open a window on the server
-	# (this also blocks other processes from running until the window is closed!)
+
+	class renderTexture:
+		displayPlot = True
+		defaultPixelResolution = 100 # determines resolution of each kernel pixel within the final texture image file
+		# Approximates and refers to the kernel width
+		# It helps to calculate that this expression should evaluate to a whole number:
+		# defaultPixelDimensions[0] / spacingBetweenKernels[0] (/ defaultPixelResolution[0] if spacing is absolute)
+		saveToRendersFolder = True # will save a copy of the rendered kernel texture to the renders folder
+		opacity = 1
+
 
 class layouting:
 	# Dimensions as single numbers or tuples: one value = uniform scaling,
@@ -70,16 +77,21 @@ class layouting:
 	horizontalSpaceBetweenLayers = 500
 	verticalSpaceBetweenLayers = -400
 
-	# SETTINGS FOR THE FORCE ALGORITHM:
-	iterations = 1200 # starting at 0, ending one below
-	class debug:
-		drawPlots = False # If this is False, this whole debug section will be deactivated
+	class renderGif:
+		displayPlot = False
 		# With this enabled, the layouting cannot run in an async thread and will block the server
 		# You need to close the drawn plot window on the server before the layout can be sent
-		numberOfPlots = 20 # number of plots to draw during layouting iterations
-		saveAsGif = False # needs drawPlots True and numberOfPlots > 1
-		gifSizeInches = (20, 10) # determines the resolution of the gif, might depend on your screens dpi
-		gifFps = 10 # How fast the gif will play. Also depends on the number of plots defined above
+		# If saveAsGif is enabled too, this plot will not be displayed live, but just opens the gif file afterwards
+		# (in this case, the server is not blocked from executing more)
+		framesInAnimation = 20 # number of plots to draw during layouting iterations
+		saveAsGif = False # needs framesInAnimation > 1
+		plotSizeInches = (20, 10) # determines the plot size of the plot on your screen and the saved gif
+		gifDpi = 100 # determines the resolution of the gif image file (multiplied with gifSizeInches)
+		# without affecting the relative size of text and lines, like plotSizeInches would do
+		animationLength = 2 # in seconds, determines how fast the gif will play
+
+	# SETTINGS FOR THE FORCE ALGORITHM:
+	iterations = 1200 # starting at 0, ending one below
 
 	class classicRepulsion:
 		strength = 1
@@ -148,10 +160,10 @@ def checkSettings():
 					rule.withinIterations[2])
 		# Also warn if anything of that range is outside of the number of specified iterations
 		if min(rule.withinIterations) < 0 or max(rule.withinIterations) > layouting.iterations:
-				loggingFunctions.warn("Visualization settings, layouting: withinIterations of " +
-					f'{rule=}'.split('=')[0] + " contains values outside of the iterations range, " +
-					"layouting might not be executed properly. Please note that iterations start " +
-					"at 0 and end one before the number of iterations.", 5)
+			loggingFunctions.warn("Visualization settings, layouting: withinIterations of " +
+				f'{rule=}'.split('=')[0] + " contains values outside of the iterations range, " +
+				"layouting might not be executed properly. Please note that iterations start " +
+				"at 0 and end one before the number of iterations.", 5)
 	fixAndCheckWithinIterations(layouting.classicRepulsion)
 	fixAndCheckWithinIterations(layouting.overlapRepulsion)
 	fixAndCheckWithinIterations(layouting.gravity)
