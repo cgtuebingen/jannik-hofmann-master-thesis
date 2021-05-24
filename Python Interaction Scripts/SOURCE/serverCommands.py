@@ -364,7 +364,7 @@ class Request:
 	# for position=-1 (or no position specified) getParam will return the rest of command as str
 	async def getParam(self, position=-1, defaultOrType=str, raiseException=False, warnOnEmptyString=True):
 		if position == -1:
-			assert (defaultOrType is str or type(defaultOrType) is str)
+			assert defaultOrType is str or type(defaultOrType) is str
 			if len(self.command.split()) < 2 and type(defaultOrType) is str:
 				return defaultOrType
 			try:

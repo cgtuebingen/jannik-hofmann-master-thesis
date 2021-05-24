@@ -36,11 +36,11 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 	COMMAND_NOT_FOUND_FUNCTION = serverCommands.Request.commandNotFound
 
 	# check that the modules have been connected well
-	assert(callable(loggingFunctions.printlog))
-	assert(callable(commandInstance.senddebug))
-	assert(callable(COMMAND_NOT_FOUND_FUNCTION))
-	assert(type(serverCommands.commandList) is dict)
-	assert(len(serverCommands.commandList) > 0)
+	assert callable(loggingFunctions.printlog)
+	assert callable(commandInstance.senddebug)
+	assert callable(COMMAND_NOT_FOUND_FUNCTION)
+	assert type(serverCommands.commandList) is dict
+	assert len(serverCommands.commandList) > 0
 
 	# loop while the client stays connected,
 	# so that this server does not prematurely close the connection
@@ -152,11 +152,11 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			)
 
 			# Just making sure that func can only returns bool or None:
-			assert(shouldBeKeptOpen is None or type(shouldBeKeptOpen) is bool)
+			assert shouldBeKeptOpen is None or type(shouldBeKeptOpen) is bool
 
 			# If the load function returned any prepared commands, put them into chainedCommands
 			if len(loadedCommand) > 0:
-				assert(type(loadedCommand[0]) is str)
+				assert type(loadedCommand[0]) is str
 				if chainedCommands.strip() == "":
 					chainedCommands = loadedCommand[0]
 				else:

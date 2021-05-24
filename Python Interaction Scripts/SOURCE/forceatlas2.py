@@ -553,10 +553,8 @@ class ForceAtlas2:
         except ImportError:
             cynetworkx = None
 
-        assert (
-            isinstance(G, networkx.classes.graph.Graph)
-            or (cynetworkx and isinstance(G, cynetworkx.classes.graph.Graph))
-        ), "Not a networkx graph"
+        assert isinstance(G, networkx.classes.graph.Graph) or \
+            (cynetworkx and isinstance(G, cynetworkx.classes.graph.Graph)), "Not a networkx graph"
         assert isinstance(pos, dict) or (pos is None), "pos must be specified as a dictionary, as in networkx"
         assert not(self.groupLinearlyConnectedNodes and pos is None), \
             "can only group linearly connected nodes when a list of positions is given"
@@ -569,9 +567,9 @@ class ForceAtlas2:
         if quadsizes is not None:
             if not isinstance(quadsizes, numpy.ndarray):
                 quadsizes = numpy.array(quadsizes)
-            assert (quadsizes.shape[0] == M.shape[0]), \
+            assert quadsizes.shape[0] == M.shape[0], \
                 "quadsizes has the wrong length. It must have exactly as many entries as there are nodes"
-            assert (quadsizes.shape[1] == 2), \
+            assert quadsizes.shape[1] == 2, \
                 "quadsizes has the wrong dimensions. Each node entry must have exactly two float values: width and height"
         if pos is None:
             l = await self.forceatlas2(M, pos=None, quadsizes=quadsizes, iterations=iterations)
@@ -619,9 +617,9 @@ class ForceAtlas2:
         if quadsizes is not None:
             if not isinstance(quadsizes, numpy.ndarray):
                 quadsizes = numpy.array(quadsizes)
-            assert (quadsizes.shape[0] == G.shape[0]), \
+            assert quadsizes.shape[0] == G.shape[0], \
                 "quadsizes has the wrong length. It must have exactly as many entries as there are nodes"
-            assert (quadsizes.shape[1] == 2), \
+            assert quadsizes.shape[1] == 2, \
                 "quadsizes has the wrong dimensions. Each node entry must have exactly two float values: width and height"
 
         adj = to_sparse(G, weight_attr)

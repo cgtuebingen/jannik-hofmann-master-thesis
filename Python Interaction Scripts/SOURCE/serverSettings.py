@@ -106,7 +106,7 @@ def addServerScriptPath(filepath):
 	import centralController
 	# to be able to retrieve SCRIPT_PATH()
 	# needs to be in this function to avoid circular module imports
-	assert(type(filepath) is str)
+	assert type(filepath) is str
 	if filepath.startswith(('\\', '/')):
 		return centralController.SCRIPT_PATH() + filepath
 	else:
@@ -115,7 +115,7 @@ def addServerScriptPath(filepath):
 def ensureFolderEnding(filepath, remove=False):
 	if type(filepath) is list and len(filepath) == 2:
 		return [ensureFolderEnding(filepath[0], remove), filepath[1]]
-	assert(type(filepath) is str)
+	assert type(filepath) is str
 	if filepath.endswith(('\\', '/')):
 		if remove:
 			return filepath[:-1]
@@ -135,7 +135,7 @@ def separateFilename(filepath):
 	return ensureFolderEnding(filepath, remove=True)
 # Checks that the file path exists and create the dir structure if not
 def createFilepath(filepath):
-	assert(type(filepath) is str)
+	assert type(filepath) is str
 	if '.' in separateFilename(filepath)[1]:
 		# path ends with a file name, not with a folder
 		filepath = separateFilename(filepath)[0]
@@ -171,15 +171,15 @@ def checkSettings():
 		ALLOW_REMOTE_CODE_EXECUTION = False # overwrite user decision for security reasons
 		# you can theoretically disable this overwrite, but at your own risk!
 
-	assert((type(LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S) is float) or
-		(type(LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S) is int))
+	assert type(LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S) is float or \
+		type(LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S) is int
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S = max(0, LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S)
 	if LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S < 0.01:
 		msg = "LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S lower than 0.01 is not recommended for " + \
 			"easily readable log files. New lines might printed with individual timestamps!"
 		loggingFunctions.warn(msg, 1)
 
-	assert(type(MAX_MESSAGE_SIZE) is int)
+	assert type(MAX_MESSAGE_SIZE) is int
 	if MAX_MESSAGE_SIZE < 256:
 		msg = "MAX_MESSAGE_SIZE cannot be smaller than 256, otherwise unexpected behaviour " + \
 			"and recursion loops will occur! Setting MAX_MESSAGE_SIZE to 256."
@@ -190,15 +190,15 @@ def checkSettings():
 			"get passed through than its current value of {MAX_MESSAGE_SIZE} bytes."
 		loggingFunctions.warn(msg, 7)
 
-	assert(type(TIMES_TO_RETRY_ESTABLISHING_SERVER) is int)
+	assert type(TIMES_TO_RETRY_ESTABLISHING_SERVER) is int
 	if TIMES_TO_RETRY_ESTABLISHING_SERVER < 1:
 		msg = "TIMES_TO_RETRY_ESTABLISHING_SERVER has to be at least 1, otherwise the server " + \
 			"cannot be started. Setting TIMES_TO_RETRY_ESTABLISHING_SERVER to 1."
 		loggingFunctions.warn(msg, 8)
 		TIMES_TO_RETRY_ESTABLISHING_SERVER = 1
 
-	assert(type(SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER) is int or
-		type(SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER) is float)
+	assert type(SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER) is int or \
+		type(SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER) is float
 	if SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER <= 0:
 		msg = "SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER cannot be smaller than or equal to 0!\n" + \
 			"Setting SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER to 0.1"
@@ -212,7 +212,7 @@ def checkSettings():
 		msg = "No valid logpath given in settings. Logging will be disabled. This is not recommended"
 		loggingFunctions.warn(msg, 4)
 	else:
-		assert(type(LOGFILE_PATH) is str)
+		assert type(LOGFILE_PATH) is str
 		LOGFILE_PATH = addServerScriptPath(LOGFILE_PATH)
 	createFilepath(LOGFILE_PATH)
 	
