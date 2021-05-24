@@ -104,7 +104,9 @@ class Request:
 							warnText = f'Unexpected command clash! Command "{key}" starts in the same way as these commands: {joinedCommands}'
 						warnText += "\nPlease make sure that the commands are recognized correctly when the user adds spaces inbetween."
 						loggingFunctions.warn(warnText, 2)
-
+	
+	def __bool__(self): # to check if a command is not None
+		return True
 
 	# Use this function to define command aliases for the same commands
 	# originalCommand should be of type str
@@ -150,7 +152,7 @@ class Request:
 	# Sends the specified message to the websocket client and prints it in console
 	# utilizing messagepack and projects data specification.
 	# Returns a boolean that signals whether the message was small enough to be sent properly
-	async def send(self, data, printhere = True, forceDataSerializable = False, printText = None):
+	async def send(self, data, printText = True, forceDataSerializable = False):
 		if forceDataSerializable:
 			data = self.makeDataSerializable(data)
 		
@@ -177,7 +179,7 @@ class Request:
 				packed = msgpack.packb(data)
 			except:
 				if not forceDataSerializable:
-					return await self.send(data, printhere, True)
+					return await self.send(data, printText, True)
 				else: # basically raising that error itself again
 					packed = msgpack.packb(data)
 			if len(packed) > setting.MAX_MESSAGE_SIZE:
@@ -186,8 +188,9 @@ class Request:
 		
 		if message_size_too_large is False: # message can be sent
 			await self.websocket.send(packed) # actually send it via websocket
-			if printhere: # and print it in the console and debug
-				if printText is None:
+			if printText is not None and printText is not False and printText is not "":
+				# and print it in the console and debug
+				if printText is True:
 					loggingFunctions.printlog("> " + str(data), -3)
 				else:
 					loggingFunctions.printlog("> " + str(printText), -3)
@@ -223,24 +226,25 @@ class Request:
 			return False
 
 		assert type(data) is bytes
-		# only remember the filename itself. Client doesn't care about the servers folder structure
-		filename = re.split(r"[\\/]", path)[-1]
+		filesize = len(data)
+		units = "B KB MB GB TB PB EB ZB YB".split(' ')
+		while filesize > 1000 and len(units) > 1:
+			filesize /= 1000
+			units.pop(0)
+		filesize = str(round(filesize, 2)) + ' ' + units[0]
+		# get the filename itself
+		path, filename = setting.separateFilename(path)
 		# Structure of a sent file tuple:
 		struct = ("FILE", filename, data)
-		sentSuccessfully = await self.send(struct, False)
-		if sentSuccessfully:
-			# Some formatting fun
-			filename = filename.replace("_",
-				beautifulDebug.DISABLE_UNDERLINE + "_" + beautifulDebug.UNDERLINE)
-			path = beautifulDebug.special(0, 1, 0) + path.replace(filename, #beautifulDebug.UNDERLINE +
-				beautifulDebug.B_GREEN + filename #+ beautifulDebug.DISABLE_UNDERLINE
-				)
-			msg = beautifulDebug.B_GREEN + "> Sent file " + path + \
-				beautifulDebug.special(0,3,0) + " (" + len(data) + " bytes)" + \
-				beautifulDebug.B_GREEN + " via msgpack." + beautifulDebug.RESET
-			loggingFunctions.printlog(msg, -2)
-		
-		return sentSuccessfully
+		# Some formatting fun
+		#filename = beautifulDebug.underline(filename)
+		msg = beautifulDebug.B_GREEN + "Sent file "
+		msg += beautifulDebug.special(0, 3, 0) + path + os.path.sep
+		msg += beautifulDebug.B_GREEN + filename
+		msg += beautifulDebug.special(0, 3, 0) + f" ({filesize})"
+		#msg += beautifulDebug.B_GREEN + " via msgpack."
+		msg += beautifulDebug.RESET
+		return await self.send(struct, printText=msg)
 
 	# Sends a status response to the client. Statuscodes:
 	# -30 = success / completed (usually as response to commands that don’t receive data back)
@@ -525,7 +529,7 @@ class Request:
 
 				if result is not None: # Result found. Printing and sending the detailed explanation
 					explanation = 'Detailed explanation for command "' + \
-						beautifulDebug.underlinetext(result[1]) + '":\n' + result[2]
+						beautifulDebug.underline(result[1]) + '":\n' + result[2]
 					if len(result) > 4:
 						originalCommand = result[4].replace(" ", "")
 						explanation += ":\n" + commandList[originalCommand][2]
@@ -1027,7 +1031,7 @@ class Request:
 		await self.checkParams(0)
 		await self.sendstatus(-20, "Waiting for console input by user on python script execution server.")
 		newcommand = await ainput("Enter your desired command here: ")
-		await self.sendstatus(-10, f'Console input received. Continuing with command "{beautifulDebug.underlinetext(newcommand)}"')
+		await self.sendstatus(-10, f'Console input received. Continuing with command "{beautifulDebug.underline(newcommand)}"')
 		loadedCommand.append(newcommand)
 		return True
 		# old implementation:
@@ -1090,7 +1094,7 @@ class Request:
 			return False
 		else:
 			nextCommand = preparedCommands.pop(0)
-			await self.sendstatus(-10, f'Command "{beautifulDebug.underlinetext(nextCommand)}" was loaded from the list of prepared commands. Executing it now.')
+			await self.sendstatus(-10, f'Command "{beautifulDebug.underline(nextCommand)}" was loaded from the list of prepared commands. Executing it now.')
 			loadedCommand.append(nextCommand)
 			return True
 	commandList["load"] = (loadCommand, "Loads and executes the oldest prepared command",

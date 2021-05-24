@@ -75,12 +75,14 @@ def grayscale(w, text = None):
 # underlines the specified text.
 # optionally underlines all occurences within another text.
 # and optionally only if preceding by any of an array of specified words
-def underlinetext(text, withintext = None, precedingWords = None):
+def underline(text, withintext = None, precedingWords = None, dontUnderlineUnderscores = True):
 	if withintext is None:
+		if dontUnderlineUnderscores:
+			text = text.replace('_', DISABLE_UNDERLINE + '_' + UNDERLINE)
 		return UNDERLINE + text + DISABLE_UNDERLINE
 
 	elif precedingWords is None or len(precedingWords) == 0:
-		return withintext.replace(text, underlinetext(text))
+		return withintext.replace(text, underline(text))
 	
 	else:
 		if type(precedingWords) is str:
@@ -89,7 +91,7 @@ def underlinetext(text, withintext = None, precedingWords = None):
 			if not word.endswith(" "):
 				word += " "
 			withintext = withintext.replace(word + text,
-				word + underlinetext(text))
+				word + underline(text))
 		return withintext
 
 # Removes any formatting ansi escape codes applied by this module. Should be used for log files
@@ -144,7 +146,7 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 		len(commandToUnderline) > 0 and \
 		len(commandToUnderline.split()) > 0:
 
-		text = underlinetext(commandToUnderline, text, [" about", " with", "command", "Command"])
+		text = underline(commandToUnderline, text, [" about", " with", "command", "Command"])
 		# The replace function might underline parts of the text that contain the command in a
 		# sentence. However, this is negligible as it's just for formatting purposes.
 

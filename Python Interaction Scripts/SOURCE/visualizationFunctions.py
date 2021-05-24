@@ -294,7 +294,7 @@ async def debugDrawCuboidInPlot(position, size, color, rotator = 0, ignoreAxis =
 async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
 	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True):
 
-	if connection is None:
+	if not connection:
 		return await debugDrawCuboidInPlot(position, size, color, rotator)
 
 	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
@@ -383,7 +383,7 @@ async def checkEmptyQueue(connection, processDescription):
 # You have to call sendCuboidBatch to finally clear the queue after sending the last cuboid!
 async def queueCuboid(connection, position, size, color, rotator = None,
 	positionIsCenterPoint = False, processDescription = None):
-	if connection is None:
+	if not connection:
 		return await debugDrawCuboidInPlot(position, size, color, rotator)
 	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
 	cuboidQueue.append(drawResponse)
@@ -428,7 +428,7 @@ def sizeFromLayerDimensions(layerDims):
 # DEPRECATED
 # Draws the tfnet.layer structure via the client-connection
 # Returns whether we could successfully draw the architecture
-# If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
+# If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
 # Linearly = All layers spread on z axis, with their center on x = 0, y = 0
 async def drawstructureLinearly(connection = None):
 	if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
@@ -438,7 +438,7 @@ async def drawstructureLinearly(connection = None):
 	drawnLayers = [] # For later reference for drawing layer connections
 
 	# If no connection has been given, initialize matplotlib
-	if connection is None:
+	if not connection:
 		plt.axes()
 	
 	for index, layer in enumerate(ai.tfnet.layers):
@@ -522,7 +522,7 @@ async def drawstructureLinearly(connection = None):
 	await sendCuboidBatch(connection, "structure", False)
 	
 	# Displaying plot if no client connection was given
-	if connection is None:
+	if not connection:
 		plt.axis('auto')
 		plt.show()
 
@@ -639,7 +639,7 @@ class Layer:
 # DEPRECATED
 # Draws the tfnet.layer structure via the client-connection
 # Returns whether we could successfully draw the architecture
-# If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
+# If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
 # Tree Basic = Trying to align layers with their connected ones in a tree-like format
 async def drawstructureTreeBasic(connection = None):
 	if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
@@ -649,7 +649,7 @@ async def drawstructureTreeBasic(connection = None):
 	drawnLayers = [] # For later reference for drawing layer connections
 
 	# If no connection has been given, initialize matplotlib
-	if connection is None:
+	if not connection:
 		plt.axes()
 	
 	Layer.resetAllLayers()
@@ -745,14 +745,14 @@ async def drawstructureTreeBasic(connection = None):
 	await sendCuboidBatch(connection, "structure", False)
 
 	# Displaying plot if no client connection was given
-	if connection is None:
+	if not connection:
 		plt.axis('auto')
 		plt.show()
 
 	return True
 
 # Draws a given layout via the connection by sending drawing instructions.
-# If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
+# If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
 # Positions are given in an array as parameter, the other info is retrieved from ai.tfnet.layers
 async def drawLayout(connection, positions):
 	positionOffset = Coordinates(0, positions[0][1], positions[0][0]).scale(-1)
@@ -760,7 +760,7 @@ async def drawLayout(connection, positions):
 	Layer.resetAllLayers()
 
 	# If no connection has been given, initialize matplotlib
-	if connection is None:
+	if not connection:
 		plt.axes()
 	
 	for index, layer in enumerate(ai.tfnet.layers):
@@ -841,7 +841,7 @@ async def drawLayout(connection, positions):
 	await connection.sendstatus(-30, successMsg)
 
 	# Displaying plot if no client connection was given
-	if connection is None:
+	if not connection:
 		plt.axis('auto')
 		plt.show()
 
@@ -849,7 +849,7 @@ async def drawLayout(connection, positions):
 
 # Draws the tfnet.layer structure via the client-connection
 # Returns whether we could successfully draw the architecture
-# If connection is None, then the cuboids cannot be drawn but will be displayed in a graphic
+# If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
 # Using modified forceatlas2-algorithm for layouting
 async def drawstructure(connection = None):
 	if not hasattr(ai.tfnet, "layoutPositions") or ai.tfnet.layoutPositions is None:
@@ -914,11 +914,11 @@ async def drawstructure(connection = None):
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 	drawTexture = True # can be changed later if it's not deemed necessary
-	if connection is None: # here definitely necessary, so we can display the kernels to the user
+	if not connection: # here definitely necessary, so we can display the kernels to the user
 		drawTexture = True
 
 	async def status(verbosity, text):
-		if connection is None:
+		if not connection:
 			if verbosity < 0: loggingFunctions.printlog(text)
 			else: loggingFunctions.warn(text)
 		else:
@@ -1047,7 +1047,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 					progress += 1
 					processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
 						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
-					if connection is None:
+					if not connection:
 						await server.sleep(0, processDesc)
 					else:
 						position = Coordinates(
@@ -1068,7 +1068,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 						)
 						await queueCuboid(connection, position, size, color, processDescription = processDesc)
 
-	if connection is not None:
+	if connection:
 		await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
 	
 	render = (render * 255).astype(np.uint8)
@@ -1077,7 +1077,9 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 	if design.kernels.renderTexture.saveToRendersFolder:
 		filepath = ai.externalImagePath(f"kernels-layer-{layerIndex}.png", True)
 		Image.fromarray(render).save(filepath)
-	if connection is None or design.kernels.renderTexture.displayPlot:
+		if connection:
+			connection.sendfile(filepath)
+	if not connection or design.kernels.renderTexture.displayPlot:
 		os.startfile(filepath)
 
 
