@@ -6,6 +6,7 @@
 # USED LIBRARIES
 import re
 import os
+import math
 
 # LOCAL IMPORTS
 import serverSettings as setting
@@ -153,8 +154,69 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 	# Return the formatted text, followed by a reset signal for default future output
 	return colorcode + text + RESET
 
+
 def clearScreen():
 	if os.name == 'nt': # windows
 		os.system('cls')
 	else: # os.name == 'posix' # linux or mac
 		os.system('clear')
+
+
+def consoleWidth():
+	try:
+		return os.get_terminal_size()[0]
+	except:
+		return 80
+
+def getCleanLinebreak(text, width = None, splitAtSpaces = True):
+	if width is None:
+		width = consoleWidth()
+	text = text.strip()
+	text_line = text[:width]
+	if '\n' in text_line:
+		return text.split('\n', 1)
+	elif splitAtSpaces and len(text) > len(text_line) and text_line[:-1] != ' ' and \
+		text[width] != ' ' and ' ' in text_line:
+			text_line = text_line.rsplit(' ', 1)[0]
+			return text_line, text[len(text_line)+1:]
+	else:
+		return text_line, text[len(text_line):]
+
+def printWithLinebreaks(text):
+	while len(text):
+		text_line, text = getCleanLinebreak(text)
+		print(text_line)
+
+def mapToText(map, spacing = 3, max_line_length = None, max_key_length = .5, splitAtSpaces = True,
+	before_key = '', after_key = '', before_value = '', after_value = ''):
+
+	if max_line_length is None:
+		max_line_length = consoleWidth()
+	if type(max_key_length) is float:
+		max_key_length = int(math.floor((max_line_length - spacing) * max_key_length))
+	key_lengths = [len(str(k) + before_key + after_key) for k in map.keys()]
+	max_key_length = min(max_key_length, max(key_lengths))
+	output = ""
+	for key, value in map.items():
+		key = before_key + str(key) + after_key
+		value = before_value + str(value) + after_value
+		while len(key) or len(value):
+			key_line, key = getCleanLinebreak(key, max_key_length, splitAtSpaces)
+			value_line, value = getCleanLinebreak(key,
+				max_line_length - spacing - max_key_length, splitAtSpaces)
+			spaces = ' ' * (spacing + max_key_length - len(key_line))
+			output += key_line + spaces + value_line + '\n'
+	return output[:-1]
+
+def filesize(data):
+	if type(data) is int:
+		filesize = data
+	elif type(data) is bin:
+		filesize = len(data)
+	else:
+		filesize = len(str(data))
+	units = "B KB MB GB TB PB EB ZB YB".split(' ')
+	while filesize > 1000 and len(units) > 1:
+		filesize /= 1000
+		units.pop(0)
+	return str(round(filesize, 2)) + ' ' + units[0]

@@ -188,7 +188,7 @@ class Request:
 		
 		if message_size_too_large is False: # message can be sent
 			await self.websocket.send(packed) # actually send it via websocket
-			if printText is not None and printText is not False and printText is not "":
+			if printText is not None and printText is not False and printText != "":
 				# and print it in the console and debug
 				if printText is True:
 					loggingFunctions.printlog("> " + str(data), -3)
@@ -226,12 +226,7 @@ class Request:
 			return False
 
 		assert type(data) is bytes
-		filesize = len(data)
-		units = "B KB MB GB TB PB EB ZB YB".split(' ')
-		while filesize > 1000 and len(units) > 1:
-			filesize /= 1000
-			units.pop(0)
-		filesize = str(round(filesize, 2)) + ' ' + units[0]
+		filesize = beautifulDebug.filesize(data)
 		# get the filename itself
 		path, filename = setting.separateFilename(path)
 		# Structure of a sent file tuple:
@@ -458,7 +453,7 @@ class Request:
 				await self.senddebug(-1, 'Here are all commands recognized by the python interaction ' +
 				'server.\nType "help [command]" for a more detailed explanation of a specific command.\n' +
 				'All commands can also be typed without spaces in the command name.')
-				await self.send(("LIST OF ALL AVAILABLE COMMANDS", result))
+				await self.sendstatus(-30, "LIST OF ALL AVAILABLE COMMANDS:\n" + beautifulDebug.mapToText(result))
 			elif helpString.startswith(HELP_SEARCH) or helpString.startswith(HELP_DEEP_SEARCH):
 				# Do a search for descriptions containing this word
 				deepSearch = helpString.startswith(HELP_DEEP_SEARCH)
@@ -478,7 +473,8 @@ class Request:
 					f'server containing "{helpString}" in their description.\n' +
 					'Type "help [command]" for a more detailed explanation of a specific ' +
 					'command.\nAll commands can also be typed without spaces in the name.')
-					await self.send((f'LIST OF COMMANDS WITH DESCRIPTION CONTAINING "{helpString}"', result))
+					await self.sendstatus(-30, f'LIST OF COMMANDS WITH DESCRIPTION CONTAINING "{helpString}"\n' +
+						beautifulDebug.mapToText(result))
 					return
 				else:
 					originalCommand = helpString
@@ -510,7 +506,8 @@ class Request:
 						f'server mentioning "{helpString}" in their description or usage.\n' +
 						'Type "help [command]" for a more detailed explanation of a specific ' +
 						'command.\nAll commands can also be typed without spaces in the name.')
-						await self.send((f'LIST OF COMMANDS MENTIONING "{helpString}"', result))
+						await self.sendstatus(-30, f'LIST OF COMMANDS MENTIONING "{helpString}"\n' +
+							beautifulDebug.mapToText(result))
 					else:
 						await self.sendstatus(12,
 							'Command matching or mentioning "' + originalCommand +
@@ -555,7 +552,8 @@ class Request:
 						f'server starting with "{helpString}".\n' +
 						'Type "help [command]" for a more detailed explanation of a specific command.\n' +
 						'All commands can also be typed without spaces in the command name.')
-						await self.send((f'LIST OF COMMANDS STARTING WITH "{helpString}"', result))
+						await self.sendstatus(-30, f'LIST OF COMMANDS STARTING WITH "{helpString}"\n' +
+							beautifulDebug.mapToText(result))
 					else:
 						# Try to list all commands that contain this string
 						result = {value[1]:value[2] for (key,value) in commandList.items()
@@ -572,7 +570,8 @@ class Request:
 							f'server containing "{helpString}".\n' +
 							'Type "help [command]" for a more detailed explanation of a specific ' +
 							'command.\nAll commands can also be typed without spaces in the name.')
-							await self.send((f'LIST OF COMMANDS CONTAINING "{helpString}"', result))
+							await self.sendstatus(-30, f'LIST OF COMMANDS CONTAINING "{helpString}"\n' +
+								beautifulDebug.mapToText(result))
 						else: # Still nothing
 							# Let's try further searching for these words
 							return await self.displayhelp("search " + helpString)
@@ -595,7 +594,8 @@ class Request:
 			'python interaction server.\nType "help all" for a complete list of all individual commands.\n' +
 			'Type "help [command]" for a more detailed explanation of a specific command.\n' +
 			'All commands can also be typed without spaces in the command name.')
-			await self.send(("GROUPED LIST OF AVAILABLE COMMANDS", result))
+			await self.sendstatus(-30, f'GROUPED LIST OF AVAILABLE COMMANDS\n' +
+				beautifulDebug.mapToText(result))
 			# await self.sendstatus(-30, "Short list of available commands: " + ", ".join(sorted(commandList.keys()))) # don't need that
 	commandList["help"] = (displayhelp,
 		"Displays available commands or detailed info about a certain command",
@@ -612,7 +612,7 @@ class Request:
 		await self.checkParams(0, 1)
 		if not await self.checkParams(1, 1, False):
 			# Just display the current verbosity level
-			await self.send(setting.DESIRED_VERBOSITY)
+			await self.sendstatus(-30, "Current verbosity level: " + str(setting.DESIRED_VERBOSITY))
 		else:
 			newVerbosity = await self.getParam(1, setting.DESIRED_VERBOSITY)
 			if setting.DESIRED_VERBOSITY == newVerbosity:
@@ -778,7 +778,7 @@ class Request:
 			if param.lower() == "port":
 				return await self.serverIPPort(warnParameters = False)
 		await self.checkParams(0)
-		await self.send(setting.SERVER_IP)
+		await self.sendstatus(-30, "IP address of this websocket server: " + str(setting.SERVER_IP))
 	commandList["server ip"] = (serverIP, "Returns IP address of this websocket server",
 		'Does not take parameters and responds with a string.\n' +
 		'IP is returned according to the python server settings')
@@ -786,7 +786,7 @@ class Request:
 
 	async def serverPort(self, **kwargs):
 		await self.checkParams(0)
-		await self.send(setting.SERVER_PORT)
+		await self.sendstatus(-30, "Port of this websocket server: " + str(setting.SERVER_PORT))
 	commandList["server ip"] = (serverIP, "Returns port of this websocket server",
 		'Does not take parameters and responds with an integer.\n' +
 		'Port is returned according to the python server settings')
@@ -795,7 +795,8 @@ class Request:
 	async def serverIPPort(self, *, warnParameters = True, **kwargs):
 		if warnParameters:
 			await self.checkParams(0)
-		await self.send(setting.SERVER_IP + ":" + str(setting.SERVER_PORT))
+		await self.sendstatus(-30, "IP and port of this websocket server: " +
+			str(setting.SERVER_IP) + ":" + str(setting.SERVER_PORT))
 	commandList["server address"] = (serverIPPort, "Returns IP address and port of this websocket server",
 		'Does not take parameters and responds with a string.\n' +
 		'IP and port are returned according to the python server settings')
@@ -1048,7 +1049,7 @@ class Request:
 	async def prepareCommand(self, **kwargs):
 		global preparedCommands
 		if await self.checkParams(0, 0, False):
-			await self.send(("PREPARED COMMANDS", preparedCommands))
+			await self.sendstatus(-30, "PREPARED COMMANDS:\n    " + '\n    '.join(preparedCommands))
 		else:
 			param = await self.getParam()
 			param = param.strip()
@@ -1108,7 +1109,7 @@ class Request:
 	async def checkScriptVersion(self, **kwargs):
 		await self.checkParams(1, 2)
 		if not await self.checkParams(warnUser=False):
-			await self.send(("SERVER SCRIPT VERSION",  server.PYTHON_INTERACTION_SCRIPT_VERSION))
+			await self.sendstatus(-30, "SERVER SCRIPT VERSION: " + str(server.PYTHON_INTERACTION_SCRIPT_VERSION))
 			return
 		criticalWarning = True
 		if await self.checkParams(2, math.inf, False):
@@ -1307,6 +1308,7 @@ class Request:
 		try:
 			v = ai.tfversion()
 			await self.send(v)
+			await self.sendstatus(-30, "Using tensorflow version " + str(v))
 		except:
 			await self.sendstatus(16, f"Couldn't retrieve tensorflow version!\n" +
 				traceback.format_exc())
@@ -1398,6 +1400,22 @@ class Request:
 		global tfNetwork
 		if await self.checkParams(1, 1, False):
 			attr = await self.getParam(1, str, True)
+			if attr.lower() == "overview":
+				def shortenVar(var):
+					if type(var) is np.ndarray:
+						return f'ndarray ({var.shape})'
+					if len(str(var)) > 300:
+						output = str(type(var)).split("'")[1]
+						try: output += " of length " + str(len(var))
+						except: pass
+						output += f" ({beautifulDebug.filesize(var)})"
+						output += ':\n' + str(var)[:200] + '...'
+						return output
+					return str(var)
+				overview = {k: shortenVar(v) for (k, v) in vars(ai.tfnet).items()}
+				await self.sendstatus(-30, "Available variables in the currently loaded network:\n" +
+					beautifulDebug.mapToText(overview, 3))
+				return
 			try:
 				await self.send(getattr(ai.tfnet, attr))
 			except:
@@ -1410,7 +1428,9 @@ class Request:
 	commandList["tf get vars"] = (tf_getvars, "Returns all tf variables and information currently loaded",
 		"Retrieves any information already known about the loaded tensorflow network.\n" +
 		"Returns a map of the continually expanding class type that stores information about the " +
-		"neural network\nThis data is continually expanded by more commands and information requests")
+		"neural network\nThis data is continually expanded by more commands and information requests.\n" +
+		"§[varname]§ only gives back the requested variable.\n§OVERVIEW§ returns a list of available vars " +
+		"that can be read by humans due to capped output")
 
 
 	async def tf_refreshtrainablevars(self, returnShapeDict=False, **kwargs):
@@ -1426,8 +1446,9 @@ class Request:
 			
 		shapeDict = ai.tfRefreshTrainableVars()
 		if printVars:
-			debugMsg = ["The following trainable variable shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
-			await self.send(debugMsg)
+			debugMsg = "The following trainable variable shapes have been retrieved {{index:layername, kernelshape}}:\n" +\
+				beautifulDebug.mapToText(shapeDict, 1)
+			await self.sendstatus(-30, debugMsg)
 		await self.sendstatus(-30, f"Trainable variables of the loaded tf network have been retrieved and stored.")
 		if returnShapeDict:
 			return shapeDict
@@ -1447,8 +1468,9 @@ class Request:
 			await self.sendstatus(-10, f"Refreshing trainable variables of the network...")
 			shapeDict = await self.tf_refreshtrainablevars(returnShapeDict=True)
 			shapeDict = {name.replace('/kernel:0', ''): str(shape) for (name, shape) in shapeDict.items() if '/kernel:0' in name}
-			debugMsg = ["The following kernel shapes have been retrieved {{index:layername, kernelshape}}:", shapeDict]
-			await self.send(debugMsg)
+			debugMsg = "The following kernel shapes have been retrieved {{index:layername, kernelshape}}:\n" + \
+				beautifulDebug.mapToText(shapeDict, 1)
+			await self.sendstatus(-30, debugMsg)
 			return
 		if refresh or not hasattr(ai.tfnet, "validstructure"):
 			if refresh:

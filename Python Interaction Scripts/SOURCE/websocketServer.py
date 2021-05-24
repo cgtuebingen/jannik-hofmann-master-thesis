@@ -146,7 +146,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 
 			# Execute corresponding function, relaying websocket connection and command
 			# Functions returns whether it wants the connection to be kept open after execution
-			shouldBeKeptOpen = await commandInstance.func(
+			shouldBeKeptOpen = await func(commandInstance,
 				# Defining additional parameters needed for certain command functions
 				loadedCommand=loadedCommand, # for console and load
 			)

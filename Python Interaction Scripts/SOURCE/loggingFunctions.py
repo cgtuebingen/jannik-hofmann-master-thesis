@@ -101,6 +101,9 @@ def printlog(text, verbosity = None):
 	# Reverse any formatting if the user doesn't want it
 	if not setting.PRINT_COLOR_ANSI_CODES:
 		text = beautifulDebug.removeAnsiEscapeCharacters(text)
-	print(text)
+	if setting.SMART_LINE_BREAKS:
+		beautifulDebug.printWithLinebreaks(text)
+	else:
+		print(text)
 	# Log function does its own removal of formatting, no need to worry about it here
 	return log(text)

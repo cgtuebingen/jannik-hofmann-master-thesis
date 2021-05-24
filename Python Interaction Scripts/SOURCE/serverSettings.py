@@ -77,6 +77,8 @@ INTERNAL_IMG_PATH = R"\..\filecache"
 # Also changes what is stored in the logfile.
 DESIRED_VERBOSITY = -10
 
+# Whether or not the server should try to break printed text at spaces
+SMART_LINE_BREAKS = True
 # Prints colored output in the console. Nevertheless, ansi color codes will be emitted from the log
 PRINT_COLOR_ANSI_CODES = True
 # Respond with color-formatted debug and status strings to the client.
@@ -226,14 +228,22 @@ def checkSettings():
 
 	if PRINT_COLOR_ANSI_CODES:
 		if ONLY_USE_SIMPLE_ANSI_CODES:
-			print('\u001b[40m' + beautifulDebug.ansicode(30) + beautifulDebug.ansicode(120, False) + # green text on black background
+			text = ('\u001b[40m' + beautifulDebug.ansicode(30) + beautifulDebug.ansicode(120, False) + # green text on black background
 			"You can disable ONLY_USE_SIMPLE_ANSI_CODES in the server settings for more " +
 			"nuanced colors in the console output.\n" + beautifulDebug.RESET)
+			if SMART_LINE_BREAKS:
+				beautifulDebug.printWithLinebreaks(text)
+			else:
+				print(text)
 		else:
-			print('\u001b[40m' + beautifulDebug.YELLOW + beautifulDebug.ansicode(232, False) + # green text on black background
+			text = ('\u001b[40m' + beautifulDebug.YELLOW + beautifulDebug.ansicode(232, False) + # green text on black background
 			"Please enable ONLY_USE_SIMPLE_ANSI_CODES in the server settings for correct colors in " +
 			"the console output!\nOtherwise, warnings and errors could be overlooked easily." +
 			beautifulDebug.RESET)
+			if SMART_LINE_BREAKS:
+				beautifulDebug.printWithLinebreaks(text)
+			else:
+				print(text)
 
 
 
