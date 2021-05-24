@@ -146,7 +146,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 
 			# Execute corresponding function, relaying websocket connection and command
 			# Functions returns whether it wants the connection to be kept open after execution
-			shouldBeKeptOpen = await func(commandInstance,
+			shouldBeKeptOpen = await commandInstance.func(
 				# Defining additional parameters needed for certain command functions
 				loadedCommand=loadedCommand, # for console and load
 			)
@@ -172,7 +172,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 					not setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
 					# Executed server command function returned False
 					# and the settings specified to close the connection in this case
-					msg = beautifulDebug.underlinetext(chainedCommands)
+					msg = beautifulDebug.underline(chainedCommands)
 					msg = 'Further chained commands ' + msg + \
 						' will not be executed, because the command ' + commandInstance.command + \
 						" provided a negative result, failed or threw an error!"
