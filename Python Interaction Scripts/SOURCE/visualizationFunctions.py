@@ -1082,8 +1082,8 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 						def treatWithResolution(val):
 							return int(round(val / resolution))
 						render[
-							treatWithResolution(x) : treatWithResolution(x + size.x),
-							treatWithResolution(y) : treatWithResolution(y + size.y)
+							treatWithResolution(y) : treatWithResolution(y + size.y),
+							treatWithResolution(x) : treatWithResolution(x + size.x)
 						] = color + [design.kernels.renderTexture.opacity]
 					if connection and design.kernels.spawnIndividualCuboids:
 						position = Coordinates(
@@ -1095,8 +1095,9 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 							+ x
 						, # y
 							+ Layer.layerList[layerIndex].position.y
-							- structureHeight / 2
-							+ y
+							+ structureHeight / 2
+							- y
+							- size.y
 						, # z
 							+ Layer.layerList[layerIndex].position.z
 							- Layer.layerList[layerIndex].size.z / 2
