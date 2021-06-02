@@ -304,6 +304,36 @@ async def debugDrawCuboidInPlot(position, size, color, rotator = 0, ignoreAxis =
 			angle = 180-rotator.z)
 		plt.gca().add_patch(rectangle)
 
+# Contains all of the drawing instructions that have been queued into batches
+cuboidQueue = []
+lastCheckEmptyQueue = None
+lastQueueEmptiedAt = None
+def resetCuboidQueue():
+	global cuboidQueue, lastQueueEmptiedAt
+	cuboidQueue = []
+	lastQueueEmptiedAt = time.time()
+
+async def waitUntilReadyToDraw(processDescription):
+	global readyToDraw
+	for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
+		if readyToDraw:
+			return True
+		await server.sleep(design.recheckDrawReadyInterval,
+			'Waiting for "server draw next" request by client before drawing ' + processDescription)
+	readyToDraw = True
+	return False
+
+async def waitForServerDrawNext(processDescription):
+	global readyToDraw
+	readyToDraw = False
+	await server.sleep(0, processDescription)
+	for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
+		if readyToDraw:
+			return
+		await server.sleep(sleepInterval,
+			'Waiting for "server draw next" request by client after ' + processDescription)
+	readyToDraw = True
+
 # Spawns a cuboid at the specified coordinates with the specified color via a client-connection
 # Ignores batches and just spawns it directly.
 async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
@@ -312,21 +342,17 @@ async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
 	if not connection:
 		return await debugDrawCuboidInPlot(position, size, color, rotator)
 
-	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
-	await connection.send(drawResponse)
 	if processDescription is None:
 		processDescription = "Spawning cuboids in the virtual world"
 	else:
 		processDescription = "Spawning cuboids in the virtual world for " + processDescription
+
+	await waitUntilReadyToDraw(processDescription)
+
+	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
+	await connection.send(drawResponse)
 	if waitAfterwardsForServerDrawNext:
-		global readyToDraw
-		readyToDraw = False
-		await server.sleep(0, processDescription)
-		for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
-			if readyToDraw:
-				return
-			await server.sleep(design.recheckDrawReadyInterval,
-				'Waiting for "server draw next" request by client after ' + processDescription)
+		await waitForServerDrawNext(processDescription)
 
 # Directly spawns an image at the specified coordinates via a client-connection, does not use batch
 async def spawnImage(connection, filepath, position, size, rotator = None,
@@ -337,51 +363,33 @@ async def spawnImage(connection, filepath, position, size, rotator = None,
 		return
 
 	drawResponse = await packImage(filepath, position, size, rotator, positionIsCenterPoint)
-	await connection.send(drawResponse)
+
 	if processDescription is None:
 		processDescription = "Spawning image in the virtual world"
 	else:
 		processDescription = "Spawning image in the virtual world for " + processDescription
-	if waitAfterwardsForServerDrawNext:
-		global readyToDraw
-		readyToDraw = False
-		await server.sleep(0, processDescription)
-		for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
-			if readyToDraw:
-				return
-			await server.sleep(design.recheckDrawReadyInterval,
-				'Waiting for "server draw next" request by client after ' + processDescription)
+	
+	await waitUntilReadyToDraw(processDescription)
 
-# Contains all of the drawing instructions that have been queued into batches
-cuboidQueue = []
-lastCheckEmptyQueue = None
-lastQueueEmptiedAt = None
-def resetCuboidQueue():
-	global cuboidQueue, lastQueueEmptiedAt
-	cuboidQueue = []
-	lastQueueEmptiedAt = time.time()
+	await connection.send(drawResponse)
+	if waitAfterwardsForServerDrawNext:
+		await waitForServerDrawNext(processDescription)
 
 # Sends the whole cuboidQueue as batch or drawing instructions to the client
 async def sendCuboidBatch(connection, processDescription, waitAfterwardsForServerDrawNext=True):
-	await connection.send(("SPAWN CUBOID BATCH", cuboidQueue),
-		printText=f"SPAWN CUBOID BATCH containing {len(cuboidQueue)} objects up to {processDescription}.")
-	resetCuboidQueue()
 	if processDescription is None:
 		processDescription = "Spawning cuboids in the virtual world"
 	else:
 		processDescription = "Spawning cuboids in the virtual world for " + processDescription
+	
+	await waitUntilReadyToDraw(processDescription)
+	
+	await connection.send(("SPAWN CUBOID BATCH", cuboidQueue),
+		printText=f"SPAWN CUBOID BATCH containing {len(cuboidQueue)} objects up to {processDescription}.")
+	resetCuboidQueue()
 	await server.sleep(0, processDescription)
 	if waitAfterwardsForServerDrawNext:
-		global readyToDraw
-		readyToDraw = False
-		sleepInterval = design.maxDrawWaitTimeout
-		while sleepInterval > 0.01: sleepInterval /= 2
-		for i in range(int(design.maxDrawWaitTimeout / sleepInterval)):
-			if readyToDraw:
-				return
-			await server.sleep(sleepInterval,
-				'Waiting for "server draw next" request by client after ' + processDescription)
-		readyToDraw = True
+		await waitForServerDrawNext(processDescription)
 
 sleepInterval = design.checkSentBatchAfter
 while sleepInterval > 0.05: sleepInterval /= 2
@@ -394,6 +402,8 @@ async def checkEmptyQueue(connection, processDescription):
 	startTime = time.time()
 	while time.time() < startTime + design.checkSentBatchAfter:
 		await server.sleep(sleepInterval, "Queueing cuboid spawn instructions")
+		if lastQueueEmptiedAt is None:
+			return
 		if lastCheckEmptyQueue != startTime:
 			# checkEmptyQueue has been called again in the meantime and is running in a later instance.
 			# Therefore we can safely terminate this instance
@@ -951,17 +961,21 @@ async def drawstructure(connection = None):
 	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
-async def drawKernels(connection, layerIndex, refreshTrainVars=False):
-	renderTexture = not design.kernels.spawnIndividualCuboids or \
-		design.kernels.renderTexture.saveToRendersFolder or \
-		not connection
-
+async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True):
 	async def status(verbosity, text):
 		if not connection:
 			if verbosity < 0: loggingFunctions.printlog(text)
 			else: loggingFunctions.warn(text)
 		else:
 			await connection.sendstatus(verbosity, text)
+	
+	filename = f"kernels-layer-{layerIndex}.png"
+	filepath = ai.internalCachePath(filename)
+	canUseCachedFile = canUseCachedFile and os.path.exists(filepath) and \
+		not (connection and design.kernels.spawnIndividualCuboids)
+	renderTexture = not design.kernels.spawnIndividualCuboids or \
+		design.kernels.renderTexture.saveToRendersFolder or \
+		not connection
 	
 	if len(Layer.layerList) <= layerIndex:
 		await status(16, f"Layer {layerIndex} doesn't exist! The index {layerIndex} is higher " +
@@ -1017,104 +1031,111 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 		spacing.y *= size.y
 	structureWidth = groups[0] * pixelsPerGroup[0] * size.x + (groups[0]-1) * spacing.x
 	structureHeight = groups[1] * pixelsPerGroup[1] * size.y + (groups[1]-1) * spacing.y
-	resolution = design.kernels.defaultPixelDimensions[0] / design.kernels.renderTexture.defaultPixelResolution
 
-	if renderTexture:
-		render = np.zeros([int(round(structureHeight / resolution)), int(round(structureHeight / resolution)), 4])
+	if not canUseCachedFile: # (re)creating the texture file for all of the kernels
+		resolution = design.kernels.defaultPixelDimensions[0] / design.kernels.renderTexture.defaultPixelResolution
 
-	# Some subfunctions for color normalization and editing
-	def makeExponent(value): # takes a value from 0 to 100
-		if math.isclose(value, 50): return 1
-		elif value > 50: return 1 / (1 - (50 - value) / 50)
-		else: return 1 / makeExponent(100 - value)
-	brightnessExponent = makeExponent(design.kernels.brightness)
-	contrastExponent = makeExponent(design.kernels.contrast)
-	def normalizeColor(value):
-		value /= max(np.max(kernel), -np.min(kernel))
-		if value >= 0: value **= contrastExponent
-		else: value = -(-value)**contrastExponent
-		value = value / 2 + 0.5
-		return value ** brightnessExponent
-	
-	progress = 0
-	for groupy in range(groups[1]):
-		for groupx in range(groups[0]):
-			for pixely in range(pixelsPerGroup[1]):
-				for pixelx in range(pixelsPerGroup[0]):
-					try:
-						nplocation = [1] * len(kernel.shape)
-						if len(kernel.shape) > 0: nplocation[0] = pixelx
-						if len(kernel.shape) > 1: nplocation[1] = pixely
-						if not colored:
+		if renderTexture:
+			render = np.zeros([int(round(structureHeight / resolution)), int(round(structureWidth / resolution)), 4])
+
+		# Some subfunctions for color normalization and editing
+		def makeExponent(value): # takes a value from 0 to 100
+			if math.isclose(value, 50): return 1
+			elif value > 50: return 1 / (1 - (50 - value) / 50)
+			else: return 1 / makeExponent(100 - value)
+		brightnessExponent = makeExponent(design.kernels.brightness)
+		contrastExponent = makeExponent(design.kernels.contrast)
+		def normalizeColor(value):
+			value /= max(np.max(kernel), -np.min(kernel))
+			if value >= 0: value **= contrastExponent
+			else: value = -(-value)**contrastExponent
+			value = value / 2 + 0.5
+			return value ** brightnessExponent
+		
+		progress = 0
+		for groupy in range(groups[1]):
+			for groupx in range(groups[0]):
+				for pixely in range(pixelsPerGroup[1]):
+					for pixelx in range(pixelsPerGroup[0]):
+						try:
+							nplocation = [1] * len(kernel.shape)
+							if len(kernel.shape) > 0: nplocation[0] = pixelx
+							if len(kernel.shape) > 1: nplocation[1] = pixely
+							if not colored:
+								if wrapping:
+									nplocation[2] = groupx + groupy * groups[0]
+								else:
+									if len(kernel.shape) > 2: nplocation[2] = groupx
+									if len(kernel.shape) > 3: nplocation[3] = groupy
+								color = normalizeColor(kernel[tuple(nplocation)])
+							
+							else: # colored
+								if wrapping:
+									nplocation[3] = groupx + groupy * groups[0]
+								else:
+									if len(kernel.shape) > 3: nplocation[3] = groupx
+									if len(kernel.shape) > 4: nplocation[4] = groupy
+								color = []
+								for nplocation[2] in range(3):
+									color.append(normalizeColor(kernel[tuple(nplocation)]))
+						except IndexError:
+							# Can't be pixelx or pixely due to groups intialization from kernel.shape
+							# So we definitely need to break out of the pixelx, pixely and groupx loops
+							pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
+							# Now decide on whether we need to break out of all of the loops...
 							if wrapping:
-								nplocation[2] = groupx + groupy * groups[0]
+								if groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
 							else:
-								if len(kernel.shape) > 2: nplocation[2] = groupx
-								if len(kernel.shape) > 3: nplocation[3] = groupy
-							color = normalizeColor(kernel[tuple(nplocation)])
+								if groupy > kernel.shape[3+colored]: groupy = math.inf
+							break # breaking out
 						
-						else: # colored
-							if wrapping:
-								nplocation[3] = groupx + groupy * groups[0]
-							else:
-								if len(kernel.shape) > 3: nplocation[3] = groupx
-								if len(kernel.shape) > 4: nplocation[4] = groupy
-							color = []
-							for nplocation[2] in range(3):
-								color.append(normalizeColor(kernel[tuple(nplocation)]))
-					except IndexError:
-						# Can't be pixelx or pixely due to groups intialization from kernel.shape
-						# So we definitely need to break out of the pixelx, pixely and groupx loops
-						pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
-						# Now decide on whether we need to break out of all of the loops...
-						if wrapping:
-							if groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
+						x = (groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x)
+						y = (groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y)
+						progress += 1
+						processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
+							f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
+						if renderTexture:
+							def treatWithResolution(val):
+								return int(round(val / resolution))
+							render[
+								treatWithResolution(y) : treatWithResolution(y + size.y),
+								treatWithResolution(x) : treatWithResolution(x + size.x)
+							] = color + [design.kernels.renderTexture.opacity]
+						if connection and design.kernels.spawnIndividualCuboids:
+							position = Coordinates(
+							# x
+								+ Layer.layerList[layerIndex].position.x
+								- Layer.layerList[layerIndex].size.x / 2
+								- design.kernels.spacingFromLayer
+								- structureWidth
+								+ x
+							, # y
+								+ Layer.layerList[layerIndex].position.y
+								+ structureHeight / 2
+								- y
+								- size.y
+							, # z
+								+ Layer.layerList[layerIndex].position.z
+								- Layer.layerList[layerIndex].size.z / 2
+								- size.z / 2
+							)
+							await queueCuboid(connection, position, size, color, processDescription = processDesc)
 						else:
-							if groupy > kernel.shape[3+colored]: groupy = math.inf
-						break # breaking out
-					
-					x = (groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x)
-					y = (groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y)
-					progress += 1
-					processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
-						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
-					if renderTexture:
-						def treatWithResolution(val):
-							return int(round(val / resolution))
-						render[
-							treatWithResolution(y) : treatWithResolution(y + size.y),
-							treatWithResolution(x) : treatWithResolution(x + size.x)
-						] = color + [design.kernels.renderTexture.opacity]
-					if connection and design.kernels.spawnIndividualCuboids:
-						position = Coordinates(
-						# x
-							+ Layer.layerList[layerIndex].position.x
-							- Layer.layerList[layerIndex].size.x / 2
-							- design.kernels.spacingFromLayer
-							- structureWidth
-							+ x
-						, # y
-							+ Layer.layerList[layerIndex].position.y
-							+ structureHeight / 2
-							- y
-							- size.y
-						, # z
-							+ Layer.layerList[layerIndex].position.z
-							- Layer.layerList[layerIndex].size.z / 2
-							- size.z / 2
-						)
-						await queueCuboid(connection, position, size, color, processDescription = processDesc)
-					else:
-						await server.sleep(0, processDesc)
-	if connection and design.kernels.spawnIndividualCuboids:
-		await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
+							await server.sleep(0, processDesc)
+
+		# After looping through all of the kernels
+		if connection and design.kernels.spawnIndividualCuboids:
+			await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
+		if renderTexture:
+			render = (render * 255).astype(np.uint8)
+			Image.fromarray(render).save(filepath)
+			if design.kernels.renderTexture.saveToRendersFolder:
+				externalFilepath = ai.externalImagePath(filename, True)
+				Image.fromarray(render).save(externalFilepath)
+	
+	# Sending the cached texture, this gets also executed if we can use the cached file
+	# and skipped rendering it again
 	if renderTexture:
-		render = (render * 255).astype(np.uint8)
-		filepath = ai.internalCachePath(f"kernels-layer-{layerIndex}.png")
-		Image.fromarray(render).save(filepath)
-		if design.kernels.renderTexture.saveToRendersFolder:
-			externalFilepath = ai.externalImagePath(f"kernels-layer-{layerIndex}.png", True)
-			Image.fromarray(render).save(externalFilepath)
 		if connection:
 			await connection.sendfile(filepath)
 			if not design.kernels.spawnIndividualCuboids:
@@ -1133,7 +1154,12 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 						- structureHeight / 2
 					)
 				size = Coordinates(structureWidth, size.z, structureHeight)
+				await server.sleep(0.2, 'Drawing kernel textures for layer ' + str(layerIndex))
 				rotator = Coordinates(90, 0, 0)
+				await spawnImage(connection, filepath, position, size, rotator, False,
+					f"kernel texture of layer {layerIndex}")
+				await server.sleep(0.2, 'Drawing kernel textures for layer ' + str(layerIndex))
+				rotator = Coordinates(90, 0, 180)
 				await spawnImage(connection, filepath, position, size, rotator, False,
 					f"kernel texture of layer {layerIndex}")
 				# TODO: Change filepath to path relative to client

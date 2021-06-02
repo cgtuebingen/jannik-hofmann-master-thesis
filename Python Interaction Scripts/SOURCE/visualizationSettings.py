@@ -56,6 +56,9 @@ class kernels:
 	contrast = 70 # default 50, grey 0, black/white 100, changes kernel contrast and saturation at the same time
 	spawnIndividualCuboids = False # otherwise spawns a plane with a rendered texture image of all the kernels.
 	# Recommended to be set to False
+	useAlreadyCachedTextures = False # whether to use the already saved textures when they have been cached.
+	# If True, does not recaculate kernels again unless forced to by the command or by spawnIndividualCuboids
+	# You might want to deactivate this if the global variables change (e.g. with different checkpoints)
 
 	class renderTexture:
 		displayTextureImage = False
