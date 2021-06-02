@@ -18,6 +18,13 @@ def onModuleReload(): checkSettings()
 DEBUG_USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary
 # This allows the server to draw a precached structure without loading any model
 
+# Here you can define your own macros that get recognized as commands
+# Use these to define more complicated behaviour or make routines quickly available
+# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
+# To reload these macros you need to execute the command "server reload serverCommands"
+COMMAND_MACROS = {
+	"fresh": "server reload vis design & tf draw layers & tf draw kernel",
+}
 
 # WEBSOCKET SERVER ADDRESS
 SERVER_IP = "localhost"
@@ -153,7 +160,7 @@ def checkSettings():
 	AVAILABLE_NN_PATHS, DEFAULT_LOAD_NN_PATH, LOGFILE_PATH, DESIRED_VERBOSITY, \
 	PRINT_COLOR_ANSI_CODES, RESPOND_WITH_COLOR_ANSI_CODES, ONLY_USE_SIMPLE_ANSI_CODES, \
 	LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S, POSITIVE_PARAMETERS, NEGATIVE_PARAMETERS, \
-	DEFAULT_NN_VARIABLE_NAME, OUTPUT_IMG_PATH, INTERNAL_IMG_PATH
+	DEFAULT_NN_VARIABLE_NAME, OUTPUT_IMG_PATH, INTERNAL_IMG_PATH, COMMAND_MACROS
 	
 	# The following checks should be self-explanatory,
 	# as they contain a verbose warning describing the issue

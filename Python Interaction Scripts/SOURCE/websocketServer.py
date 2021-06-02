@@ -98,23 +98,30 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 
 			# This nested function tries to match the command from
 			# the server commandList and returns the corresponding function
-			def findCommand(firstCommandWord):
-				return serverCommands.commandList.get(firstCommandWord.lower(),
+			def findCommand(command, splitCounter=0):
+				firstCommandWord = command.split()[0]
+				result = serverCommands.commandList.get(firstCommandWord.lower(),
 					[COMMAND_NOT_FOUND_FUNCTION])[0]
+				if result is COMMAND_NOT_FOUND_FUNCTION and len(command.split()) > 1:
+					return findCommand(command.split()[0] + command.split(None, 1)[1], splitCounter+1)
+				if result is not COMMAND_NOT_FOUND_FUNCTION:
+					commandInstance.command = ''.join(commandInstance.command.split(None, splitCounter))
+				return result
 
 			# Search in 'serverCommands.commandList'-dictionary for the first word of command by client
-			func = findCommand(commandInstance.command.split()[0])
+			func = findCommand(commandInstance.command)
 
-			# If command not found, try eliminating whitespaces consecutively and match it
-			originalCommand = commandInstance.command
-			while(func is COMMAND_NOT_FOUND_FUNCTION and len(commandInstance.command.split()) > 1):
-				commandInstance.command = commandInstance.command.split()[0] + commandInstance.command.split(None, 1)[1]
-				func = findCommand(commandInstance.command.split()[0])
+			# Check if func is a Macro command
+			if type(func) is str and func.startswith("MACRO: "):
+				msg = f'Command "{(commandInstance.command + "&").split("&", 1)[0].strip()}" has been recognized as a ' + \
+					f'macro and will execute "{func[7:]}"'
+				await commandInstance.sendstatus(-10, msg)
+				if setting.AMPERSAND_CHAINS_COMMANDS and "&" in commandInstance.command.replace("&&", ""):
+					commandInstance.command = func[7:] + ' & ' + commandInstance.command.split('&', 1)[1].strip()
+				else:
+					commandInstance.command = func[7:]
+				func = findCommand(commandInstance.command)
 			
-			# If no command could be found, restore it with whitespaces to avoid user confusion
-			if func is COMMAND_NOT_FOUND_FUNCTION:
-				commandInstance.command = originalCommand
-
 			# Now check for chained commands
 			if setting.AMPERSAND_CHAINS_COMMANDS:
 				# Matching single ampersands near you

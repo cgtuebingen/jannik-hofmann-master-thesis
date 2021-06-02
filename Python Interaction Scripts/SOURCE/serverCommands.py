@@ -70,7 +70,7 @@ class Request:
 			for key in list(commandList.keys()):
 				oldCommand = commandList.pop(key)
 				# replace spaces in key
-				newKey = key.replace(" ", "")
+				newKey = key.replace(" ", "").lower()
 				# New structure: commandList[command_without_spaces] =
 				# 	(function, verbose_command_with_spaces, explanation, details_about_usage)
 				newStructure = [oldCommand[0], key] + list(oldCommand[1:])
@@ -81,18 +81,27 @@ class Request:
 				oldCommand = commandList.pop(key)
 				functionRef = oldCommand[0]
 				if type(functionRef) is str and functionRef.startswith("ALIAS:"):
-					tmpAliasKey = functionRef[len("ALIAS:"):].replace(" ", "")
+					tmpAliasKey = functionRef[len("ALIAS:"):].replace(" ", "").lower()
 					functionRef = commandList[tmpAliasKey][0]
 				commandList[key] = [functionRef] + oldCommand[1:]
+
+			# Add command macros to the list
+			for (key, value) in setting.COMMAND_MACROS.items():
+				commandList[key.replace(" ", "").lower()] = ["MACRO: " + value, key, "Macro: " + value,
+					f'Macro defined by user in server settings. The command "{key}" ' +
+					f'will be unpacked and executes "{value}"']
+			
 			commandListInitialized = True
 
 			ignoreSameBeginningInTheseKeys = {
+				# Only add new combinations to this list when you made sure that nobody would put a
+				# space after the first word or if you added a check to the shorter command to call
+				# the other one if the first parameter is just the next word.
 				"py": ["python"],
 				"eval": ["evaluate"],
 				"serverip": ["serveripport"],
 				"tfdrawkernel": ["tfdrawkernels"],
 			}
-
 			for key in list(commandList.keys()):
 				clashingCommands = [matches for matches in list(commandList.keys()) if matches.startswith(key) and matches != key]
 				if len(clashingCommands) > 0:
