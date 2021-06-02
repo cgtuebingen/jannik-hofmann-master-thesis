@@ -859,14 +859,14 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 								if len(kernel.shape) > 0: nplocation[0] = pixelx
 								if len(kernel.shape) > 1: nplocation[1] = pixely
 								if not colored:
-									if wrapping:
+									if wrapping and len(kernel.shape) > 2:
 										nplocation[2] = groupx + groupy * groups[0]
 									else:
 										if len(kernel.shape) > 2: nplocation[2] = groupx
 										if len(kernel.shape) > 3: nplocation[3] = groupy
 									color = [colors[tuple(nplocation)]] * 3
 								else: # colored
-									if wrapping:
+									if wrapping and len(kernel.shape) > 3:
 										nplocation[3] = groupx + groupy * groups[0]
 									else:
 										if len(kernel.shape) > 3: nplocation[3] = groupx
@@ -881,9 +881,11 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 								pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
 								# Now decide on whether we need to break out of all of the loops...
 								if wrapping:
-									if groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
+									if len(kernel.shape) <= 2+colored or \
+									groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
 								else:
-									if groupy > kernel.shape[3+colored]: groupy = math.inf
+									if len(kernel.shape) <= 3+colored or \
+									groupy > kernel.shape[3+colored]: groupy = math.inf
 								break # breaking out of every loop whose counter was set to math.inf
 							
 							x = groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x
