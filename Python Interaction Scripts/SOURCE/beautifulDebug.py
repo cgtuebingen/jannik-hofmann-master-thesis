@@ -202,7 +202,7 @@ def mapToText(map, spacing = 3, max_line_length = None, max_key_length = .5, spl
 		value = before_value + str(value) + after_value
 		while len(key) or len(value):
 			key_line, key = getCleanLinebreak(key, max_key_length, splitAtSpaces)
-			value_line, value = getCleanLinebreak(key,
+			value_line, value = getCleanLinebreak(value,
 				max_line_length - spacing - max_key_length, splitAtSpaces)
 			spaces = ' ' * (spacing + max_key_length - len(key_line))
 			output += key_line + spaces + value_line + '\n'

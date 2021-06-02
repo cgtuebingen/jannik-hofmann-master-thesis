@@ -741,7 +741,7 @@ async def drawstructure(connection = None):
 	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
-async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True):
+async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True, draw=True):
 	async def status(verbosity, text):
 		if connection:
 			await connection.sendstatus(verbosity, text)
@@ -752,10 +752,10 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 	filename = f"kernels-layer-{layerIndex}.png"
 	filepath = ai.internalCachePath(filename)
 	canUseCachedFile = canUseCachedFile and os.path.exists(filepath) and \
-		not (connection and design.kernels.spawnIndividualCuboids)
+		not (draw and connection and design.kernels.spawnIndividualCuboids)
 	renderTexture = not design.kernels.spawnIndividualCuboids or \
 		design.kernels.renderTexture.saveToRendersFolder or \
-		not connection
+		not connection or not draw
 	
 	if len(Layer.layerList) <= layerIndex:
 		await status(16, f"Layer {layerIndex} doesn't exist! The index {layerIndex} is higher " +
@@ -833,20 +833,42 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 				int(round(structureWidth / resolution)), 4], np.uint8)
 
 		# Some subfunctions for color normalization and editing
-		def makeExponent(value): # takes a value from 0 to 100
+		# makeExponent takes a value from 0 to 100 to produce an exponent. value 50 results in exponent 1
+		@functools.lru_cache(maxsize=4)
+		def makeExponent(value):
 			if math.isclose(value, 50): return 1
 			if value < 50: return 1 - (value - 50) / 50
 			else: return 1 / makeExponent(100 - value)
-		# Normalizing the colors in the whole kernel at once
-		colors = np.copy(kernel)
-		colors /= max(np.max(colors), -np.min(colors))
-		colors = abs(colors) ** makeExponent(design.kernels.contrast)
-		colors = np.where(kernel >= 0, colors, -colors)
-		colors = colors / 2 + 0.5
-		colors = colors ** makeExponent(design.kernels.brightness)
-		colors = np.around(colors * 255).astype(np.uint8)
+		# Normalizes the color values of the whole input array, using contrast, brightness settings.
+		# Returns a uint8-array of the same shape with values between 0 and 255
+		def normalizeColors(input):
+			colors = np.copy(input)
+			colors /= max(np.max(kernel), -np.min(kernel))
+			colors = abs(colors) ** makeExponent(design.kernels.contrast)
+			colors = np.where(input >= 0, colors, -colors)
+			colors = colors / 2 + 0.5
+			colors = colors ** makeExponent(design.kernels.brightness)
+			return np.around(colors * 255).astype(np.uint8)
+		try:
+			# Normalizing the colors in the whole kernel at once
+			colors = normalizeColors(kernel)
+		except MemoryError:
+			# Ok, note that it didn't work
+			colors = None
+		# colorsRow normalizes the colors within one row at once.
+		# The caching is crucial to achieve higher performance than normalizing each single value
+		@functools.lru_cache(maxsize=1)
+		def colorsRow(row):
+			return normalizeColors(kernel[..., row])
+		# Retrieves the normalized color either from colors or from colorsRow
+		def getColor(nplocation):
+			if colors is None:
+				return colorsRow(nplocation[-1])[tuple(nplocation[:-1])]
+			else:
+				return colors[tuple(nplocation)]
 		
 		progress = 0
+		updateEvery = 1000
 		totalIterations = groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]
 		opacity = int(round(design.kernels.renderTexture.opacity * 255))
 		with tqdm(total=totalIterations) as pbar:
@@ -864,7 +886,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 									else:
 										if len(kernel.shape) > 2: nplocation[2] = groupx
 										if len(kernel.shape) > 3: nplocation[3] = groupy
-									color = [colors[tuple(nplocation)]] * 3
+									color = [getColor(nplocation)] * 3
 								else: # colored
 									if wrapping and len(kernel.shape) > 3:
 										nplocation[3] = groupx + groupy * groups[0]
@@ -873,7 +895,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 										if len(kernel.shape) > 4: nplocation[4] = groupy
 									color = []
 									for nplocation[2] in range(3):
-										color.append(colors[tuple(nplocation)])
+										color.append(getColor(nplocation))
 								color.append(opacity)
 							except IndexError:
 								# Can't be pixelx or pixely due to groups intialization from kernel.shape
@@ -881,17 +903,18 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 								pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
 								# Now decide on whether we need to break out of all of the loops...
 								if wrapping:
-									if len(kernel.shape) <= 2+colored or \
-									groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
+									if len(kernel.shape) <= 2 + colored or \
+									groupx + groupy * groups[0] > kernel.shape[2 + colored]:
+										groupy = math.inf
 								else:
-									if len(kernel.shape) <= 3+colored or \
-									groupy > kernel.shape[3+colored]: groupy = math.inf
+									if len(kernel.shape) <= 3 + colored or \
+									groupy > kernel.shape[3 + colored]:
+										groupy = math.inf
 								break # breaking out of every loop whose counter was set to math.inf
 							
 							x = groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x
 							y = groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y
 							progress += 1
-							updateEvery = 1000
 							if progress % updateEvery == 0 or progress > totalIterations - updateEvery:
 								pbar.update(updateEvery)
 							processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
@@ -903,7 +926,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 									treatWithResolution(y) : treatWithResolution(y + size.y),
 									treatWithResolution(x) : treatWithResolution(x + size.x)
 								] = color
-							if connection and design.kernels.spawnIndividualCuboids:
+							if draw and design.kernels.spawnIndividualCuboids and connection:
 								position = Coordinates(
 								# x
 									+ thisLayer.position.x
@@ -925,7 +948,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 								await server.sleep(0, processDesc)
 
 		# After looping through all of the kernels
-		if connection and design.kernels.spawnIndividualCuboids:
+		if draw and design.kernels.spawnIndividualCuboids and connection:
 			await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
 		if renderTexture:
 			Image.fromarray(render).save(filepath)
@@ -938,7 +961,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 	if renderTexture:
 		if connection:
 			await connection.sendfile(filepath)
-			if not design.kernels.spawnIndividualCuboids:
+			if draw and not design.kernels.spawnIndividualCuboids:
 				position = Coordinates(
 					# x
 						+ thisLayer.position.x

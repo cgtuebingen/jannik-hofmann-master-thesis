@@ -1462,6 +1462,7 @@ class Request:
 	async def tf_drawkernel(self, **kwargs):
 		if not await self.assertTf(): return False
 		if not await self.checkParams(0, 2): return False
+		precacheAll = (await self.getParam()).lower() == "all"
 		index = await self.getParam(1, -1)
 		refresh = await self.getParam(2, False)
 		if index == -1: # just printing out all kernel shapes without drawing anything
@@ -1471,6 +1472,13 @@ class Request:
 			debugMsg = "The following kernel shapes have been retrieved {{index:layername, kernelshape}}:\n" + \
 				beautifulDebug.mapToText(shapeDict, 1)
 			await self.sendstatus(-30, debugMsg)
+			if precacheAll:
+				for key in shapeDict.keys():
+					index = int(key.split(':')[0])
+					try:
+						await vis.drawKernels(self, index, canUseCachedFile=True, draw=False)
+					except asyncio.CancelledError:
+						raise asyncio.CancelledError
 			return
 		if refresh or not hasattr(ai.tfnet, "validstructure"):
 			if refresh:
@@ -1486,7 +1494,7 @@ class Request:
 			'Use "tf draw structure" to render the network itself before any kernels can be visualized.')
 			return False
 		try:
-			await vis.drawKernels(self, index)
+			await vis.drawKernels(self, index, canUseCachedFile=not refresh)
 		except asyncio.CancelledError:
 			raise asyncio.CancelledError
 		except:
@@ -1498,6 +1506,7 @@ class Request:
 		'§[int:index]§ will respond with drawing instructions for all kernel data of the neural ' +
 		'network layer with that index to display it in the game engine.\n' +
 		'§[int:index] [refresh=False]§ If refresh is true or no kernel data can be found, ' +
-		'data of trainable variables will be refreshed first.\n')
+		'data of trainable variables will be refreshed first and kernel will be recalculated.\n' +
+		"§all§ will recalculate and cache all kernel textures that have not been cached yet without drawing")
 	commandList["tf draw kernels"] = commandAlias("tf draw kernel")
 
