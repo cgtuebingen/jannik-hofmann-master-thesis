@@ -207,7 +207,7 @@ class Request:
 	# Sends the file specified by path over binary data via msgpack to the websocket client
 	# Optionally sends the already specified data and path is only used as the filename
 	# File cannot be larger than MAX_MESSAGE_SIZE
-	# Todo: chop up large files and send them in chunks to the client
+	# TODO: chop up large files and send them in chunks to the client
 	async def sendfile(self, path, data = None):
 		assert type(path) is str
 		try:

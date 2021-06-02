@@ -10,6 +10,8 @@ def onModuleReload(): checkSettings()
 
 maxDrawWaitTimeout = 0.5 # seconds to wait for the command "server draw next" before resuming drawing
 # This avoids getting stuck in infinite loops if the command "server draw next" hasn't been received properly
+recheckDrawReadyInterval = .001 # in seconds, how often the algorithm rechecks if "server draw next" was received
+# should be much smaller than maxDrawWaitTimeout
 objectBatchSize = 1000 # how many objects/cuboids will be sent to the client in one batch via websocket response
 checkSentBatchAfter = 120 # checks this number of seconds after the last queueCuboid call, that the batch has been sent
 
@@ -49,11 +51,14 @@ class kernels:
 	spacingFromLayer = 50 # scalar, horizontal spacing as kernels are to the side of layers
 	thickness = .1 # if value <= 1, intepreted as percentage of pixel width
 	wrapIfDimLeftover = True # when there are dimensions left over, the algorithm can wrap the kernel groups
+	# instead of displaying them in one huge line
 	brightness = 45 # default 50, black 0, white 100, changes the color brightness of kernels
 	contrast = 70 # default 50, grey 0, black/white 100, changes kernel contrast and saturation at the same time
+	spawnIndividualCuboids = False # otherwise spawns a plane with a rendered texture image of all the kernels.
+	# Recommended to be set to False
 
 	class renderTexture:
-		displayPlot = True
+		displayTextureImage = False
 		defaultPixelResolution = 100 # determines resolution of each kernel pixel within the final texture image file
 		# Approximates and refers to the kernel width
 		# It helps to calculate that this expression should evaluate to a whole number:

@@ -241,9 +241,24 @@ async def packCuboid(position, size, color, rotator = 0, positionIsCenterPoint =
 	# Transform coordinates to UE
 	position, size = transformCoordinates(position, size, positionIsCenterPoint)
 	# Append them into one large array and send them away as instruction
-	posSizeColor = [float(i) for i in
+	propertyList = [float(i) for i in
 		position.list() + size.list() + formatColor(color) + rotator.list()]
-	return ("SPAWN CUBOID pos size color opacity rot", posSizeColor)
+	return ("SPAWN CUBOID pos size color opacity rot", propertyList)
+
+# Packs image drawing instructions into a list, that can be sent alone or in a batch via websocket later
+async def packImage(path, position, size, rotator = 0, positionIsCenterPoint = False):
+	if type(position) is not Coordinates:
+		position = Coordinates(position)
+	if type(size) is not Coordinates:
+		size = Coordinates(size)
+	if type(rotator) is not Coordinates:
+		rotator = Coordinates(rotator)
+	# Transform coordinates to UE
+	position, size = transformCoordinates(position, size, positionIsCenterPoint)
+	# Append them into one large array and send them away as instruction
+	propertyList = [path] + \
+		[float(i) for i in position.list() + size.list() + rotator.list()]
+	return ("SPAWN IMAGE path pos size rot", propertyList)
 
 # Spawns a cuboid at the specified coordinates with the specified color via a client-connection
 # Rotations might not work perfectly yet, especially with axis switching...
@@ -303,6 +318,30 @@ async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
 		processDescription = "Spawning cuboids in the virtual world"
 	else:
 		processDescription = "Spawning cuboids in the virtual world for " + processDescription
+	if waitAfterwardsForServerDrawNext:
+		global readyToDraw
+		readyToDraw = False
+		await server.sleep(0, processDescription)
+		for i in range(int(math.ceil(design.maxDrawWaitTimeout / design.recheckDrawReadyInterval))):
+			if readyToDraw:
+				return
+			await server.sleep(design.recheckDrawReadyInterval,
+				'Waiting for "server draw next" request by client after ' + processDescription)
+
+# Directly spawns an image at the specified coordinates via a client-connection, does not use batch
+async def spawnImage(connection, filepath, position, size, rotator = None,
+	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True):
+
+	if not connection:
+		os.startfile(filepath)
+		return
+
+	drawResponse = await packImage(filepath, position, size, rotator, positionIsCenterPoint)
+	await connection.send(drawResponse)
+	if processDescription is None:
+		processDescription = "Spawning image in the virtual world"
+	else:
+		processDescription = "Spawning image in the virtual world for " + processDescription
 	if waitAfterwardsForServerDrawNext:
 		global readyToDraw
 		readyToDraw = False
@@ -913,9 +952,9 @@ async def drawstructure(connection = None):
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False):
-	drawTexture = True # can be changed later if it's not deemed necessary
-	if not connection: # here definitely necessary, so we can display the kernels to the user
-		drawTexture = True
+	renderTexture = not design.kernels.spawnIndividualCuboids or \
+		design.kernels.renderTexture.saveToRendersFolder or \
+		not connection
 
 	async def status(verbosity, text):
 		if not connection:
@@ -980,7 +1019,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 	structureHeight = groups[1] * pixelsPerGroup[1] * size.y + (groups[1]-1) * spacing.y
 	resolution = design.kernels.defaultPixelDimensions[0] / design.kernels.renderTexture.defaultPixelResolution
 
-	if drawTexture:
+	if renderTexture:
 		render = np.zeros([int(round(structureHeight / resolution)), int(round(structureHeight / resolution)), 4])
 
 	# Some subfunctions for color normalization and editing
@@ -1036,20 +1075,17 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 					
 					x = (groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x)
 					y = (groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y)
-					if drawTexture:
+					progress += 1
+					processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
+						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
+					if renderTexture:
 						def treatWithResolution(val):
 							return int(round(val / resolution))
 						render[
 							treatWithResolution(x) : treatWithResolution(x + size.x),
 							treatWithResolution(y) : treatWithResolution(y + size.y)
 						] = color + [design.kernels.renderTexture.opacity]
-					
-					progress += 1
-					processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
-						f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
-					if not connection:
-						await server.sleep(0, processDesc)
-					else:
+					if connection and design.kernels.spawnIndividualCuboids:
 						position = Coordinates(
 						# x
 							+ Layer.layerList[layerIndex].position.x
@@ -1067,20 +1103,42 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False):
 							- size.z / 2
 						)
 						await queueCuboid(connection, position, size, color, processDescription = processDesc)
-
-	if connection:
+					else:
+						await server.sleep(0, processDesc)
+	if connection and design.kernels.spawnIndividualCuboids:
 		await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
-	
-	render = (render * 255).astype(np.uint8)
-	filepath = ai.internalCachePath(f"kernels-layer-{layerIndex}.png")
-	Image.fromarray(render).save(filepath)
-	if design.kernels.renderTexture.saveToRendersFolder:
-		filepath = ai.externalImagePath(f"kernels-layer-{layerIndex}.png", True)
+	if renderTexture:
+		render = (render * 255).astype(np.uint8)
+		filepath = ai.internalCachePath(f"kernels-layer-{layerIndex}.png")
 		Image.fromarray(render).save(filepath)
+		if design.kernels.renderTexture.saveToRendersFolder:
+			externalFilepath = ai.externalImagePath(f"kernels-layer-{layerIndex}.png", True)
+			Image.fromarray(render).save(externalFilepath)
 		if connection:
-			connection.sendfile(filepath)
-	if not connection or design.kernels.renderTexture.displayPlot:
-		os.startfile(filepath)
+			await connection.sendfile(filepath)
+			if not design.kernels.spawnIndividualCuboids:
+				position = Coordinates(
+					# x
+						+ Layer.layerList[layerIndex].position.x
+						- Layer.layerList[layerIndex].size.x / 2
+						- design.kernels.spacingFromLayer
+						- structureWidth
+					, # y
+						+ Layer.layerList[layerIndex].position.y
+						- size.z / 2
+					, # z
+						+ Layer.layerList[layerIndex].position.z
+						- Layer.layerList[layerIndex].size.z / 2
+						- structureHeight / 2
+					)
+				size = Coordinates(structureWidth, size.z, structureHeight)
+				rotator = Coordinates(90, 0, 0)
+				await spawnImage(connection, filepath, position, size, rotator, False,
+					f"kernel texture of layer {layerIndex}")
+				# TODO: Change filepath to path relative to client
+				# after sendfile command has been implemented client side
+		if not connection or design.kernels.renderTexture.displayTextureImage:
+			os.startfile(filepath)
 
 
 # FOR DEBUGGING, executed if you start this script directly
