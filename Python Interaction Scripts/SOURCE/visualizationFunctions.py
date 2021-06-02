@@ -25,6 +25,7 @@ import itertools
 import functools
 import networkx as nx
 from PIL import Image
+from tqdm import tqdm
 
 # LOCAL IMPORTS
 import visualizationSettings as design
@@ -474,109 +475,6 @@ def sizeFromLayerDimensions(layerDims):
 		size[i] = max(size[i], minDims[i])
 	return Coordinates(size)
 
-# DEPRECATED
-# Draws the tfnet.layer structure via the client-connection
-# Returns whether we could successfully draw the architecture
-# If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
-# Linearly = All layers spread on z axis, with their center on x = 0, y = 0
-async def drawstructureLinearly(connection = None):
-	if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
-		# Wait, we can't draw that
-		return False
-	position = Coordinates() # center position of first cube at origin
-	drawnLayers = [] # For later reference for drawing layer connections
-
-	# If no connection has been given, initialize matplotlib
-	if not connection:
-		plt.axes()
-	
-	for index, layer in enumerate(ai.tfnet.layers):
-		# Retrieve reasonable size and scale x, y by 50
-		size = sizeFromLayerDimensions(layer[2]).scale(50, 1)
-		# Shift the position, so layers don't overlap
-		position.add(z = size/2)
-		# Check if actually connected to previously drawn layer
-		if not ai.tfnet.layers[index-1][0] in layer[4]:
-				position.add(z = 1000) # increase distance between unconnected layers
-		# Retrieve color for this layer type
-		color = getLayerColor(layer[1])
-		# Spawn that thing and append it to drawnLayers
-		await queueCuboid(connection, position, size, color, positionIsCenterPoint = True)
-		drawnLayers.append([position.copy(), size.copy(), color])
-		# Draw connections between layers if applicable
-		if design.connections.display and \
-			(len(layer[4]) > 1 or layer[4][0] != ai.tfnet.layers[index-1][0]):
-			# connected to another layer than just the previous one. Check which one it is
-			for connectedIndex, connectedLayer in enumerate(ai.tfnet.layers):
-				# Check if that layer matches with the connected list and isn't just the previous
-				if connectedLayer[0] in layer[4] and connectedIndex < index-1:
-					# retrieve position and size of the connected layer
-					cposition, csize, *_ = drawnLayers[connectedIndex]
-					# calculate random x and y connection properties (so connections don't overlap)
-					minval = min(size.x, size.y, csize.x, csize.y)/2
-					maxval = max(size.x, size.y, csize.x, csize.y)/2
-					randomPos = Coordinates(
-						x = random.uniform(-minval * 0.8, minval * 0.8),
-						y = random.uniform(maxval * 1.3, maxval * 2))
-					if True:#not design.angledConnections:
-						await queueCuboid(connection,
-							Coordinates(randomPos, size/2, position - design.connections.strength/2),
-							Coordinates(design.connections.strength, y = randomPos - size/2),
-							design.connections.color)
-						await queueCuboid(connection,
-							Coordinates(randomPos, randomPos, cposition - design.connections.strength/2),
-							Coordinates(design.connections.strength, z = position - cposition + design.connections.strength),
-							design.connections.color)
-						await queueCuboid(connection,
-							Coordinates(randomPos, csize/2, cposition - design.connections.strength/2),
-							Coordinates(design.connections.strength, y = randomPos - csize/2),
-							design.connections.color)
-					else: # direct connections between layers instead of angled ones
-						# define proportion of horizontal bar to angle away on each side
-						deltaz = random.uniform(0, 0.5)
-						deltaz *= (position.z - cposition.z + design.connections.strength)
-						def alpha(size, degrees = True):
-							alpha = math.atan(deltaz / (randomPos.y - size.y/2))
-							if degrees: return math.degrees(alpha)
-							else: return alpha
-						
-						posz = position - deltaz/2
-						origsizey = randomPos - size/2
-						sizey = origsizey / math.cos(alpha(size, False))
-						await queueCuboid(connection,
-							Coordinates(randomPos, size/2 + origsizey/2, posz),
-							Coordinates(design.connections.strength, y = sizey),
-							design.connections.color,
-							rotator = Coordinates(x = -alpha(size)),
-							positionIsCenterPoint = True)
-						
-						posz = cposition - design.connections.strength/2 + deltaz
-						sizez = position - cposition + design.connections.strength - deltaz * 2
-						await queueCuboid(connection,
-							Coordinates(randomPos, randomPos, posz + sizez/2),
-							Coordinates(design.connections.strength, z = sizez),
-							design.connections.color,
-							positionIsCenterPoint = True)
-						
-						posz = cposition + deltaz/2
-						origsizey = randomPos - csize/2
-						sizey = origsizey / math.cos(alpha(csize, False))
-						await queueCuboid(connection,
-							Coordinates(randomPos, csize/2 + origsizey/2, posz),
-							Coordinates(design.connections.strength, y = sizey),
-							design.connections.color,
-							rotator = Coordinates(x = alpha(csize)),
-							positionIsCenterPoint = True)
-		position.add(z = size/2 + design.layouting.horizontalSpaceBetweenLayers)
-	await sendCuboidBatch(connection, "structure", False)
-	
-	# Displaying plot if no client connection was given
-	if not connection:
-		plt.axis('auto')
-		plt.show()
-
-	return True
-
 # retrieves the layer color based on its type description
 # Tries first with the whole name ignoring spaces,
 # then removes any "2D" at the end and tries again
@@ -596,17 +494,16 @@ class Layer:
 	layerList = []
 	def __init__(self, position = 0, size = 0, type = "unknown", parents = [],
 		activeAreaAbove = 0, activeAreaBelow = 0, index = None):
-
-		self.position = Coordinates(position)
-		self.size = Coordinates(size)
-		self.activeAreaAbove = Coordinates(activeAreaAbove)
-		self.activeAreaBelow = Coordinates(activeAreaBelow)
-		self.type = type
-		self.color = getLayerColor(type)
-		self.index = len(Layer.layerList) if index is None else index
-		self.parents = []
-		self.findParents(parents)
-		self.justmoved = []
+			self.position = Coordinates(position)
+			self.size = Coordinates(size)
+			self.activeAreaAbove = Coordinates(activeAreaAbove)
+			self.activeAreaBelow = Coordinates(activeAreaBelow)
+			self.type = type
+			self.color = getLayerColor(type)
+			self.index = len(Layer.layerList) if index is None else index
+			self.parents = []
+			self.findParents(parents)
+			self.justmoved = []
 
 	def append(self):
 		Layer.layerList.append(self)
@@ -684,122 +581,6 @@ class Layer:
 						badOnes.append(layer)
 		return badOnes
 
-		
-# DEPRECATED
-# Draws the tfnet.layer structure via the client-connection
-# Returns whether we could successfully draw the architecture
-# If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
-# Tree Basic = Trying to align layers with their connected ones in a tree-like format
-async def drawstructureTreeBasic(connection = None):
-	if not hasattr(ai.tfnet, "validstructure") or not ai.tfnet.validstructure:
-		# Wait, we can't draw that
-		return False
-	position = Coordinates() # center position of first cube at origin
-	drawnLayers = [] # For later reference for drawing layer connections
-
-	# If no connection has been given, initialize matplotlib
-	if not connection:
-		plt.axes()
-	
-	Layer.resetAllLayers()
-
-	for index, layer in enumerate(ai.tfnet.layers):
-		# Create layer instance and append it to layerList
-		current = Layer(position = 0, size = sizeFromLayerDimensions(layer[2]).scale(50, 1),
-			parents = layer[4], color = layer[1], index = index)
-		Layer.layerList.append(current)
-	
-	for current in Layer.layerList:
-		# z is set to be directly behind the furthest parent layer
-		current.position.z = max([0] + [layer.position.z + layer.size.z/2 for layer in current.parents])
-		current.position.z += design.layouting.horizontalSpaceBetweenLayers + current.size.z/2
-		
-		if len(current.parents) == 0:
-			pass # position.x and y stay at 0
-		elif len(current.parents) == 1:
-			current.position = Coordinates(current.parents[0].position, z = current.position) # x and y change
-		else:
-			positions = []
-			maxY = 0
-			minY = 0
-			for parent in current.parents:
-				if parent.isDescendantOfList(current.parents):
-					# move parent and its children by this amount:
-					moveBy = min(current.size.y, parent.size.y)/2 + design.layouting.verticalSpaceBetweenLayers
-					moveBy = Coordinates(y = moveBy)
-					parent.moveWithDescendants(moveBy)
-					current.activeAreaAbove += moveBy
-					for grandparent in current.parents:
-						if parent.isDescendantOf(grandparent):
-							grandparent.activeAreaAbove += moveBy
-				else:
-					positions.append(parent.position.y)
-					maxY = max(maxY, parent.position.y + parent.size.y / 2)
-					minY = min(minY, parent.position.y - parent.size.y / 2)
-			current.position.y = sum(positions) / len(positions)
-			current.activeAreaAbove.y = maxY - current.position.y - current.size.y / 2
-			current.activeAreaBelow.y = minY - current.position.y + current.size.y/2
-
-		# now check if the desired position is already taken and if so, move things
-		current.moveWithDescendants(0) # resetting who just moved
-		minY = current.position.y
-		for layer in current.whoOverlaps():
-			#if layer.position.y > current.position.y:
-				# move layer up, current down
-				# overlap between the two:
-				#moveBy = current.position.y + current.size.y/2 - layer.position.y - layer.size.y/2
-				# OVERWRITE: It's safer to calculate to just move everyone by a const. value
-				moveBy = current.size.y
-				moveBy += design.layouting.verticalSpaceBetweenLayers # add some space
-				moveBy /= 2 # everyone does half the work
-				moveBy = Coordinates(y = moveBy)
-				layer.moveWithDescendants(moveBy, dontMoveSameAgain = True)
-				minY = min(minY, layer.position.y - layer.size.y/2)
-				for parent in layer.parents:
-					parent.activeAreaAbove.y = max(parent.activeAreaAbove.y,
-						layer.position.y + layer.size.y/2)
-		if len(current.whoOverlaps()) > 0:
-			current.position.y = minY - design.layouting.verticalSpaceBetweenLayers - current.size.y/2
-		for parent in current.parents:
-			parent.activeAreaAbove.y = max(parent.activeAreaAbove.y,
-				current.position.y + current.size.y/2)
-			parent.activeAreaBelow.y = max(parent.activeAreaBelow.y,
-				current.position.y - current.size.y/2)
-
-	for current in Layer.layerList:
-		await queueCuboid(connection, current.position, current.size, current.color, positionIsCenterPoint = True)
-		for parent in current.parents:
-			y = parent.position.y
-			z = parent.position.z
-			yy = current.position.y
-			zz = current.position.z
-			deltay = yy-y
-			deltaz = zz-z
-			drawIt = True
-			if deltay == 0:
-				drawIt = False
-				#alpha = math.pi/2
-				#long = deltaz
-			else:
-				alpha = math.atan(deltaz/deltay)
-				long = deltay / math.cos(alpha)
-			if drawIt:
-				await queueCuboid(connection,
-					Coordinates(current.position.x, (y+yy)/2, (z+zz)/2),
-					Coordinates(design.connections.strength, z = long),
-					color = design.connections.color,
-					rotator = Coordinates(x = 90-math.degrees(-alpha)),
-					positionIsCenterPoint = True)
-
-	await sendCuboidBatch(connection, "structure", False)
-
-	# Displaying plot if no client connection was given
-	if not connection:
-		plt.axis('auto')
-		plt.show()
-
-	return True
-
 # Draws a given layout via the connection by sending drawing instructions.
 # If not connection, then the cuboids cannot be drawn but will be displayed in a graphic
 # Positions are given in an array as parameter, the other info is retrieved from ai.tfnet.layers
@@ -852,7 +633,6 @@ async def drawLayout(connection, positions):
 					parent.size.x/2, parent.size.y/2,
 					current.size.x/2, current.size.y/2)
 				if deltay == 0:
-					#drawIt = False
 					alpha = math.pi/2
 					long = deltaz
 				else:
@@ -963,11 +743,11 @@ async def drawstructure(connection = None):
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True):
 	async def status(verbosity, text):
-		if not connection:
+		if connection:
+			await connection.sendstatus(verbosity, text)
+		else:
 			if verbosity < 0: loggingFunctions.printlog(text)
 			else: loggingFunctions.warn(text)
-		else:
-			await connection.sendstatus(verbosity, text)
 	
 	filename = f"kernels-layer-{layerIndex}.png"
 	filepath = ai.internalCachePath(filename)
@@ -992,7 +772,9 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		await status(16, f"Layer {layerIndex} does not have any kernels that could be visualized!")
 		return False
 	kernel = trainableVars['kernel'][0]
-	await status(-10, f"Now drawing kernels with dimensions {kernel.shape} of layer {layerIndex}...")
+	await status(-10, f"Calculating kernels with dimensions {kernel.shape} of layer {layerIndex}...\n" +
+		"Depending on the kernel size, this might take some time. " +
+		'You can see a progress bar in the python server console or type "server info" to see the status.')
 	colored = (len(kernel.shape) > 2 and kernel.shape[2] == 3)
 	pixelsPerGroup = kernel.shape[:2]
 	if colored:
@@ -1026,108 +808,124 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		size.x = min(size.x, design.kernels.maxPixelDimensions[0])
 		size.y = min(size.y, design.kernels.maxPixelDimensions[1])
 	spacing = Coordinates(design.kernels.spacingBetweenKernels, z = 0)
-	if spacing.x <= 1 and spacing.y <= 1:
+	if design.kernels.hideSpacingBetweenSingles and \
+		pixelsPerGroup[0] == 1 and pixelsPerGroup[1] == 1:
+			spacing = Coordinates(0)
+	elif spacing.x <= 1 and spacing.y <= 1:
 		spacing.x *= size.x
 		spacing.y *= size.y
 	structureWidth = groups[0] * pixelsPerGroup[0] * size.x + (groups[0]-1) * spacing.x
 	structureHeight = groups[1] * pixelsPerGroup[1] * size.y + (groups[1]-1) * spacing.y
+	thisLayer = Layer.layerList[layerIndex]
 
 	if not canUseCachedFile: # (re)creating the texture file for all of the kernels
-		resolution = design.kernels.defaultPixelDimensions[0] / design.kernels.renderTexture.defaultPixelResolution
-
 		if renderTexture:
-			render = np.zeros([int(round(structureHeight / resolution)), int(round(structureWidth / resolution)), 4])
+			resolution = design.kernels.defaultPixelDimensions[0] /	design.kernels.renderTexture.defaultPixelResolution
+			# Applying max resolution to texture size
+			if structureHeight >= structureWidth:
+				if round(structureHeight / resolution) > design.kernels.renderTexture.maxResolution:
+					resolution = structureHeight / design.kernels.renderTexture.maxResolution
+			else:
+				if round(structureWidth / resolution) > design.kernels.renderTexture.maxResolution:
+					resolution = structureWidth / design.kernels.renderTexture.maxResolution
+			# Creating render array to be filled with color (and opacity) values
+			render = np.zeros([int(round(structureHeight / resolution)),
+				int(round(structureWidth / resolution)), 4], np.uint8)
 
 		# Some subfunctions for color normalization and editing
 		def makeExponent(value): # takes a value from 0 to 100
 			if math.isclose(value, 50): return 1
-			elif value > 50: return 1 / (1 - (50 - value) / 50)
+			if value < 50: return 1 - (value - 50) / 50
 			else: return 1 / makeExponent(100 - value)
-		brightnessExponent = makeExponent(design.kernels.brightness)
-		contrastExponent = makeExponent(design.kernels.contrast)
-		def normalizeColor(value):
-			value /= max(np.max(kernel), -np.min(kernel))
-			if value >= 0: value **= contrastExponent
-			else: value = -(-value)**contrastExponent
-			value = value / 2 + 0.5
-			return value ** brightnessExponent
+		# Normalizing the colors in the whole kernel at once
+		colors = np.copy(kernel)
+		colors /= max(np.max(colors), -np.min(colors))
+		colors = abs(colors) ** makeExponent(design.kernels.contrast)
+		colors = np.where(kernel >= 0, colors, -colors)
+		colors = colors / 2 + 0.5
+		colors = colors ** makeExponent(design.kernels.brightness)
+		colors = np.around(colors * 255).astype(np.uint8)
 		
 		progress = 0
-		for groupy in range(groups[1]):
-			for groupx in range(groups[0]):
-				for pixely in range(pixelsPerGroup[1]):
-					for pixelx in range(pixelsPerGroup[0]):
-						try:
-							nplocation = [1] * len(kernel.shape)
-							if len(kernel.shape) > 0: nplocation[0] = pixelx
-							if len(kernel.shape) > 1: nplocation[1] = pixely
-							if not colored:
+		totalIterations = groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]
+		opacity = int(round(design.kernels.renderTexture.opacity * 255))
+		with tqdm(total=totalIterations) as pbar:
+			for groupy in range(groups[1]):
+				for groupx in range(groups[0]):
+					for pixely in range(pixelsPerGroup[1]):
+						for pixelx in range(pixelsPerGroup[0]):
+							try:
+								nplocation = [1] * len(kernel.shape)
+								if len(kernel.shape) > 0: nplocation[0] = pixelx
+								if len(kernel.shape) > 1: nplocation[1] = pixely
+								if not colored:
+									if wrapping:
+										nplocation[2] = groupx + groupy * groups[0]
+									else:
+										if len(kernel.shape) > 2: nplocation[2] = groupx
+										if len(kernel.shape) > 3: nplocation[3] = groupy
+									color = [colors[tuple(nplocation)]] * 3
+								else: # colored
+									if wrapping:
+										nplocation[3] = groupx + groupy * groups[0]
+									else:
+										if len(kernel.shape) > 3: nplocation[3] = groupx
+										if len(kernel.shape) > 4: nplocation[4] = groupy
+									color = []
+									for nplocation[2] in range(3):
+										color.append(colors[tuple(nplocation)])
+								color.append(opacity)
+							except IndexError:
+								# Can't be pixelx or pixely due to groups intialization from kernel.shape
+								# So we definitely need to break out of the pixelx, pixely and groupx loops
+								pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
+								# Now decide on whether we need to break out of all of the loops...
 								if wrapping:
-									nplocation[2] = groupx + groupy * groups[0]
+									if groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
 								else:
-									if len(kernel.shape) > 2: nplocation[2] = groupx
-									if len(kernel.shape) > 3: nplocation[3] = groupy
-								color = normalizeColor(kernel[tuple(nplocation)])
+									if groupy > kernel.shape[3+colored]: groupy = math.inf
+								break # breaking out of every loop whose counter was set to math.inf
 							
-							else: # colored
-								if wrapping:
-									nplocation[3] = groupx + groupy * groups[0]
-								else:
-									if len(kernel.shape) > 3: nplocation[3] = groupx
-									if len(kernel.shape) > 4: nplocation[4] = groupy
-								color = []
-								for nplocation[2] in range(3):
-									color.append(normalizeColor(kernel[tuple(nplocation)]))
-						except IndexError:
-							# Can't be pixelx or pixely due to groups intialization from kernel.shape
-							# So we definitely need to break out of the pixelx, pixely and groupx loops
-							pixelx = pixely = groupx = math.inf # (pixelx optional, is taken care of by break)
-							# Now decide on whether we need to break out of all of the loops...
-							if wrapping:
-								if groupx + groupy * groups[0] > kernel.shape[2+colored]: groupy = math.inf
+							x = groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x
+							y = groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y
+							progress += 1
+							updateEvery = 1000
+							if progress % updateEvery == 0 or progress > totalIterations - updateEvery:
+								pbar.update(updateEvery)
+							processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
+								f"of {totalIterations}"
+							if renderTexture:
+								def treatWithResolution(val):
+									return int(round(val / resolution))
+								render[
+									treatWithResolution(y) : treatWithResolution(y + size.y),
+									treatWithResolution(x) : treatWithResolution(x + size.x)
+								] = color
+							if connection and design.kernels.spawnIndividualCuboids:
+								position = Coordinates(
+								# x
+									+ thisLayer.position.x
+									- thisLayer.size.x / 2
+									- design.kernels.spacingFromLayer
+									- structureWidth
+									+ x
+								, # y
+									+ thisLayer.position.y
+									+ structureHeight / 2
+									- size.y
+									- y
+								, # z
+									+ thisLayer.position.z
+									- size.z / 2
+								)
+								await queueCuboid(connection, position, size, color, processDescription = processDesc)
 							else:
-								if groupy > kernel.shape[3+colored]: groupy = math.inf
-							break # breaking out
-						
-						x = (groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x)
-						y = (groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y)
-						progress += 1
-						processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
-							f"of {groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]}"
-						if renderTexture:
-							def treatWithResolution(val):
-								return int(round(val / resolution))
-							render[
-								treatWithResolution(y) : treatWithResolution(y + size.y),
-								treatWithResolution(x) : treatWithResolution(x + size.x)
-							] = color + [design.kernels.renderTexture.opacity]
-						if connection and design.kernels.spawnIndividualCuboids:
-							position = Coordinates(
-							# x
-								+ Layer.layerList[layerIndex].position.x
-								- Layer.layerList[layerIndex].size.x / 2
-								- design.kernels.spacingFromLayer
-								- structureWidth
-								+ x
-							, # y
-								+ Layer.layerList[layerIndex].position.y
-								+ structureHeight / 2
-								- y
-								- size.y
-							, # z
-								+ Layer.layerList[layerIndex].position.z
-								- Layer.layerList[layerIndex].size.z / 2
-								- size.z / 2
-							)
-							await queueCuboid(connection, position, size, color, processDescription = processDesc)
-						else:
-							await server.sleep(0, processDesc)
+								await server.sleep(0, processDesc)
 
 		# After looping through all of the kernels
 		if connection and design.kernels.spawnIndividualCuboids:
 			await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
 		if renderTexture:
-			render = (render * 255).astype(np.uint8)
 			Image.fromarray(render).save(filepath)
 			if design.kernels.renderTexture.saveToRendersFolder:
 				externalFilepath = ai.externalImagePath(filename, True)
@@ -1141,16 +939,16 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 			if not design.kernels.spawnIndividualCuboids:
 				position = Coordinates(
 					# x
-						+ Layer.layerList[layerIndex].position.x
-						- Layer.layerList[layerIndex].size.x / 2
+						+ thisLayer.position.x
+						- thisLayer.size.x / 2
 						- design.kernels.spacingFromLayer
 						- structureWidth
 					, # y
-						+ Layer.layerList[layerIndex].position.y
+						+ thisLayer.position.y
 						- size.z / 2
 					, # z
-						+ Layer.layerList[layerIndex].position.z
-						- Layer.layerList[layerIndex].size.z / 2
+						+ thisLayer.position.z
+						- thisLayer.size.z / 2
 						- structureHeight / 2
 					)
 				size = Coordinates(structureWidth, size.z, structureHeight)
