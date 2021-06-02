@@ -28,8 +28,7 @@ def log(text, tryToCreateNewFile = True):
 	if setting.LOGFILE_PATH is None or \
 		setting.LOGFILE_PATH == "ERROR" or \
 		setting.LOGFILE_PATH == "":
-		
-		return False
+			return False
 
 	# removing escape characters that look pretty in console but ugly in textfiles
 	text = beautifulDebug.removeAnsiEscapeCharacters(text)

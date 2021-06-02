@@ -55,20 +55,21 @@ class kernels:
 	brightness = 45 # default 50, black 0, white 100, changes the color brightness of kernels
 	contrast = 70 # default 50, grey 0, black/white 100, changes kernel contrast and saturation at the same time
 	spawnIndividualCuboids = False # otherwise spawns a plane with a rendered texture image of all the kernels.
-	# Recommended to be set to False
+	# Should be set to False
 	useAlreadyCachedTextures = False # whether to use the already saved textures when they have been cached.
 	# If True, does not recaculate kernels again unless forced to by the command or by spawnIndividualCuboids
 	# You might want to deactivate this if the global variables change (e.g. with different checkpoints)
-
+	hideSpacingBetweenSingles = True # When enabled, if each kernel has dims 1 x 1, removes spacing between them
 	class renderTexture:
 		displayTextureImage = False
 		defaultPixelResolution = 100 # determines resolution of each kernel pixel within the final texture image file
 		# Approximates and refers to the kernel width
 		# It helps to calculate that this expression should evaluate to a whole number:
 		# defaultPixelDimensions[0] / spacingBetweenKernels[0] (/ defaultPixelResolution[0] if spacing is absolute)
+		maxResolution = 5000 # int defining the maximum pixel resolution at the longer edge of the texture file
+		# A too small resolution might lead to aliasing patterns in the texture image
 		saveToRendersFolder = True # will save a copy of the rendered kernel texture to the renders folder
 		opacity = 1
-
 
 class layouting:
 	# Dimensions as single numbers or tuples: one value = uniform scaling,
@@ -84,7 +85,6 @@ class layouting:
 	bufferZone = 500
 	horizontalSpaceBetweenLayers = 500
 	verticalSpaceBetweenLayers = -400
-
 	class renderGif:
 		displayPlot = False
 		# With this enabled, the layouting cannot run in an async thread and will block the server
