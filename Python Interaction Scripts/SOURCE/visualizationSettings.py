@@ -14,6 +14,7 @@ recheckDrawReadyInterval = .001 # in seconds, how often the algorithm rechecks i
 # should be much smaller than maxDrawWaitTimeout
 objectBatchSize = 1000 # how many objects/cuboids will be sent to the client in one batch via websocket response
 checkSentBatchAfter = 120 # checks this number of seconds after the last queueCuboid call, that the batch has been sent
+debugWhenDrawingObject = True # accompanies any object draw response (or batch of objects) with a debug msg to client
 
 # Colors of different DNN layers, specified by their type as it appears in the model summary
 # Spaces and capitalization will be ignored and reversed, also a "2d" at the end can be omitted

@@ -28,11 +28,11 @@ if __name__ == '__main__':
 		os.system('clear')
 
 # LOCAL IMPORTS
+import serverCommands
 import serverSettings as setting
 import loggingFunctions
 import beautifulDebug
 import websocketServer as server
-import serverCommands
 import visualizationSettings as design
 
 

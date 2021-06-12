@@ -351,7 +351,8 @@ async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
 	await waitUntilReadyToDraw(processDescription)
 
 	drawResponse = await packCuboid(position, size, color, rotator, positionIsCenterPoint)
-	await connection.send(drawResponse)
+	await connection.send(drawResponse, sendAlsoAsDebugMsg=design.debugWhenDrawingObject,
+		printText=f"SPAWN CUBOID at position {position} with size {size}.")
 	if waitAfterwardsForServerDrawNext:
 		await waitForServerDrawNext(processDescription)
 
@@ -372,7 +373,8 @@ async def spawnImage(connection, filepath, position, size, rotator = None,
 	
 	await waitUntilReadyToDraw(processDescription)
 
-	await connection.send(drawResponse)
+	await connection.send(drawResponse, sendAlsoAsDebugMsg=design.debugWhenDrawingObject,
+		printText="SPAWN IMAGE from file " + fileHandling.separateFilename(filepath)[1])
 	if waitAfterwardsForServerDrawNext:
 		await waitForServerDrawNext(processDescription)
 
@@ -385,7 +387,7 @@ async def sendCuboidBatch(connection, processDescription, waitAfterwardsForServe
 	
 	await waitUntilReadyToDraw(processDescription)
 	
-	await connection.send(("SPAWN CUBOID BATCH", cuboidQueue),
+	await connection.send(("SPAWN CUBOID BATCH", cuboidQueue), sendAlsoAsDebugMsg=design.debugWhenDrawingObject,
 		printText=f"SPAWN CUBOID BATCH containing {len(cuboidQueue)} objects up to {processDescription}.")
 	resetCuboidQueue()
 	await server.sleep(0, processDescription)
@@ -997,8 +999,8 @@ async def testVis():
 	
 	setting.checkSettings()
 	if loadRealNN:
-		path = setting.DEFAULT_LOAD_NN_PATH
-		path = setting.AVAILABLE_NN_PATHS.get(path, path)
+		path = setting.FILEPATHS.NN_LOAD_DEFAULT_MODEL
+		path = setting.FILEPATHS.AVAILABLE_MODELS.get(path, path)
 		ai.preparemodule(path)
 		ai.importtf()
 		# await ai.tf_getstructure(printStructure=False)

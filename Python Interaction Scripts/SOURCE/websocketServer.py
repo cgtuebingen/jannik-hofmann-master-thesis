@@ -116,14 +116,14 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 				msg = f'Command "{(commandInstance.command + "&").split("&", 1)[0].strip()}" has been recognized as a ' + \
 					f'macro and will execute "{func[7:]}"'
 				await commandInstance.sendstatus(-10, msg)
-				if setting.AMPERSAND_CHAINS_COMMANDS and "&" in commandInstance.command.replace("&&", ""):
+				if setting.COMMANDS.AMPERSAND_CHAINS_COMMANDS and "&" in commandInstance.command.replace("&&", ""):
 					commandInstance.command = func[7:] + ' & ' + commandInstance.command.split('&', 1)[1].strip()
 				else:
 					commandInstance.command = func[7:]
 				func = findCommand(commandInstance.command)
 			
 			# Now check for chained commands
-			if setting.AMPERSAND_CHAINS_COMMANDS:
+			if setting.COMMANDS.AMPERSAND_CHAINS_COMMANDS:
 				# Matching single ampersands near you
 				if "&" in commandInstance.command.replace("&&", ""):
 					# Temporarily replace escaped double ampersands before splitting the commands
@@ -156,6 +156,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			shouldBeKeptOpen = await func(commandInstance,
 				# Defining additional parameters needed for certain command functions
 				loadedCommand=loadedCommand, # for console and load
+				calledDirectlyByCommand=True, # for nn is loaded
 			)
 
 			# Just making sure that func can only returns bool or None:
@@ -174,9 +175,9 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			# If more chained commands are left over for processing, but func returned False and
 			# settings require to close the connection in that case, print a debug message and
 			# clear chained commands
-			if setting.AMPERSAND_CHAINS_COMMANDS and len(chainedCommands) > 0:
+			if setting.COMMANDS.AMPERSAND_CHAINS_COMMANDS and len(chainedCommands) > 0:
 				if shouldBeKeptOpen is False and \
-					not setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
+					not setting.COMMANDS.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
 					# Executed server command function returned False
 					# and the settings specified to close the connection in this case
 					msg = beautifulDebug.underline(chainedCommands)
@@ -215,7 +216,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 			
 			# Give other threads a chance to pass through. This should have a negligible effect
 			# on performance exclusively on &-chained commands.
-			if not setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
+			if not setting.COMMANDS.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE:
 				if len(chainedCommands) > 0:
 					await sleep(0.001, "Chained commands " + str(chainedCommands))
 				else:
@@ -283,14 +284,14 @@ def startServer():
 	# Try to establish the server as often as the settings tell us
 	# For example it might take a few tries on server restart, when the ip/port connection is still
 	# being closed and the server wants to immediately open a new connection on the same address
-	triesLeft = setting.TIMES_TO_RETRY_ESTABLISHING_SERVER
+	triesLeft = setting.SERVER.TIMES_TO_RETRY_ESTABLISHING_SERVER
 	while (triesLeft > 0):
 		triesLeft -= 1
 		
 		errorMsg = None
 		try:
 			# Specify the server function and address
-			newServer = websockets.serve(interactiveServer, setting.SERVER_IP, setting.SERVER_PORT)
+			newServer = websockets.serve(interactiveServer, setting.SERVER.IP, setting.SERVER.PORT)
 			# asyncio: start specified server
 			asyncio.get_event_loop().run_until_complete(newServer)
 			# Great, print the success
@@ -332,7 +333,7 @@ def startServer():
 			# Telling the user how often we try again or that we give up:
 			if triesLeft > 0:
 				errorMsg += f"Trying {triesLeft} more times in " + \
-				f"{setting.SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER} seconds.\n" + beautifulDebug.RESET
+				f"{setting.SERVER.SECONDS_BETWEEN_TRIES} seconds.\n" + beautifulDebug.RESET
 			else:
 				errorMsg += beautifulDebug.RED + \
 					"Address and port for the desired websocket connection are blocked!\n" + \
@@ -348,7 +349,7 @@ def startServer():
 				sys.exit()
 			else:
 				# Otherwise, wait specified time before trying again
-				time.sleep(setting.SECONDS_BETWEEN_TRIES_TO_ESTABLISH_SERVER)
+				time.sleep(setting.SERVER.SECONDS_BETWEEN_TRIES)
 
 
 yieldingCoroutines = set()

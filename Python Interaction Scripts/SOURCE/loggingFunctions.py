@@ -19,15 +19,15 @@ import serverSettings as setting
 # stores the last time something was appended to the log
 lastlogwrite = None
 
-# appends the text into the logfile specified by setting.LOGFILE_PATH
+# appends the text into the logfile specified by setting.FILEPATHS.LOGFILE
 # returns whether the text could be successfully appended
 def log(text, tryToCreateNewFile = True):
 	global lastlogwrite
 	
 	# abort if no logfile path or path couldn't be accessed previously
-	if setting.LOGFILE_PATH is None or \
-		setting.LOGFILE_PATH == "ERROR" or \
-		setting.LOGFILE_PATH == "":
+	if setting.FILEPATHS.LOGFILE is None or \
+		setting.FILEPATHS.LOGFILE == "ERROR" or \
+		setting.FILEPATHS.LOGFILE == "":
 			return False
 
 	# removing escape characters that look pretty in console but ugly in textfiles
@@ -37,7 +37,7 @@ def log(text, tryToCreateNewFile = True):
 	
 	try:
 		# append to logfile
-		file = open(setting.LOGFILE_PATH, 'a')
+		file = open(setting.FILEPATHS.LOGFILE, 'a')
 
 		dateTimeObj = datetime.now()
 		if lastlogwrite is None:
@@ -47,9 +47,9 @@ def log(text, tryToCreateNewFile = True):
 			file.write("Logfile created on " + dateTimeObj.strftime("%Y-%m-%d at %H:%M:%S") + "\n" +
 				"Current server script location is " +
 				centralController.SCRIPT_PATH() + "\nVerbosity level set to" +
-				str(setting.DESIRED_VERBOSITY) + "\n\n")
+				str(setting.FORMAT_OUTPUT.DESIRED_VERBOSITY) + "\n\n")
 		# If there is a lastlogwrite value, check if it older than specified in the settings file
-		elif time.time() - lastlogwrite >= setting.LOG_NEW_TIMESTAMP_IF_LAST_ENTRY_OLDER_THAN_S:
+		elif time.time() - lastlogwrite >= setting.FORMAT_OUTPUT.LOG_TIMESTAMP_AFTER_SECONDS:
 			# If so, attach the current timestamp
 			file.write("\n" + dateTimeObj.strftime("%H:%M:%S (%Y-%m-%d)") + "\n")
 		
@@ -69,23 +69,23 @@ def log(text, tryToCreateNewFile = True):
 		else:
 			# uh oh, something went wrong... Let's warn the user, but only once this time
 			print(beautifulDebug.special(5, 3, 0) +
-				f"ERROR finding logfile at {setting.LOGFILE_PATH}:\n" +
+				f"ERROR finding logfile at {setting.FILEPATHS.LOGFILE}:\n" +
 				traceback.format_exc() + beautifulDebug.RESET)
-			setting.LOGFILE_PATH = "ERROR"
+			setting.FILEPATHS.LOGFILE = "ERROR"
 			return False
 	except IOError:
 		# uh oh, something went wrong... Let's warn the user, but only once this time
 		print(beautifulDebug.special(5, 3, 0) +
-			f"ERROR accessing/creating logfile at {setting.LOGFILE_PATH}:\n" +
+			f"ERROR accessing/creating logfile at {setting.FILEPATHS.LOGFILE}:\n" +
 			traceback.format_exc() + beautifulDebug.RESET)
-		setting.LOGFILE_PATH = "ERROR"
+		setting.FILEPATHS.LOGFILE = "ERROR"
 		return False
 
 
 # Use outside of websocket connections, where senddebug cannot be utilized. This will only warn on the
 # server console and log it. Any client connection will not receive warnings passed to this function!
 def warn(text, verbosity = 5):
-	if setting.PRINT_COLOR_ANSI_CODES:
+	if setting.FORMAT_OUTPUT.PRINT_COLOR_ANSI_CODES:
 		text = beautifulDebug.special(5, 5, 0, text)
 	printlog("\n" + text + "\n", verbosity)
 
@@ -93,14 +93,14 @@ def warn(text, verbosity = 5):
 # Prints and logs a specified text, optionally according to specified verbosity preferences
 def printlog(text, verbosity = None):
 	if verbosity is not None:
-		if verbosity < setting.DESIRED_VERBOSITY:
+		if verbosity < setting.FORMAT_OUTPUT.DESIRED_VERBOSITY:
 			# Not important enough for the user, discard
 			return True
 
 	# Reverse any formatting if the user doesn't want it
-	if not setting.PRINT_COLOR_ANSI_CODES:
+	if not setting.FORMAT_OUTPUT.PRINT_COLOR_ANSI_CODES:
 		text = beautifulDebug.removeAnsiEscapeCharacters(text)
-	if setting.SMART_LINE_BREAKS:
+	if setting.FORMAT_OUTPUT.SMART_LINE_BREAKS:
 		beautifulDebug.printWithLinebreaks(text)
 	else:
 		print(text)

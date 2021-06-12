@@ -46,7 +46,7 @@ RESET = ansicode(0) #+ '\u001b[48;5;235m' + '\u001b[38;5;252m'
 def special(r, g, b, text = None):
 	if text is not None:
 		return special(r, g, b) + text + RESET
-	if not setting.ONLY_USE_SIMPLE_ANSI_CODES:
+	if not setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES:
 		return ansicode(16 + 36*r + 6*g + b, False)
 	else:
 		r //= 3
@@ -124,19 +124,19 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 
 	# warning rgb value from 2,2,0 via 5,5,3 via 5,5,0 to 5,3,0 (5 is max.)
 	elif level <= 4:
-		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(level+1, level+1, level-1) + BOLD
+		colorcode = YELLOW + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(level+1, level+1, level-1) + BOLD
 	elif level <= 7:
-		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 5, 7-level) + BOLD
+		colorcode = YELLOW + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 5, 7-level) + BOLD
 	elif level <= 9:
-		colorcode = YELLOW + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 12-level, 0) + BOLD
+		colorcode = YELLOW + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 12-level, 0) + BOLD
 
 	# error rgb value from 2,0,0 to 5,0,0 (5 is max.)
 	elif level < 20:
-		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(int(round(2 + (level-10)/3, 0)), 0, 0) + BOLD
+		colorcode = RED + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(int(round(2 + (level-10)/3, 0)), 0, 0) + BOLD
 	
 	# critical failure
 	else: # level >= 20
-		colorcode = RED + BOLD if setting.ONLY_USE_SIMPLE_ANSI_CODES else special(4, 0, 0) + BOLD + NEGATIVE
+		colorcode = RED + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(4, 0, 0) + BOLD + NEGATIVE
 
 	# If no text has been specified, just return the colorcode corresponding to that level
 	if text == "":
@@ -187,36 +187,28 @@ def printWithLinebreaks(text):
 		text_line, text = getCleanLinebreak(text)
 		print(text_line)
 
-def mapToText(map, spacing = 3, max_line_length = None, max_key_length = .5, splitAtSpaces = True,
-	before_key = '', after_key = '', before_value = '', after_value = ''):
+def mapToText(map, spacing = 3, line_width = None, key_width = None, splitAtSpaces = True,
+	before_key = '', after_key = '', before_value = '', after_value = '', auto_adjust_column_length = True):
 
-	if max_line_length is None:
-		max_line_length = consoleWidth()
-	if type(max_key_length) is float:
-		max_key_length = int(math.floor((max_line_length - spacing) * max_key_length))
-	key_lengths = [len(str(k) + before_key + after_key) for k in map.keys()]
-	max_key_length = min(max_key_length, max(key_lengths))
+	if line_width is None:
+		line_width = consoleWidth()
+
+	key_lengths = [len(before_key + after_key + key) for key, value in map.items()]
+	value_lengths = [len(before_value + after_value + value) for key, value in map.items()]
+	if key_width is None:
+		key_width = sum(key_lengths) / sum(value_lengths) # ratio of average lengths
+	if type(key_width) is float:
+		key_width = int(math.floor((line_width - spacing) * key_width))
+	key_width = max(key_width, line_width - spacing - max(value_lengths)) # adapt to short values
+	key_width = min(key_width, max(key_lengths)) # adapt to short keys
 	output = ""
 	for key, value in map.items():
 		key = before_key + str(key) + after_key
 		value = before_value + str(value) + after_value
 		while len(key) or len(value):
-			key_line, key = getCleanLinebreak(key, max_key_length, splitAtSpaces)
+			key_line, key = getCleanLinebreak(key, key_width, splitAtSpaces)
 			value_line, value = getCleanLinebreak(value,
-				max_line_length - spacing - max_key_length, splitAtSpaces)
-			spaces = ' ' * (spacing + max_key_length - len(key_line))
+				line_width - spacing - key_width, splitAtSpaces)
+			spaces = ' ' * (spacing + key_width - len(key_line))
 			output += key_line + spaces + value_line + '\n'
-	return output[:-1]
-
-def filesize(data):
-	if type(data) is int:
-		filesize = data
-	elif type(data) is bin:
-		filesize = len(data)
-	else:
-		filesize = len(str(data))
-	units = "B KB MB GB TB PB EB ZB YB".split(' ')
-	while filesize > 1000 and len(units) > 1:
-		filesize /= 1000
-		units.pop(0)
-	return str(round(filesize, 2)) + ' ' + units[0]
+	return output[:-1] # removing last '\n'

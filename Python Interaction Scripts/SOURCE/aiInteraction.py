@@ -52,28 +52,25 @@ def model():
 def tfloaded():
 	return hasattr(tfnet, 'loaded') and tfnet.loaded
 
+# Adds the verbose model name and optional timestamp to a path
+def addNetworkInfoIntoPath(path, filename="", timestamp=False):
+	if timestamp and '.' in filename:
+		filename = filename.rsplit('.', 1)
+		filename = filename[0] + '_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.' + filename[1]
+	if hasattr(tfnet, 'modelname_verbose'):
+		return path + tfnet.modelname_verbose + os.path.sep + filename
+	else:
+		return path + filename
 # Returns the path for caching files
 def internalCachePath(filename="", timestamp=False):
-	if timestamp:
-		filename = filename.rsplit('.', 1)
-		filename = filename[0] + '_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.' + filename[1]
-	if hasattr(tfnet, 'modelname_verbose'):
-		return setting.INTERNAL_IMG_PATH + tfnet.modelname_verbose + os.path.sep + filename
-	else:
-		return setting.INTERNAL_IMG_PATH + filename
+	return addNetworkInfoIntoPath(setting.FILEPATHS.FILECACHE, filename, timestamp)
 # Returns the path for storing renders
 def externalImagePath(filename="", timestamp=False):
-	if timestamp:
-		filename = filename.rsplit('.', 1)
-		filename = filename[0] + '_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.' + filename[1]
-	if hasattr(tfnet, 'modelname_verbose'):
-		return setting.OUTPUT_IMG_PATH + tfnet.modelname_verbose + os.path.sep + filename
-	else:
-		return setting.OUTPUT_IMG_PATH + filename
-# Initialized those paths
+	return addNetworkInfoIntoPath(setting.FILEPATHS.OUTPUT_IMAGES, filename, timestamp)
+# Initialize those paths
 def initInternalCachePath():
-	setting.createFilepath(internalCachePath())
-	setting.createFilepath(externalImagePath())
+	fileHandling.createFilepath(internalCachePath())
+	fileHandling.createFilepath(externalImagePath())
 
 
 # Prepares a python module and execs it.
@@ -82,16 +79,16 @@ def preparemodule(path, allowPreparingNewModuleOnTop = False):
 	global nn_spec, nn_module, nnprepared, modelvarname
 	# Check if model variable name has been specified
 	# by searching for a ':' in the filename / in the string after the last folder
-	if ':' in setting.separateFilename(path)[1]:
+	if ':' in fileHandling.separateFilename(path)[1]:
 		path, modelvarname = path.rsplit(':', 1)
 		path = path.strip()
 		modelvarname = modelvarname.strip()
 	else:
-		if setting.DEFAULT_NN_VARIABLE_NAME is None:
+		if setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME is None:
 			raise AssertionError("No name for the model variable has been defined! Please specify " +
 				"how to acccess the NN model py adding the varname after the AI script path, separated by a colon.")
 		else:
-			modelvarname = setting.DEFAULT_NN_VARIABLE_NAME
+			modelvarname = setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME
 	if not allowPreparingNewModuleOnTop and (nnprepared or nnloaded):
 		raise AssertionError("The ai interface has already loaded a module in the past and " +
 			"should not load another (or the same) nn script on top. You can override this " +
@@ -100,7 +97,7 @@ def preparemodule(path, allowPreparingNewModuleOnTop = False):
 	nn_spec = importlib.util.spec_from_file_location("", path)
 	nn_module = importlib.util.module_from_spec(nn_spec)
 	nn_spec.loader.exec_module(nn_module)
-	nnprepared = setting.separateFilename(path)[1].replace('.py', '') + '-' + modelvarname
+	nnprepared = fileHandling.separateFilename(path)[1].replace('.py', '') + '-' + modelvarname
 
 
 # Returns whether the prepared module contains a tensorflow neural network

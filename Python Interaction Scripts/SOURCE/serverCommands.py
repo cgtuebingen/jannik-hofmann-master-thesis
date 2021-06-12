@@ -36,6 +36,7 @@ import beautifulDebug
 import loggingFunctions
 import debugAndTesting
 import visualizationSettings as design
+import fileHandling
 
 def onModuleReload(): Request(None, None) # initialize command list
 
@@ -86,7 +87,7 @@ class Request:
 				commandList[key] = [functionRef] + oldCommand[1:]
 
 			# Add command macros to the list
-			for (key, value) in setting.COMMAND_MACROS.items():
+			for (key, value) in setting.COMMANDS.MACROS.items():
 				commandList[key.replace(" ", "").lower()] = ["MACRO: " + value, key, "Macro: " + value,
 					f'Macro defined by user in server settings. The command "{key}" ' +
 					f'will be unpacked and executes "{value}"']
@@ -101,6 +102,7 @@ class Request:
 				"eval": ["evaluate"],
 				"serverip": ["serveripport"],
 				"tfdrawkernel": ["tfdrawkernels"],
+				"servercachedel": ["servercachedelete"],
 			}
 			for key in list(commandList.keys()):
 				clashingCommands = [matches for matches in list(commandList.keys()) if matches.startswith(key) and matches != key]
@@ -161,7 +163,7 @@ class Request:
 	# Sends the specified message to the websocket client and prints it in console
 	# utilizing messagepack and projects data specification.
 	# Returns a boolean that signals whether the message was small enough to be sent properly
-	async def send(self, data, printText = True, forceDataSerializable = False):
+	async def send(self, data, printText = True, forceDataSerializable = False, sendAlsoAsDebugMsg = False):
 		if forceDataSerializable:
 			data = self.makeDataSerializable(data)
 		
@@ -174,11 +176,11 @@ class Request:
 			await self.senddebug(14, f"Error sending message! This message contains numbers outside of " +
 				f"the int64 range! Please convert them to float before sending these values!\n" +
 				f"Beginning of the message " +
-				f"you were trying to send: {str(data)[0:min(256, setting.MAX_MESSAGE_SIZE-248)]}...")
+				f"you were trying to send: {str(data)[0:min(256, setting.SERVER.MAX_MESSAGE_SIZE-248)]}...")
 			return False
 
 		message_size_too_large = False
-		if len(str(data)) > setting.MAX_MESSAGE_SIZE:
+		if len(str(data)) > setting.SERVER.MAX_MESSAGE_SIZE:
 			# nope, too large to even try packing it. might cause buffer overflow otherwise
 			message_size_too_large = len(str(data))
 			packed = None
@@ -187,37 +189,41 @@ class Request:
 			try:
 				packed = msgpack.packb(data)
 			except:
-				if not forceDataSerializable:
-					return await self.send(data, printText, True)
+				if not forceDataSerializable: # try again with forced serialization
+					return await self.send(data, printText, forceDataSerializable=True)
 				else: # basically raising that error itself again
 					packed = msgpack.packb(data)
-			if len(packed) > setting.MAX_MESSAGE_SIZE:
+			if len(packed) > setting.SERVER.MAX_MESSAGE_SIZE:
 				# still larger than expected
 				message_size_too_large = len(packed)
 		
 		if message_size_too_large is False: # message can be sent
-			await self.websocket.send(packed) # actually send it via websocket
-			if printText is not None and printText is not False and printText != "":
-				# and print it in the console and debug
-				if printText is True:
-					loggingFunctions.printlog("> " + str(data), -3)
+			if printText is True:
+				printText = data
+			if sendAlsoAsDebugMsg:
+				if printText not in (None, False, ""):
+					await self.senddebug(-9, printText)
 				else:
-					loggingFunctions.printlog("> " + str(printText), -3)
+					await self.senddebug(-9, data)
+			await self.websocket.send(packed) # actually send it via websocket
+			if printText not in (None, False, ""):
+				# and print it in the console and debug
+				loggingFunctions.printlog("> " + str(printText), -3)
 			return True
 		else: # message too large to be sent properly!
 			# Caution when changing this debug message! The content of this message needs to stay
 			# below a length of 256 to avoid recursive loops for very small MAX_MESSAGE_SIZE setting
 			await self.senddebug(14, f"Error sending message! This message is {message_size_too_large} " +
-				f"bytes long and exceeds the limit of {setting.MAX_MESSAGE_SIZE} bytes!\n" +
+				f"bytes long and exceeds the limit of {setting.SERVER.MAX_MESSAGE_SIZE} bytes!\n" +
 				f"Content has to be shortened before being sent.\nBeginning of the message " +
-				f"you were trying to send: {str(data)[0:min(256, setting.MAX_MESSAGE_SIZE-246)]}...")
+				f"you were trying to send: {str(data)[0:min(256, setting.SERVER.MAX_MESSAGE_SIZE-246)]}...")
 			return False
 	
 	# Sends the file specified by path over binary data via msgpack to the websocket client
 	# Optionally sends the already specified data and path is only used as the filename
 	# File cannot be larger than MAX_MESSAGE_SIZE
 	# TODO: chop up large files and send them in chunks to the client
-	async def sendfile(self, path, data = None):
+	async def sendfile(self, path, data = None, sendAlsoAsDebugMsg = True):
 		assert type(path) is str
 		try:
 			if data is None:
@@ -235,9 +241,9 @@ class Request:
 			return False
 
 		assert type(data) is bytes
-		filesize = beautifulDebug.filesize(data)
+		filesize = fileHandling.formatFilesize(data)
 		# get the filename itself
-		path, filename = setting.separateFilename(path)
+		path, filename = fileHandling.separateFilename(path)
 		# Structure of a sent file tuple:
 		struct = ("FILE", filename, data)
 		# Some formatting fun
@@ -248,7 +254,7 @@ class Request:
 		msg += beautifulDebug.special(0, 3, 0) + f" ({filesize})"
 		#msg += beautifulDebug.B_GREEN + " via msgpack."
 		msg += beautifulDebug.RESET
-		return await self.send(struct, printText=msg)
+		return await self.send(struct, printText=msg, sendAlsoAsDebugMsg=sendAlsoAsDebugMsg)
 
 	# Sends a status response to the client. Statuscodes:
 	# -30 = success / completed (usually as response to commands that don’t receive data back)
@@ -261,8 +267,9 @@ class Request:
 	# more detailed values can be seen in the documentation
 	async def sendstatus(self, level, info,
 		errorOnCriticalFailure=True, shutdownByCriticalFailure=True, removeOutsideWhitespace = True):
+		
 		assert type(level) is int
-		assert type(info) is str
+		info = str(info)
 
 		# create structure according to data specification and send it packed by msgpack
 		struct = info
@@ -271,7 +278,7 @@ class Request:
 				struct = struct[:-1]
 			while (struct[0].isspace()):
 				struct = struct[1:]
-		if setting.RESPOND_WITH_COLOR_ANSI_CODES:
+		if setting.FORMAT_OUTPUT.RESPOND_WITH_COLOR_ANSI_CODES:
 			struct = beautifulDebug.formatLevel(level, struct, False, self.command)
 		else:
 			struct = beautifulDebug.removeAnsiEscapeCharacters(struct)
@@ -291,8 +298,9 @@ class Request:
 	# decreasing level = less important / more verbose debug info
 	async def senddebug(self, level, info, autoShutdownOnCriticalError = True, *,
 		sendToClient = True, removeOutsideWhitespace = True):
+
 		assert type(level) is int
-		assert type(info) is str
+		info = str(info)
 
 		if sendToClient:
 			# create structure according to data specification and send it packed by msgpack
@@ -302,7 +310,7 @@ class Request:
 					struct = struct[:-1]
 				while (struct[0].isspace()):
 					struct = struct[1:]
-			if setting.RESPOND_WITH_COLOR_ANSI_CODES:
+			if setting.FORMAT_OUTPUT.RESPOND_WITH_COLOR_ANSI_CODES:
 				struct = beautifulDebug.formatLevel(level, struct, True, self.command)
 			else:
 				struct = beautifulDebug.removeAnsiEscapeCharacters(struct)
@@ -313,7 +321,7 @@ class Request:
 			sentSuccessfully = True
 
 		# print if user chosen verbosity level demands it
-		if sentSuccessfully and (level >= setting.DESIRED_VERBOSITY or level == 0):
+		if sentSuccessfully and (level >= setting.FORMAT_OUTPUT.DESIRED_VERBOSITY or level == 0):
 			if level >= 20: # critical error / failure. shuts down the client system
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
 					f"\n> CRITICAL ERROR (lvl {level}) with {self.command}!\nX {info}\n", True, self.command))
@@ -410,9 +418,9 @@ class Request:
 			# trying to cast the command parameter string to desired type
 			paramValue = self.command.split()[position]
 			if type(defaultOrType) is bool or defaultOrType is bool:
-				if paramValue in setting.POSITIVE_PARAMETERS:
+				if paramValue in setting.COMMANDS.POSITIVE_PARAMETERS:
 					result = True
-				elif paramValue in setting.NEGATIVE_PARAMETERS:
+				elif paramValue in setting.COMMANDS.NEGATIVE_PARAMETERS:
 					result = False
 				elif type(defaultOrType) is bool:
 					result = defaultOrType
@@ -621,16 +629,16 @@ class Request:
 		await self.checkParams(0, 1)
 		if not await self.checkParams(1, 1, False):
 			# Just display the current verbosity level
-			await self.sendstatus(-30, "Current verbosity level: " + str(setting.DESIRED_VERBOSITY))
+			await self.sendstatus(-30, "Current verbosity level: " + str(setting.FORMAT_OUTPUT.DESIRED_VERBOSITY))
 		else:
-			newVerbosity = await self.getParam(1, setting.DESIRED_VERBOSITY)
-			if setting.DESIRED_VERBOSITY == newVerbosity:
+			newVerbosity = await self.getParam(1, setting.FORMAT_OUTPUT.DESIRED_VERBOSITY)
+			if setting.FORMAT_OUTPUT.DESIRED_VERBOSITY == newVerbosity:
 				await self.senddebug(-5, f"Server verbosity level is already set at {newVerbosity}.")
 			else:
-				setting.DESIRED_VERBOSITY = newVerbosity
+				setting.FORMAT_OUTPUT.DESIRED_VERBOSITY = newVerbosity
 				infotext = f"Verbosity level of the server has been changed to {newVerbosity}."
 				await self.senddebug(-1, infotext)
-				if -1 < setting.DESIRED_VERBOSITY:
+				if -1 < setting.FORMAT_OUTPUT.DESIRED_VERBOSITY:
 					loggingFunctions.log(infotext)
 					# To make sure that at least the logfile logs this change to avoid confusion
 					# about missing debug info later on
@@ -686,7 +694,7 @@ class Request:
 	# should be for debug only. deactivated on connections outside of localhost
 	# do not rely on this function for production code via unencrypted connections
 	async def python(self, **kwargs):
-		if not setting.ALLOW_REMOTE_CODE_EXECUTION:
+		if not setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION:
 			await self.senddebug(15, f"Cannot execute {await self.getParam()}. " +
 				"Remote code execution is disabled by python websocket server.")
 			return False
@@ -700,18 +708,18 @@ class Request:
 				traceback.format_exc())
 			return False
 	commandList["python"] = (python, "Executes the specified string as python code" +
-		("" if setting.ALLOW_REMOTE_CODE_EXECUTION else " (DISABLED)"),
+		("" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else " (DISABLED)"),
 		"Parameters as string specify the code that will be executed by the server\n" +
 		"Due to security reasons, this feature is normally disabled when this server is " +
 		"active on the internet via unencrypted connections (outside of localhost)\n" +
-		"This command is currently " + ("ENABLED" if setting.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
+		"This command is currently " + ("ENABLED" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
 	commandList["py"] = commandAlias("python")
 
 
 	# should be for debug only. deactivated on connections outside of localhost
 	# do not rely on this function for production code via unencrypted connections
 	async def pythoneval(self, **kwargs):
-		if not setting.ALLOW_REMOTE_CODE_EXECUTION:
+		if not setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION:
 			await self.senddebug(15, f"Cannot evaluate {await self.getParam()}. " +
 				"Remote code execution is disabled by python websocket server.")
 			return False
@@ -725,11 +733,11 @@ class Request:
 				traceback.format_exc())
 			return False
 	commandList["eval"] = (pythoneval, "Evaluates the specified string as python expression and " +
-			"responds with the result" + ("" if setting.ALLOW_REMOTE_CODE_EXECUTION else " (DISABLED)"),
+			"responds with the result" + ("" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else " (DISABLED)"),
 			"Parameters as string specify the expression that will be evaluated by the server\n" +
 			"Due to security reasons, this feature is normally disabled when this server is " +
 			"active on the internet via unencrypted connections (outside of localhost)\n" +
-			"This command is currently " + ("ENABLED" if setting.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
+			"This command is currently " + ("ENABLED" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
 	commandList["evaluate"] = commandAlias("eval")
 
 
@@ -750,7 +758,7 @@ class Request:
 	async def serverInfo(self, **kwargs):
 		await self.checkParams(0)
 		text = f"You are connected to the python interaction server, " + \
-			f"which is located on {setting.SERVER_IP}:{setting.SERVER_PORT}"
+			f"which is located on {setting.SERVER.IP}:{setting.SERVER.PORT}"
 		if len([desc for (_, desc) in server.yieldingCoroutines if not desc.startswith("#HIDDEN\n")]) == 0:
 			text += f'\n(No other command coroutines are currently running on the server)'
 		else:
@@ -787,7 +795,7 @@ class Request:
 			if param.lower() == "port":
 				return await self.serverIPPort(warnParameters = False)
 		await self.checkParams(0)
-		await self.sendstatus(-30, "IP address of this websocket server: " + str(setting.SERVER_IP))
+		await self.sendstatus(-30, "IP address of this websocket server: " + str(setting.SERVER.IP))
 	commandList["server ip"] = (serverIP, "Returns IP address of this websocket server",
 		'Does not take parameters and responds with a string.\n' +
 		'IP is returned according to the python server settings')
@@ -795,7 +803,7 @@ class Request:
 
 	async def serverPort(self, **kwargs):
 		await self.checkParams(0)
-		await self.sendstatus(-30, "Port of this websocket server: " + str(setting.SERVER_PORT))
+		await self.sendstatus(-30, "Port of this websocket server: " + str(setting.SERVER.PORT))
 	commandList["server ip"] = (serverIP, "Returns port of this websocket server",
 		'Does not take parameters and responds with an integer.\n' +
 		'Port is returned according to the python server settings')
@@ -805,7 +813,7 @@ class Request:
 		if warnParameters:
 			await self.checkParams(0)
 		await self.sendstatus(-30, "IP and port of this websocket server: " +
-			str(setting.SERVER_IP) + ":" + str(setting.SERVER_PORT))
+			str(setting.SERVER.IP) + ":" + str(setting.SERVER.PORT))
 	commandList["server address"] = (serverIPPort, "Returns IP address and port of this websocket server",
 		'Does not take parameters and responds with a string.\n' +
 		'IP and port are returned according to the python server settings')
@@ -842,7 +850,7 @@ class Request:
 
 
 	async def reload(self, **kwargs):
-		if not setting.ALLOW_REMOTE_CODE_EXECUTION:
+		if not setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION:
 			await self.senddebug(15, f"Cannot reload modules! " +
 				"Remote code execution is disabled by python websocket server.")
 			return False
@@ -907,7 +915,6 @@ class Request:
 					errorsEncountered = True
 			if errorsEncountered:
 				return False
-
 	commandList["server reload"] = (reload, "Reloads certain modules on the server",
 		"§§ will list all the modules that can be reloaded and their aliases.\n" +
 		"§[modules]§ name as many modules as you want, separated by spaces.\n" +
@@ -919,7 +926,8 @@ class Request:
 		'It is recommended to completely reinitialize the server with "server reset"\n' +
 		"Due to security reasons, this feature is normally disabled when this server is " +
 		"active on the internet via unencrypted connections (outside of localhost)\n" +
-		"This command is currently " + ("ENABLED" if setting.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
+		"This command is currently " + ("ENABLED" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
+
 
 	async def stopCoroutines(self, **kwargs):
 		await self.checkParams(0)
@@ -927,7 +935,7 @@ class Request:
 		if len(stopped) == 0:
 			await self.senddebug(10, f"Nothing to stop. No stoppable coroutines are currently running or yielding to be stopped")
 		elif self.listCoroutines(stopped) == "":
-			await self.senddebug(-30, f"Successfullly stopped {len(stopped)} hidden subroutines, nothing major.")
+			await self.sendstatus(-30, f"Successfullly stopped {len(stopped)} hidden subroutines, nothing major.")
 		else:
 			await self.sendstatus(-30, f"Successfully interrupted these processes:" +
 				self.listCoroutines(stopped) +
@@ -938,8 +946,68 @@ class Request:
 		"to stop command processing that has taken much longer than expected.\n" +
 		"It might lead to undefined behaviour, therefore " +
 		'it is recommended to reinitialize the server afterwards with the command "server reset"')
-
-
+	
+	def verboseFilecacheInfo(self, deleting=False):
+		cachepath = setting.FILEPATHS.FILECACHE
+		description = "Deleted " if deleting else "The complete filecache contains "
+		description += f"{fileHandling.filecount(cachepath)} " + \
+			f"files with a total size of {fileHandling.foldersize(cachepath)}"
+		description += " from the filecache, including data from these networks:\n" if deleting \
+			else ".\nIt has cached information about the following networks:\n"
+		return description + beautifulDebug.mapToText({folder:
+			f"{fileHandling.filecount(cachepath, folder)} files / " + str(fileHandling.foldersize(cachepath, folder))
+			for folder in fileHandling.getSubdirectories(cachepath)})
+	
+	async def infoFilecache(self, **kwargs):
+		await self.checkParams(0, 0)
+		await self.sendstatus(-30, self.verboseFilecacheInfo())
+	commandList["server cache info"] = (infoFilecache, "Gives information about the files in the servers filecache",
+		"Will print out available information about the files stored in the servers filecache.")
+	commandList["server filecache info"] = commandAlias("server cache info")
+	
+	async def deleteFilecache(self, **kwargs):
+		await self.checkParams(0, 1)
+		if await self.checkParams(warnUser=False): # specific folder
+			folder = await self.getParam()
+			folderlist = fileHandling.getSubdirectories(setting.FILEPATHS.FILECACHE)
+			print(folder)
+			if folder not in folderlist:
+				folder = folder.strip()
+			if folder not in folderlist:
+				folders = [f for f in folderlist if f.startswith(folder)]
+			else:
+				folders = [folder]
+			if len(folders) == 0:
+				await self.sendstatus(10, f'Cannot find any cache-directory for "{folder}"! ' + \
+					'Nothing in the cache has been deleted.\nTo clear the cache of a specific network, ' + \
+					'select one of the following directories by typing "server cache delete [directory]": ' + \
+					', '.join(folderlist))
+				return False
+			for folder in folders:
+				cachepath = setting.FILEPATHS.FILECACHE
+				description = f'Deleted the filecache of the network "{folder}", which contained ' + \
+					f"{fileHandling.filecount(cachepath, folder)} files / " + \
+					f"{fileHandling.foldersize(cachepath, folder)} of data."
+				fileHandling.deleteDirectoryContent(setting.FILEPATHS.FILECACHE + os.path.sep + folder)
+				await self.sendstatus(-30, description)
+		else: # delete whole cache
+			description = self.verboseFilecacheInfo(deleting=True)
+			fileHandling.deleteDirectoryContent(setting.FILEPATHS.FILECACHE)
+			await self.sendstatus(-30, description)
+	commandList["server cache delete"] = (deleteFilecache, "Deletes all files in the servers filecache",
+		"Will remove any files that have been stored in the servers filecache path.\n" +
+		"Any calculations (like kernel texture renderings) need to be done again.\n" +
+		"Use this command if you updated your neural network and are still seeing old versions " +
+		"of data in the visualization or if you want to ensure that no old information persists.\n" +
+		"Does not ask for confirmation and clears the cache for all networks, not just the current one. " +
+		'Please execute the command "server cache info" before, to see what you are deleting.\n' +
+		"§[network]§ will only delete the cache of that specific network directory. Available networks: " +
+		', '.join(fileHandling.getSubdirectories(setting.FILEPATHS.FILECACHE)) +
+		"\nIf you type just the beginning of a network, it matches all directories beginning with that string.")
+	commandList["server cache del"] = commandAlias("server cache delete")
+	commandList["server filecache delete"] = commandAlias("server cache delete")
+	
+	
 	async def serverDraw(self, **kwargs):
 		vis.readyToDraw = True
 	commandList["server draw next"] = (serverDraw, "Requests the next batch of object draw instructions",
@@ -960,7 +1028,7 @@ class Request:
 	async def sendfiletest(self, **kwargs):
 		if not await self.checkParams(warnUser=False):
 			await self.senddebug(1, f"No filepath specified for sendfile test. Sending log file.")
-			path = setting.LOGFILE_PATH
+			path = setting.FILEPATHS.LOGFILE
 		else:
 			path = await self.getParam()
 		await self.sendfile(path)
@@ -972,7 +1040,7 @@ class Request:
 	async def sendstruct(self, **kwargs):
 		struct = (1, 'text', 5.234, (1, 'more', 3, ()), ('b', 'a', 'c'), None, {"hi": 1, "there": 2})
 		if await self.checkParams(warnUser=False):
-			if setting.ALLOW_REMOTE_CODE_EXECUTION:
+			if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION:
 				try:
 					struct = eval(await self.getParam())
 				except:
@@ -983,7 +1051,7 @@ class Request:
 				await self.senddebug(1, f"Cannot evalute parameter {await self.getParam()}. " +
 					"Remote code execution is disabled by python websocket server. " +
 					"Using default structure.")
-		await self.send(struct)
+		await self.send(struct, sendAlsoAsDebugMsg=True)
 	commandList["send struct"] = (sendstruct, "Sends a test structure via msgpack",
 		"§[custom structure]§ can define a custom structure to send. If no structure is specified (§§)" +
 		"or the provided string cannot be parsed into a structure, a default structure is used")
@@ -1023,7 +1091,7 @@ class Request:
 
 	async def add(self, **kwargs):
 		await self.checkParams(2)
-		await self.send(await self.getParam(1, 2.0) + await self.getParam(2, 3.0))
+		await self.send(await self.getParam(1, 2.0) + await self.getParam(2, 3.0), sendAlsoAsDebugMsg=True)
 	commandList["test add"] = (add, "Adds two float numbers",
 		"§[float:number=2] [float:number=3]§ responds with the result " +
 		"as float\nCan be used for testing purposes")
@@ -1031,7 +1099,7 @@ class Request:
 
 	async def divide(self, **kwargs):
 		await self.checkParams(2)
-		await self.send(await self.getParam(1, 2.0) / await self.getParam(2, 3.0))
+		await self.send(await self.getParam(1, 2.0) / await self.getParam(2, 3.0), sendAlsoAsDebugMsg=True)
 	commandList["test divide"] = (divide, "Divides two float numbers",
 		"§[float:number=2] [float:number=3]§ responds with the result " +
 		"as float\nCan be used for testing purposes")
@@ -1082,7 +1150,7 @@ class Request:
 		'prepared consecutively when loaded.\nWithout parameters, it will return a list of the ' +
 		'currently prepared commands.\nUse §clear§ or §reset§ to clear the list ' +
 		'from any loaded commands.\nWith chained commands ' +
-		('(currently enabled)' if setting.AMPERSAND_CHAINS_COMMANDS else '(currently disabled)') +
+		('(currently enabled)' if setting.COMMANDS.AMPERSAND_CHAINS_COMMANDS else '(currently disabled)') +
 		', a single & will first prepare the command and then execute anything behind it. A ' +
 		'double ampersand will be converted into a prepared chained command, that executes its ' +
 		'contents consecutively. To use a ampersand in a string within those commands, escape ' +
@@ -1122,7 +1190,7 @@ class Request:
 			return
 		criticalWarning = True
 		if await self.checkParams(2, math.inf, False):
-			criticalWarning = not((await self.getParam(2, "True")) in setting.NEGATIVE_PARAMETERS)
+			criticalWarning = not((await self.getParam(2, "True")) in setting.COMMANDS.NEGATIVE_PARAMETERS)
 		if criticalWarning:
 			warningLevel = self.SEVERE_WARNING_LEVEL
 			shutdownText = "Terminating the connection and shutting down the server."
@@ -1233,14 +1301,14 @@ class Request:
 		'undefined behaviour with unexpected errors due to differing implementations in updates.\n' +
 		'This check can be overridden with a negative second parameter, which lowers the warning level ' +
 		'to ' + str(SUPPRESSED_WARNING_LEVEL) + '. (Negative parameters are: ' +
-		', '.join(setting.NEGATIVE_PARAMETERS) + ')\nLower minor version in the client or differing build ' +
+		', '.join(setting.COMMANDS.NEGATIVE_PARAMETERS) + ')\nLower minor version in the client or differing build ' +
 		'will only display a low level warning and pass the check.\n' +
 			('If this check is used and fails while chaining commands with ampersand (' +
-			('enabled' if setting.AMPERSAND_CHAINS_COMMANDS else 'disabled') +
+			('enabled' if setting.COMMANDS.AMPERSAND_CHAINS_COMMANDS else 'disabled') +
 			'), execution will carry on regardless due to server settings.'
-		if setting.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE else
+		if setting.COMMANDS.EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE else
 			'This check can be used when chaining commands with ampersand (' +
-			('enabled' if setting.AMPERSAND_CHAINS_COMMANDS else 'disabled') + '), ' +
+			('enabled' if setting.COMMANDS.AMPERSAND_CHAINS_COMMANDS else 'disabled') + '), ' +
 			'as the chain will only continue if the check is passed.'))
 	commandList["assert version"] = commandAlias("check version")
 	commandList["verify version"] = commandAlias("check version")
@@ -1254,13 +1322,13 @@ class Request:
 			'recommended to use "server reset" before loading another network, to avoid ' +
 			'undefined behaviour!')
 		if not await self.checkParams(warnUser=False):
-			path = setting.DEFAULT_LOAD_NN_PATH
+			path = setting.FILEPATHS.NN_LOAD_DEFAULT_MODEL
 			await self.senddebug(5, f"No custom path for the neural network was specified. " +
 			"Using default path specified in python server script:\n" + path)
 		else:
 			path = await self.getParam()
 		# Try to match with a predefined path from server settings
-		path = setting.AVAILABLE_NN_PATHS.get(path, path)
+		path = setting.FILEPATHS.AVAILABLE_MODELS.get(path, path)
 		
 		try:
 			await self.sendstatus(-10, f"Neural network at {path} is being loaded. This might " +
@@ -1288,11 +1356,11 @@ class Request:
 		"§[path]§ specify the location of the python script on the server. " +
 		"This script is then imported and loaded by python.\n" +
 		"Use a keyword as parameter to load one of the networks specified in server settings.\n" +
-		'Available keywords are: "' + '", "'.join(setting.AVAILABLE_NN_PATHS.keys()) + '"')
+		'Available keywords are: "' + '", "'.join(setting.FILEPATHS.AVAILABLE_MODELS.keys()) + '"')
 
 
-	async def isnnloaded(self, **kwargs):
-		await self.send(ai.tfloaded())
+	async def isnnloaded(self, calledDirectlyByCommand=False, **kwargs):
+		await self.send(ai.tfloaded(), sendAlsoAsDebugMsg=calledDirectlyByCommand)
 		if not(ai.tfloaded()):
 			return False
 	commandList["nn is loaded"] = (isnnloaded, "Checks if any NN is loaded and initialized",
@@ -1326,7 +1394,10 @@ class Request:
 		"Returns a string with the version number")
 
 
-	async def tf_getstructure(self, printStructure=True, canUseFakeStructure=setting.DEBUG_USE_FAKE_STRUCTURE, **kwargs):
+	async def tf_getstructure(self, printStructure=True, canUseFakeStructure=None, **kwargs):
+		if canUseFakeStructure is None:
+			canUseFakeStructure = hasattr(setting, "DEBUG") and getattr(setting.DEBUG, "USE_FAKE_STRUCTURE", False)
+		
 		if not canUseFakeStructure:
 			if not await self.assertTf(): return False
 		try:
@@ -1351,7 +1422,7 @@ class Request:
 			else:
 				if printStructure:
 					# Send the whole structure as array
-					await self.send(("TF STRUCTURE", ai.tfnet.layers))
+					await self.send(("TF STRUCTURE", ai.tfnet.layers), sendAlsoAsDebugMsg=True)
 		except:
 			await self.sendstatus(17, f"Couldn't parse tensorflow structure!\n" +
 				traceback.format_exc())
@@ -1417,7 +1488,7 @@ class Request:
 						output = str(type(var)).split("'")[1]
 						try: output += " of length " + str(len(var))
 						except: pass
-						output += f" ({beautifulDebug.filesize(var)})"
+						output += f" ({fileHandling.formatFilesize(var)})"
 						output += ':\n' + str(var)[:200] + '...'
 						return output
 					return str(var)
@@ -1426,14 +1497,14 @@ class Request:
 					beautifulDebug.mapToText(overview, 3))
 				return
 			try:
-				await self.send(getattr(ai.tfnet, attr))
+				await self.send(getattr(ai.tfnet, attr), sendAlsoAsDebugMsg=True)
 			except:
 				await self.senddebug(12, f"Attribute {attr} does not (yet) exist in tfNetwork. " +
 					f"Sending back None as value for {attr}.")
 				await self.send(None)
 				return False
 		else:
-			await self.send(vars(ai.tfnet))
+			await self.send(vars(ai.tfnet), sendAlsoAsDebugMsg=True)
 	commandList["tf get vars"] = (tf_getvars, "Returns all tf variables and information currently loaded",
 		"Retrieves any information already known about the loaded tensorflow network.\n" +
 		"Returns a map of the continually expanding class type that stores information about the " +
