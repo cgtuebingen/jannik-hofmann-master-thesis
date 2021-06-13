@@ -249,9 +249,9 @@ class Request:
 		# Some formatting fun
 		#filename = beautifulDebug.underline(filename)
 		msg = beautifulDebug.B_GREEN + "Sent file "
-		msg += beautifulDebug.special(0, 3, 0) + path + os.path.sep
+		msg += beautifulDebug.special(0, 2, 0) + path + os.path.sep
 		msg += beautifulDebug.B_GREEN + filename
-		msg += beautifulDebug.special(0, 3, 0) + f" ({filesize})"
+		msg += beautifulDebug.special(0, 2, 0) + f" ({filesize})"
 		#msg += beautifulDebug.B_GREEN + " via msgpack."
 		msg += beautifulDebug.RESET
 		return await self.send(struct, printText=msg, sendAlsoAsDebugMsg=sendAlsoAsDebugMsg)
@@ -1589,6 +1589,7 @@ class Request:
 					index = int(key.split(':')[0])
 					try:
 						await vis.drawKernels(self, index, canUseCachedFile=True, draw=False)
+						server.sleep(0.1, "Checking and drawing all kernel textures. Currently at layer " + str(index))
 					except asyncio.CancelledError:
 						raise asyncio.CancelledError
 			return

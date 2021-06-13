@@ -754,17 +754,30 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 	
 	design_k = design.kernels
 	design_tx = design_k.renderTexture
-	filename = f"kernels-layer-{layerIndex}_settings-" + \
-		f"res{design_tx.defaultPixelResolution[0]}-{design_tx.defaultPixelResolution[1]}-" + \
-		f"max{design_tx.maxTextureResolution}-" + \
-		f"space{design_k.spacingBetweenKernels[0]}-{design_k.spacingBetweenKernels[1]}" + \
-		(f'-bright{design_k.brightness}' if not math.isclose(design_k.brightness, 50) else '') + \
-		(f'-contr{design_k.contrast}' if not math.isclose(design_k.contrast, 50) else '') + \
-		(f'-opac{design_tx.opacity}' if not math.isclose(design_tx.opacity, 1) else '') + \
-		('-aa' if design_tx.antiAliasing else '') + \
-		('-singleSp' if not design_k.hideSpacingBetweenSingles else '') + \
-		('-wrap' if design_k.wrapIfDimLeftover else '')
-	filename = filename.replace('.', ',') + ".png"
+	# Create uniquely identifiable filename for the kernel cachefile
+	def fileInfo(description, setting, ignoreValue=None):
+		if setting is True: return '-' + description
+		if setting is False: return ""
+		if type(setting) in [tuple, list]:
+			if math.isclose(float(setting[0]), float(setting[1])):
+				setting = setting[0]
+			else:
+				setting = str(setting[0] + '-' + str(setting[1]))
+		if ignoreValue is not None and math.isclose(setting, ignoreValue):
+			return ""
+		setting = str(setting).replace('.', ',')
+		return '-' + description + str(setting)
+	filename = f"kernels-layer-{layerIndex}_settings" + \
+		fileInfo("res", design_tx.defaultPixelResolution) + \
+		fileInfo("max", design_tx.maxTextureResolution) + \
+		fileInfo("space", design_k.spacingBetweenKernels) + \
+		fileInfo("bright", design_k.brightness, 50) + \
+		fileInfo("contr", design_k.contrast, 50) + \
+		fileInfo("opac", design_tx.opacity, 1) + \
+		fileInfo("aa", design_tx.antiAliasing) + \
+		fileInfo("singleSp", not design_k.hideSpacingBetweenSingles) + \
+		fileInfo("wrap", design_k.wrapIfDimLeftover) + \
+		".png"
 	filepath = ai.internalCachePath(filename)
 	canUseCachedFile = canUseCachedFile and os.path.exists(filepath) and \
 		not (draw and connection and design_k.spawnIndividualCuboids)

@@ -44,6 +44,9 @@ class connections:
 	strength = 70
 	color = .3
 
+# If a kernel setting is changed, the cached kernels will not be used by the algorithm,
+# therefore new kernel textures will need to be recalculated when drawing them.
+# With a few exceptions, this rule applies to a huge majority of the kernel settings.
 class kernels:
 	defaultPixelDimensions = (50, 50)
 	minPixelDimensions = None
