@@ -27,12 +27,12 @@ import random
 import types
 
 # LOCAL IMPORTS
+import beautifulDebug
 import serverSettings as setting
 import websocketServer as server
 import aiInteraction as ai
 import visualizationFunctions as vis
 import loggingFunctions
-import beautifulDebug
 import loggingFunctions
 import debugAndTesting
 import visualizationSettings as design
@@ -1481,21 +1481,8 @@ class Request:
 		if await self.checkParams(1, 1, False):
 			attr = await self.getParam(1, str, True)
 			if attr.lower() == "overview":
-				def shortenVar(var):
-					if type(var) is np.ndarray:
-						return f'ndarray ({var.shape})'
-					if len(str(var)) > 300:
-						output = str(type(var)).split("'")[1]
-						try: output += " of length " + str(len(var))
-						except: pass
-						output += f" ({fileHandling.formatFilesize(var)})"
-						output += ':\n' + str(var)[:200] + '...'
-						return output
-					return str(var)
-				overview = {k: shortenVar(v) for (k, v) in vars(ai.tfnet).items()}
-				await self.sendstatus(-30, "Available variables in the currently loaded network:\n" +
-					beautifulDebug.mapToText(overview, 3))
-				return
+				return await self.sendstatus(-30, "Available variables in the currently loaded network:\n" +
+					beautifulDebug.mapToText(vars(ai.tfnet), 3, autoShortenValues=True))
 			try:
 				await self.send(getattr(ai.tfnet, attr), sendAlsoAsDebugMsg=True)
 			except:
@@ -1504,7 +1491,8 @@ class Request:
 				await self.send(None)
 				return False
 		else:
-			await self.send(vars(ai.tfnet), sendAlsoAsDebugMsg=True)
+			await self.send(vars(ai.tfnet), sendAlsoAsDebugMsg=True,
+				printText=beautifulDebug.mapToText(vars(ai.tfnet), autoShortenValues=True))
 	commandList["tf get vars"] = (tf_getvars, "Returns all tf variables and information currently loaded",
 		"Retrieves any information already known about the loaded tensorflow network.\n" +
 		"Returns a map of the continually expanding class type that stores information about the " +
@@ -1533,7 +1521,8 @@ class Request:
 		if returnShapeDict:
 			return shapeDict
 	commandList["tf get train vars"] = (tf_refreshtrainablevars,
-		"Retrieves and stores all trainable variables available in the network.\n" +
+		"Retrieves and stores all trainable variables available in the network.",
+		"All trainable tensorflow variables are retrieved and stored temporarily.\n" +
 		"$[respond=False]$ If respond is positive, the var shapes will be sent as response")
 	commandList["tf get trainable vars"] = commandAlias("tf get train vars")
 	commandList["tf get trainable variables"] = commandAlias("tf get train vars")

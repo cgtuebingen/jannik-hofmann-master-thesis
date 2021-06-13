@@ -103,11 +103,14 @@ class FORMAT_OUTPUT:
 
 	# Whether or not the server should try to break printed text at spaces when printing in console
 	# False: No smart line breaks, True: Split at spaces, String: Split after any character in that string
-	SMART_LINE_BREAKS = ' .,-_+*/|\\\t'
+	SMART_LINE_BREAKS = ' -_+*/|\\\t=()[]\{\}'
 	# Prints colored output in the console. Nevertheless, ansi color codes will be emitted from the log
 	PRINT_COLOR_ANSI_CODES = True
+	# You can use this workaround, works better for some console, but might lead to weird spaces in others
+	USE_ALTERNATIVE_ANSI_CODE_WORKAROUND = True
 	# Change this value if you can see a text in the console that recommends you to.
-	ONLY_USE_SIMPLE_ANSI_CODES = True
+	# Rather than setting True here, you can also try to flip the Alternative workaround value above.
+	ONLY_USE_SIMPLE_ANSI_CODES = False
 	# Respond with color-formatted debug and status strings to the client. Use this only when reading
 	# server responses in a console while simulating a client (not recommended for UE4 client)
 	RESPOND_WITH_COLOR_ANSI_CODES = False
@@ -207,8 +210,10 @@ def checkSettings():
 				print(text)
 		else:
 			text = ('\u001b[40m' + beautifulDebug.YELLOW + beautifulDebug.ansicode(232, False) + # green text on black background
-			"Please enable FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES in the server settings for correct colors in " +
-			"the console output!\nOtherwise, warnings and errors could be overlooked easily." +
+			"Please try changing the value FORMAT_OUTPUT.USE_ALTERNATIVE_ANSI_CODE_WORKAROUND " +
+			"in the settings. If doesn't make this message disappear, please enable " +
+			"FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES in the server settings for correct colors " +
+			"in the console output!\nOtherwise, warnings and errors could be overlooked easily." +
 			beautifulDebug.RESET)
 			if FORMAT_OUTPUT.SMART_LINE_BREAKS:
 				beautifulDebug.printWithLinebreaks(text)

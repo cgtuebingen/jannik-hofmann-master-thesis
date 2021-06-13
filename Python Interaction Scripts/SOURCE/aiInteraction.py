@@ -373,7 +373,7 @@ def tfRefreshTrainableVars():
 		trainVars = tfGetTrainableVars(layer[0])
 		layerVarDict = dict()
 		for var in trainVars:
-			shapeDict[str(index) + ": " + var.name] = var.numpy().shape
+			shapeDict[str(index) + ": " + var.name] = var.shape if isinstance(var, np.ndarray) else var.numpy().shape
 			name = var.name.rsplit('/', 1)[1].split(':')[0]
 			# name is something like "kernel", "bias", "beta" or "gamma"
 			if name in layerVarDict:

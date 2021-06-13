@@ -7,16 +7,19 @@
 import re
 import os
 import math
+import numpy as np
 
 # LOCAL IMPORTS
 import serverSettings as setting
+import fileHandling
 
 # Returns a simple or complicated ansi foreground text color code as str for console formatting
 def ansicode(value, simpleCode = True):
-	if simpleCode:
-		return f'\033[{value}m'
-	else:
-		return f'\u001b[38;5;{value}m'
+	prefix = ' ' if setting.FORMAT_OUTPUT.USE_ALTERNATIVE_ANSI_CODE_WORKAROUND else ''
+	prefix += '\033[' if simpleCode else '\u001b['
+	if setting.FORMAT_OUTPUT.USE_ALTERNATIVE_ANSI_CODE_WORKAROUND: prefix += '\b'
+	if not simpleCode: prefix += '38;5;'
+	return prefix + str(value) + 'm'
 
 # Ansi Colors for nice formatting of console output
 RED = ansicode(31)
@@ -49,11 +52,8 @@ def special(r, g, b, text = None):
 	if not setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES:
 		return ansicode(16 + 36*r + 6*g + b, False)
 	else:
-		r //= 3
-		g //= 3
-		b //= 3
-		bright = r+g+b >= 8
-		code = 90 if bright else 30
+		r //= 3; g //= 3; b //= 3
+		code = 90 if r+g+b >= 8 else 30
 		code += r + 2*g + 4*b
 		if r==g==b:
 			if r+g+b < 8:
@@ -81,25 +81,21 @@ def underline(text, withintext = None, precedingWords = None, dontUnderlineUnder
 		if dontUnderlineUnderscores:
 			text = text.replace('_', DISABLE_UNDERLINE + '_' + UNDERLINE)
 		return UNDERLINE + text + DISABLE_UNDERLINE
-
 	elif precedingWords is None or len(precedingWords) == 0:
 		return withintext.replace(text, underline(text))
-	
 	else:
 		if type(precedingWords) is str:
 			precedingWords = [precedingWords]
 		for word in precedingWords:
 			if not word.endswith(" "):
 				word += " "
-			withintext = withintext.replace(word + text,
-				word + underline(text))
+			withintext = withintext.replace(word + text, word + underline(text))
 		return withintext
 
 # Removes any formatting ansi escape codes applied by this module. Should be used for log files
 def removeAnsiEscapeCharacters(text):
 	text = re.sub("\033\\[[0-9]*m", "", text)
-	text = re.sub("\u001b\\[[0-9\\;]*m", "", text)
-	return text
+	return re.sub("\u001b\\[[0-9\\;]*m", "", text)
 
 
 # Formats a text according to the debug/status level given and optionally underlines a command
@@ -136,7 +132,7 @@ def formatLevel(level, text = "", levelIsDebugLevel = True, commandToUnderline =
 	
 	# critical failure
 	else: # level >= 20
-		colorcode = RED + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(4, 0, 0) + BOLD + NEGATIVE
+		colorcode = RED + BOLD if setting.FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES else special(5, 0, 0) + BOLD + NEGATIVE
 
 	# If no text has been specified, just return the colorcode corresponding to that level
 	if text == "":
@@ -168,14 +164,17 @@ def consoleWidth():
 	except:
 		return 80
 
-def getCleanLinebreak(text, width = None, splitAt = ' '):
-	if width is None: # automatic width from console
-		width = consoleWidth()
+# negative width or width 0 will be relative to consoleWidth
+def getCleanLinebreak(text, width = 0, splitAt = ' '):
+	if width < 1: # automatic width from console
+		width += consoleWidth()
 	if len(text) <= width: # text smaller than width, doesn't need to be split
 		return text, ""
 	text_line = text[:width]
 	if '\n' in text_line: # split at first \n
 		return text.split('\n', 1)
+	if splitAt is True:
+		splitAt = ' '
 	if splitAt in [False, None, ""] or not any(d in text_line for d in splitAt):
 		# no delimiter applies for a split within width, just splitting at width
 		return text_line, text[len(text_line):]
@@ -194,25 +193,54 @@ def getCleanLinebreak(text, width = None, splitAt = ' '):
 		if text_line[i] in splitAt:
 			# split there, and if it's a space, remove it
 			if text_line[i].isspace():
-				return text[:i+text_line[i].isspace()], text[i+1:]
+				return text[:i], text[i+1:]
 			else:
 				return text[:i+1], text[i+1:]
 	# code shouldn't reach here, but if it does, fall back to simply splitting at width
 	return text_line, text[len(text_line):]
 
 def printWithLinebreaks(text, delimiters=' '):
-	while text:
-		text_line, text = getCleanLinebreak(text, splitAt=delimiters)
-		print(text_line)
+	if '\n' in text:
+		for line in text.split('\n'):
+			printWithLinebreaks(line, delimiters)
+	else:
+		indent = 0
+		while text.startswith(' '):
+			text = text[1:]
+			indent += 1
+		while text:
+			text_line, text = getCleanLinebreak(text, splitAt=delimiters, width=-indent)
+			print(' '*indent + text_line)
 
-def mapToText(map, spacing = 3, line_width = None, key_width = None, splitAtSpaces = True,
-	before_key = '', after_key = '', before_value = '', after_value = '', auto_adjust_column_length = True):
+def shortenVar(var, shortenOverLen=300, previewLen=200):
+	vartype = str(type(var)).split("'")[1]
+	vartype = vartype.replace("numpy.ndarray", "ndarray")
+	if len(str(var)) <= shortenOverLen:
+		if type(var) is str:
+			return f'{vartype}: "{var}"'
+		if type(var) is chr:
+			return f"{vartype}: '{var}'"
+		return vartype + ": " + str(var)
+	if type(var) is np.ndarray:
+		return f'{vartype} ({var.shape})'
+	output = vartype
+	try: output += " of length " + str(len(var))
+	except: pass
+	output += f" ({fileHandling.formatFilesize(var)})"
+	output += ':\n' + str(var)[:previewLen] + '...'
+	return output
+
+def mapToText(map, spacing = 3, line_width = None, key_width = .25, splitAtSpaces = True,
+	before_key = '', after_key = '', before_value = '', after_value = '', autoShortenValues = False):
 
 	if line_width is None:
 		line_width = consoleWidth()
 
-	key_lengths = [len(before_key + after_key + key) for key, value in map.items()]
-	value_lengths = [len(before_value + after_value + value) for key, value in map.items()]
+	if autoShortenValues:
+		map = {key: shortenVar(value) for (key, value) in map.items()}
+
+	key_lengths = [len(before_key + after_key + key) for key, _ in map.items()]
+	value_lengths = [len(before_value + after_value + str(value)) for _, value in map.items()]
 	if key_width is None:
 		key_width = sum(key_lengths) / sum(value_lengths) # ratio of average lengths
 	if type(key_width) is float:
@@ -223,9 +251,9 @@ def mapToText(map, spacing = 3, line_width = None, key_width = None, splitAtSpac
 	for key, value in map.items():
 		key = before_key + str(key) + after_key
 		value = before_value + str(value) + after_value
-		while len(key) or len(value):
-			key_line, key = getCleanLinebreak(key, key_width, splitAtSpaces)
-			value_line, value = getCleanLinebreak(value,
+		while len(str(key)) or len(str(value)):
+			key_line, key = getCleanLinebreak(str(key), key_width, splitAtSpaces)
+			value_line, value = getCleanLinebreak(str(value),
 				line_width - spacing - key_width, splitAtSpaces)
 			spaces = ' ' * (spacing + key_width - len(key_line))
 			output += key_line + spaces + value_line + '\n'

@@ -29,9 +29,9 @@ if __name__ == '__main__':
 
 # LOCAL IMPORTS
 import serverCommands
+import beautifulDebug
 import serverSettings as setting
 import loggingFunctions
-import beautifulDebug
 import websocketServer as server
 import visualizationSettings as design
 
