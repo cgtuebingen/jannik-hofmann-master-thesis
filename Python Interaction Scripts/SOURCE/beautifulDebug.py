@@ -164,27 +164,45 @@ def clearScreen():
 
 def consoleWidth():
 	try:
-		return os.get_terminal_size()[0]
+		return int(os.get_terminal_size()[0])
 	except:
 		return 80
 
-def getCleanLinebreak(text, width = None, splitAtSpaces = True):
-	if width is None:
+def getCleanLinebreak(text, width = None, splitAt = ' '):
+	if width is None: # automatic width from console
 		width = consoleWidth()
-	text = text.strip()
+	if len(text) <= width: # text smaller than width, doesn't need to be split
+		return text, ""
 	text_line = text[:width]
-	if '\n' in text_line:
+	if '\n' in text_line: # split at first \n
 		return text.split('\n', 1)
-	elif splitAtSpaces and len(text) > len(text_line) and text_line[:-1] != ' ' and \
-		text[width] != ' ' and ' ' in text_line:
-			text_line = text_line.rsplit(' ', 1)[0]
-			return text_line, text[len(text_line)+1:]
-	else:
+	if splitAt in [False, None, ""] or not any(d in text_line for d in splitAt):
+		# no delimiter applies for a split within width, just splitting at width
 		return text_line, text[len(text_line):]
+	if text[width] in [d for d in splitAt if d.isspace()]:
+		# space directly after width, so split at whole width and remove space in next line
+		return text_line, text[len(text_line)+1:]
+	if text_line[-1] in splitAt:
+		# directly at end of text_line (of length width) we have a delimiter
+		# split there, and remove it if it's a space
+		if text_line[-1].isspace():
+			return text_line[:-1], text[len(text_line):]
+		else:
+			return text_line, text[len(text_line):]
+	# search for a valid delimiter in text_line, starting at the end
+	for i in range(width-1, 0, -1):
+		if text_line[i] in splitAt:
+			# split there, and if it's a space, remove it
+			if text_line[i].isspace():
+				return text[:i+text_line[i].isspace()], text[i+1:]
+			else:
+				return text[:i+1], text[i+1:]
+	# code shouldn't reach here, but if it does, fall back to simply splitting at width
+	return text_line, text[len(text_line):]
 
-def printWithLinebreaks(text):
-	while len(text):
-		text_line, text = getCleanLinebreak(text)
+def printWithLinebreaks(text, delimiters=' '):
+	while text:
+		text_line, text = getCleanLinebreak(text, splitAt=delimiters)
 		print(text_line)
 
 def mapToText(map, spacing = 3, line_width = None, key_width = None, splitAtSpaces = True,

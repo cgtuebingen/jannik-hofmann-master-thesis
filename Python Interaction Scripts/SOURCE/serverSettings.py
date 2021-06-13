@@ -30,37 +30,6 @@ class SERVER:
 	TIMES_TO_RETRY_ESTABLISHING_SERVER = 10 # needs to be at least 1
 	SECONDS_BETWEEN_TRIES = 1 # should be at least 1
 
-class COMMANDS:
-	# Here you can define your own macros that get recognized as commands
-	# Use these to define more complicated behaviour or make routines quickly available
-	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
-	# To reload these macros you need to execute the command "server reload serverCommands"
-	MACROS = {
-		"fresh": "server reload vis design & tf draw layers & tf draw kernel",
-	}
-
-	# Allows the websocket client to execute and evaluate any string with python.
-	# Easier for debugging, but will introduce security concerns.
-	# Necessary for commands like python, eval, send struct, server reload
-	# Automatically disabled by checkSettings() over unencrypted internet connections outside of localhost
-	ALLOW_REMOTE_CODE_EXECUTION = True
-
-	# If true, giving commands with a ampersand will chain commands and execute them successively
-	# If enabled and you want to relay an ampersand to a command, escape it with a double ampersand
-	AMPERSAND_CHAINS_COMMANDS = True
-	# If commands can be chained, this determines whether following commands will still be executed
-	# after encountering an error with a previous command or after "server stop" has been called
-	EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE = False
-
-	# parameters that signify an affirmation or activation of some sort
-	POSITIVE_PARAMETERS = ["true", "1", "yes", "some", "accept", "t", "y", "pos", "positive", "yup",
-		"j", "yeah", "sure", "active", "activate", "activated", "+", "affirm", "confirm", "confirmed",
-		"confirmation", "affirmation"]
-	# parameters that signify a negation or deactivation of some sort
-	NEGATIVE_PARAMETERS = ["false", "0", "no", "none", "ignore", "f", "n", "neg", "negative", "nope",
-		"x", "nah", "inactive", "deactivate", "deactivated", "-", "negate", "negated", "deny", "denied",
-		"refuse", "refused", "ignored"]
-
 class FILEPATHS:
 	# Available neural networks that can be loaded via keywords
 	# Start with a \ or / to indicate a path relative to the location of the centralController.py script
@@ -94,6 +63,37 @@ class FILEPATHS:
 	# Where to temporarily cache images rendered for the Unreal Engine (e.g. textures)
 	FILECACHE = R"\..\filecache"
 
+class COMMANDS:
+	# Here you can define your own macros that get recognized as commands
+	# Use these to define more complicated behaviour or make routines quickly available
+	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
+	# To reload these macros you need to execute the command "server reload serverCommands"
+	MACROS = {
+		"fresh": "server reload vis design & tf draw layers & tf draw kernel",
+	}
+
+	# Allows the websocket client to execute and evaluate any string with python.
+	# Easier for debugging, but will introduce security concerns.
+	# Necessary for commands like python, eval, send struct, server reload
+	# Automatically disabled by checkSettings() over unencrypted internet connections outside of localhost
+	ALLOW_REMOTE_CODE_EXECUTION = True
+
+	# If true, giving commands with a ampersand will chain commands and execute them successively
+	# If enabled and you want to relay an ampersand to a command, escape it with a double ampersand
+	AMPERSAND_CHAINS_COMMANDS = True
+	# If commands can be chained, this determines whether following commands will still be executed
+	# after encountering an error with a previous command or after "server stop" has been called
+	EXECUTE_REST_OF_CHAINED_COMMANDS_AFTER_FORCE_CLOSE = False
+
+	# parameters that signify an affirmation or activation of some sort
+	POSITIVE_PARAMETERS = ["true", "1", "yes", "some", "accept", "t", "y", "pos", "positive", "yup",
+		"j", "yeah", "sure", "active", "activate", "activated", "+", "affirm", "confirm", "confirmed",
+		"confirmation", "affirmation"]
+	# parameters that signify a negation or deactivation of some sort
+	NEGATIVE_PARAMETERS = ["false", "0", "no", "none", "ignore", "f", "n", "neg", "negative", "nope",
+		"x", "nah", "inactive", "deactivate", "deactivated", "-", "negate", "negated", "deny", "denied",
+		"refuse", "refused", "ignored"]
+
 class FORMAT_OUTPUT:
 	# Desired level of debugging verbosity in console and debug. The lower you go the more verbose
 	# debug info gets printed. -10 = all debug, 0 = only warnings and errors, 3 = ignore mild warnings,
@@ -102,14 +102,15 @@ class FORMAT_OUTPUT:
 	DESIRED_VERBOSITY = -10
 
 	# Whether or not the server should try to break printed text at spaces when printing in console
-	SMART_LINE_BREAKS = True
+	# False: No smart line breaks, True: Split at spaces, String: Split after any character in that string
+	SMART_LINE_BREAKS = ' .,-_+*/|\\\t'
 	# Prints colored output in the console. Nevertheless, ansi color codes will be emitted from the log
 	PRINT_COLOR_ANSI_CODES = True
+	# Change this value if you can see a text in the console that recommends you to.
+	ONLY_USE_SIMPLE_ANSI_CODES = True
 	# Respond with color-formatted debug and status strings to the client. Use this only when reading
 	# server responses in a console while simulating a client (not recommended for UE4 client)
 	RESPOND_WITH_COLOR_ANSI_CODES = False
-	# Change this value if you can see a text in the console that recommends you to.
-	ONLY_USE_SIMPLE_ANSI_CODES = True
 
 	# Append new timestamp in the logfile if last log entry is older than ___ seconds:
 	LOG_TIMESTAMP_AFTER_SECONDS = 1
