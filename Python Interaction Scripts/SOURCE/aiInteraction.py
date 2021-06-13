@@ -75,6 +75,7 @@ def initInternalCachePath():
 
 
 # Prepares a python module and execs it.
+# Does not throw errors but returns strings with the error message!
 # Afterwards, if no error was thrown, call importtf for tensorflow networks
 def preparemodule(path, allowPreparingNewModuleOnTop = False):
 	global nn_spec, nn_module, nnprepared, modelvarname
@@ -86,19 +87,39 @@ def preparemodule(path, allowPreparingNewModuleOnTop = False):
 		modelvarname = modelvarname.strip()
 	else:
 		if setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME is None:
-			raise AssertionError("No name for the model variable has been defined! Please specify " +
-				"how to acccess the NN model py adding the varname after the AI script path, separated by a colon.")
+			return ("No name for the model variable has been defined! Please specify how to acccess the " +
+				"network model by adding the varname after the AI script path, separated by a colon.")
 		else:
 			modelvarname = setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME
+	if not os.path.exists(path):
+		return (f'File at location "{path}" does not exist! No file could be found at the ' +
+		'specified network script location! Please make sure you typed the path correctly ' +
+		'and that relative paths in the settings are relative to the source folder of the ' +
+		'servers centralController.py')
 	if not allowPreparingNewModuleOnTop and (nnprepared or nnloaded):
-		raise AssertionError("The ai interface has already loaded a module in the past and " +
+		return ("The ai interface has already loaded a module in the past and " +
 			"should not load another (or the same) nn script on top. You can override this " +
 			"check by setting the flag by calling preparemodule(path, True)")
 	loggingFunctions.printlog("Loading network from " + path)
 	nn_spec = importlib.util.spec_from_file_location("", path)
+	if nn_spec is None:
+		return (f'Python script at location "{path}" could not be loaded as a module! ' +
+		'Please make sure that the file at this location is a valid python script ' +
+		'that can be imported as a module by python')
 	nn_module = importlib.util.module_from_spec(nn_spec)
 	nn_spec.loader.exec_module(nn_module)
+	# Now let's check if the modelvarname exists...
+	try:
+		getattr(nn_module, modelvarname)
+	except:
+		return (f'No variable named "{modelvarname}" found ' +
+			f'in "{fileHandling.separateFilename(path)[1]}"!\n' +
+			"The specified variable " + modelvarname +
+			" for the model within the script does not exist!\n" +
+			"Please make sure that you correctly identify the model variable name and " +
+			"append it to the filename of the network python script, separated just by a colon.")
 	nnprepared = fileHandling.separateFilename(path)[1].replace('.py', '') + '-' + modelvarname
+	return True
 
 
 # Returns whether the prepared module contains a tensorflow neural network

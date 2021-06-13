@@ -4,6 +4,7 @@
 # the console output for a more legible debugging experience
 
 # USED LIBRARIES
+from posixpath import split
 import re
 import os
 import math
@@ -95,7 +96,10 @@ def underline(text, withintext = None, precedingWords = None, dontUnderlineUnder
 # Removes any formatting ansi escape codes applied by this module. Should be used for log files
 def removeAnsiEscapeCharacters(text):
 	text = re.sub("\033\\[[0-9]*m", "", text)
-	return re.sub("\u001b\\[[0-9\\;]*m", "", text)
+	text = re.sub(" \033\\[\b[0-9]*m", "", text)
+	text = re.sub("\u001b\\[[0-9\\;]*m", "", text)
+	text = re.sub(" \u001b\\[\b[0-9\\;]*m", "", text)
+	return text
 
 
 # Formats a text according to the debug/status level given and optionally underlines a command
@@ -199,18 +203,24 @@ def getCleanLinebreak(text, width = 0, splitAt = ' '):
 	# code shouldn't reach here, but if it does, fall back to simply splitting at width
 	return text_line, text[len(text_line):]
 
-def printWithLinebreaks(text, delimiters=' '):
+def printWithLinebreaks(text, delimiters=' ', autoDetectIndent=True):
 	if '\n' in text:
 		for line in text.split('\n'):
 			printWithLinebreaks(line, delimiters)
 	else:
 		indent = 0
-		while text.startswith(' '):
+		while autoDetectIndent and text.startswith(' '):
 			text = text[1:]
 			indent += 1
 		while text:
 			text_line, text = getCleanLinebreak(text, splitAt=delimiters, width=-indent)
 			print(' '*indent + text_line)
+
+def indent(text, prefix=2, prefixOnlyInFirstLine=True):
+	if type(prefix) is int:
+		prefix = ' ' * prefix
+	indent = ' ' * len(prefix) if prefixOnlyInFirstLine else prefix
+	return prefix + text.replace('\n', '\n' + indent)
 
 def shortenVar(var, shortenOverLen=300, previewLen=200):
 	vartype = str(type(var)).split("'")[1]
@@ -230,17 +240,38 @@ def shortenVar(var, shortenOverLen=300, previewLen=200):
 	output += ':\n' + str(var)[:previewLen] + '...'
 	return output
 
+# prints out a 2-dimensional list as a table
+def listToMap(two_dim_list):
+	map = {}
+	for index, entry in enumerate(two_dim_list):
+		if type(entry) in [list, tuple]:
+			key, *value = entry
+		key = str(index) + '%' + key
+		if len(value) == 1:
+			value = value[0]
+		value = str(value)
+		map[key] = value
+	return map
+
 def mapToText(map, spacing = 3, line_width = None, key_width = .25, splitAtSpaces = True,
-	before_key = '', after_key = '', before_value = '', after_value = '', autoShortenValues = False):
+	before_key = '', after_key = '', before_value = '', after_value = '',
+	treatKeys = lambda x: x, treatValues = lambda x: x):
+
+	if type(map) is list:
+		map = listToMap(map)
+		def newTreatKeys(key):
+			return treatKeys(key.split('%', 1)[1])
+	else:
+		newTreatKeys = treatKeys
 
 	if line_width is None:
 		line_width = consoleWidth()
 
-	if autoShortenValues:
-		map = {key: shortenVar(value) for (key, value) in map.items()}
+	# treating values
+	map = {key: treatValues(value) for (key, value) in map.items()}
 
-	key_lengths = [len(before_key + after_key + key) for key, _ in map.items()]
-	value_lengths = [len(before_value + after_value + str(value)) for _, value in map.items()]
+	key_lengths = [len(before_key + newTreatKeys(str(key)) + after_key) for key, _ in map.items()]
+	value_lengths = [len(before_value + str(value) + after_value) for _, value in map.items()]
 	if key_width is None:
 		key_width = sum(key_lengths) / sum(value_lengths) # ratio of average lengths
 	if type(key_width) is float:
@@ -249,7 +280,7 @@ def mapToText(map, spacing = 3, line_width = None, key_width = .25, splitAtSpace
 	key_width = min(key_width, max(key_lengths)) # adapt to short keys
 	output = ""
 	for key, value in map.items():
-		key = before_key + str(key) + after_key
+		key = before_key + newTreatKeys(str(key)) + after_key
 		value = before_value + str(value) + after_value
 		while len(str(key)) or len(str(value)):
 			key_line, key = getCleanLinebreak(str(key), key_width, splitAtSpaces)

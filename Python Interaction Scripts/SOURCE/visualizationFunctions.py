@@ -36,6 +36,7 @@ import loggingFunctions
 import serverSettings as setting
 import debugAndTesting
 from forceatlas2 import ForceAtlas2
+import fileHandling
 
 # Singal to see whether client is ready to receive the next drawing instruction
 readyToDraw = True
@@ -419,7 +420,7 @@ async def checkEmptyQueue(connection, processDescription):
 			return
 	# No new checkEmptyQueues running and there is something in the queue
 	try:
-		await connection.senddebug(17, "It appears, sendCuboidBatch() hasn't been called after " +
+		await connection.senddebug(17, "It appears that sendCuboidBatch() hasn't been called after " +
 			"queueing the last cuboid draw instructions! Batch will be left alone, probably not " +
 			"all desired objects are shown in the virtual world.\n" +
 			"Please call sendCuboidBatch() after drawing " + processDescription)

@@ -202,9 +202,9 @@ class Request:
 				printText = data
 			if sendAlsoAsDebugMsg:
 				if printText not in (None, False, ""):
-					await self.senddebug(-9, printText)
+					await self.senddebug(-9, beautifulDebug.removeAnsiEscapeCharacters(printText))
 				else:
-					await self.senddebug(-9, data)
+					await self.senddebug(-9, beautifulDebug.removeAnsiEscapeCharacters(data))
 			await self.websocket.send(packed) # actually send it via websocket
 			if printText not in (None, False, ""):
 				# and print it in the console and debug
@@ -288,7 +288,7 @@ class Request:
 
 		if sentSuccessfully:
 			loggingFunctions.printlog(beautifulDebug.formatLevel(level,
-				f"> Status (lvl {level}) about {self.command}:\n  {info}", False, self.command), verbosity = -2)
+				f"> Status (lvl {level}) about {self.command}:\n{beautifulDebug.indent(info, 2)}", False, self.command), verbosity = -2)
 
 		# if chosen, automatically generate error message on encountering a critical error
 		if errorOnCriticalFailure and level >= 20:
@@ -324,19 +324,19 @@ class Request:
 		if sentSuccessfully and (level >= setting.FORMAT_OUTPUT.DESIRED_VERBOSITY or level == 0):
 			if level >= 20: # critical error / failure. shuts down the client system
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
-					f"\n> CRITICAL ERROR (lvl {level}) with {self.command}!\nX {info}\n", True, self.command))
+					f"> CRITICAL ERROR (lvl {level}) with {self.command}!\n{beautifulDebug.indent(info, 'X ')}", True, self.command))
 			elif level >= 10: # error / non-critical exception
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
-					f"\n> EXCEPTION (lvl {level}) with {self.command}!\nX {info}\n", True, self.command))
+					f"> EXCEPTION (lvl {level}) with {self.command}!\n{beautifulDebug.indent(info, 'X ')}", True, self.command))
 			elif level >= 1: # warning
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
-					f"\n> WARNING (lvl {level}) about {self.command}!\n! {info}\n", True, self.command))
+					f"> WARNING (lvl {level}) about {self.command}!\n{beautifulDebug.indent(info, '! ')}", True, self.command))
 			elif level == 0: # undefined
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
-					f"> Undefined debug message with {self.command}:\n  {info}", True, self.command))
+					f"> Undefined debug message with {self.command}:\n{beautifulDebug.indent(info, 2)}", True, self.command))
 			else: # debug
 				loggingFunctions.printlog(beautifulDebug.formatLevel(level,
-					f"> Debug info (lvl {level}) about {self.command}:\n  {info}", True, self.command))
+					f"> Debug info (lvl {level}) about {self.command}:\n{beautifulDebug.indent(info, 2)}", True, self.command))
 
 		# if chosen, automatically shutdown server on encountering a critical error
 		if autoShutdownOnCriticalError and level >= 20:
@@ -448,7 +448,7 @@ class Request:
 	# return boolean to specify whether connection to client should be closed after execution
 
 	async def commandNotFound(self, **kwargs):
-		await self.senddebug(11, "ERROR! Command " + self.command + " not recognized!")
+		await self.sendstatus(11, "ERROR! Command " + self.command + " not recognized!")
 		return False
 
 	async def displayhelp(self, helpString = None, **kwargs):
@@ -695,7 +695,7 @@ class Request:
 	# do not rely on this function for production code via unencrypted connections
 	async def python(self, **kwargs):
 		if not setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION:
-			await self.senddebug(15, f"Cannot execute {await self.getParam()}. " +
+			await self.sendstatus(15, f"Cannot execute {await self.getParam()}. " +
 				"Remote code execution is disabled by python websocket server.")
 			return False
 		if(not(await self.checkParams(1, math.inf))):
@@ -720,7 +720,7 @@ class Request:
 	# do not rely on this function for production code via unencrypted connections
 	async def pythoneval(self, **kwargs):
 		if not setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION:
-			await self.senddebug(15, f"Cannot evaluate {await self.getParam()}. " +
+			await self.sendstatus(15, f"Cannot evaluate {await self.getParam()}. " +
 				"Remote code execution is disabled by python websocket server.")
 			return False
 		if(not(await self.checkParams(1, math.inf))):
@@ -1031,7 +1031,10 @@ class Request:
 			path = setting.FILEPATHS.LOGFILE
 		else:
 			path = await self.getParam()
-		await self.sendfile(path)
+		result = await self.sendfile(path)
+		# checking if it was successful or file was too large
+		if result is False:
+			return False
 	commandList["send file"] = (sendfiletest, "Transmits a file at specified path as binary data",
 		"§[path]§ path refers to the file location on the server. Absolute paths are " +
 		'preferred\nResponds with a struct of type ["FILE", filename, binarydata]')
@@ -1123,6 +1126,21 @@ class Request:
 		'Type help for a list of available commands')
 
 
+	async def history(self, *, history, **kwargs):
+		fancyHistory = []
+		for entry in history:
+			if entry[1]:
+				fancyHistory.append((beautifulDebug.B_GREEN + entry[0], "successful"))
+			else:
+				fancyHistory.append((beautifulDebug.B_YELLOW + entry[0], "failed"))
+		await self.sendstatus(-30, f"Here is the history of all executed commands in this server session:\n" +
+			beautifulDebug.mapToText(fancyHistory, spacing=1, key_width=0.8))
+	commandList["history"] = (history, "Lists a history of all executed commands in the server session",
+		'Takes no arguments. Also lists whether the commands were successful or not.\n' +
+		'For more detailed information about the results and timestamps of the command executions ' +
+		'please see the server console output or the servers logfile.')
+
+
 	async def prepareCommand(self, **kwargs):
 		global preparedCommands
 		if await self.checkParams(0, 0, False):
@@ -1166,19 +1184,28 @@ class Request:
 			raise TypeError("Function loadCommand needs to be given a list as parameter loadedCommands, otherwise it cannot relay the information of the loaded command! Make sure that the function executing commands has a mutable list parameter for loadedCommands.")
 		
 		global preparedCommands
-		await self.checkParams(0, 0)
+		await self.checkParams(0, 1)
 		if len(preparedCommands) == 0:
 			await self.senddebug(10, f"List of prepared commands is empty. Nothing to load!")
 			return False
 		else:
-			nextCommand = preparedCommands.pop(0)
-			await self.sendstatus(-10, f'Command "{beautifulDebug.underline(nextCommand)}" was loaded from the list of prepared commands. Executing it now.')
+			if not self.checkParams(1, 1, False) or \
+				not (await self.getParam(warnOnEmptyString=False)).lower().strip() == "keep":
+					nextCommand = preparedCommands.pop(0)
+					await self.sendstatus(-10, f'Command "{beautifulDebug.underline(nextCommand)}" was ' +
+					'loaded and removed from the list of prepared commands. Executing it now.')
+			else:
+				nextCommand = preparedCommands[0]
+				await self.sendstatus(-10, f'Command "{beautifulDebug.underline(nextCommand)}" was ' +
+				'loaded from the list of prepared commands without removing it from there. Executing it now.')
 			loadedCommand.append(nextCommand)
 			return True
 	commandList["load"] = (loadCommand, "Loads and executes the oldest prepared command",
 		'Does not take any arguments. Loads the oldest command from the list of prepared commands, ' +
 		'executes it on the current client connection and removes it from the list.\n' +
-		'Use §§ to check the list. See more info on the prepare and loading mechanism with "help prepare"')
+		'Use §§ to check the list. See more info on the prepare and loading mechanism with "help prepare"\n' +
+		'§keep§ loads the oldest prepared command without consuming it. ' +
+		'This way you can repeatedly load the same command')
 	
 
 	SEVERE_WARNING_LEVEL = 20
@@ -1318,7 +1345,7 @@ class Request:
 	# NEURAL NETWORK INTERACTION
 	async def loadnn(self, **kwargs):
 		if ai.nnloaded or ai.nnprepared:
-			await self.senddebug(13, f'The server has already loaded another network. It is ' +
+			await self.senddebug(9, f'The server has already loaded another network. It is ' +
 			'recommended to use "server reset" before loading another network, to avoid ' +
 			'undefined behaviour!')
 		if not await self.checkParams(warnUser=False):
@@ -1331,18 +1358,23 @@ class Request:
 		path = setting.FILEPATHS.AVAILABLE_MODELS.get(path, path)
 		
 		try:
-			await self.sendstatus(-10, f"Neural network at {path} is being loaded. This might " +
+			await self.sendstatus(-10, f'Neural network at "{path}" is being loaded. This might ' +
 				"take a while. Please view the python console for further information and loading details.")
-			await server.sleep(0.1, "Loading neural network") # make sure other async tasks have a chance to be executed before
-			# blocking main thread for a while (so that the previous status mesage gets send properly)
-			ai.preparemodule(path, True)
+			await server.sleep(0.1, "Loading neural network")
+			# make sure other async tasks have a chance to be executed before blocking main
+			# thread for a while (so that the previous status mesage gets send properly)
+			result = ai.preparemodule(path, True)
 		except:
-			await self.sendstatus(15, f"ERROR finding or loading python script at specified location {path}:\n" +
+			await self.sendstatus(15, f'ERROR finding or loading python script at specified location "{path}":\n' +
 				traceback.format_exc())
 			return False
+		if type(result) is str and len(result):
+			await self.sendstatus(15, f'ERROR loading python script at specified location "{path}":\n' + result)
+			return False
 		
-		await server.sleep(0.1, "Initializing neural network") # make sure other async tasks have a chance to be executed before
-		# blocking main thread for a while (so that the previous status mesage gets send properly)
+		await server.sleep(0.1, "Initializing neural network")
+		# make sure other async tasks have a chance to be executed before blocking main
+		# thread for a while (so that the previous status mesage gets send properly)
 		try:
 			if ai.preparedModuleIsTf():
 				ai.importtf()
@@ -1482,7 +1514,7 @@ class Request:
 			attr = await self.getParam(1, str, True)
 			if attr.lower() == "overview":
 				return await self.sendstatus(-30, "Available variables in the currently loaded network:\n" +
-					beautifulDebug.mapToText(vars(ai.tfnet), 3, autoShortenValues=True))
+					beautifulDebug.mapToText(vars(ai.tfnet), 3, treatValues=beautifulDebug.shortenVar))
 			try:
 				await self.send(getattr(ai.tfnet, attr), sendAlsoAsDebugMsg=True)
 			except:
@@ -1492,7 +1524,7 @@ class Request:
 				return False
 		else:
 			await self.send(vars(ai.tfnet), sendAlsoAsDebugMsg=True,
-				printText=beautifulDebug.mapToText(vars(ai.tfnet), autoShortenValues=True))
+				printText=beautifulDebug.mapToText(vars(ai.tfnet), treatValues=beautifulDebug.shortenVar))
 	commandList["tf get vars"] = (tf_getvars, "Returns all tf variables and information currently loaded",
 		"Retrieves any information already known about the loaded tensorflow network.\n" +
 		"Returns a map of the continually expanding class type that stores information about the " +

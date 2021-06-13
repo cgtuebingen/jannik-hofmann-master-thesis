@@ -26,6 +26,10 @@ import loggingFunctions
 # Major version difference will result in refusal to interact with neural network
 PYTHON_INTERACTION_SCRIPT_VERSION = "0.1.0"
 
+# stores the history of executed commands, as tuple of the original command, along with a bool 
+# signifying if the command was executed successfully
+command_history = []
+
 # WEBSOCKET SERVER THAT INTERACTS WITH COMMANDS
 async def interactiveServer(websocket, path, *, initialCommand=None, debugDisconnect=True):
 	# Create a new command instance for this client connection and store the websocket connection,
@@ -157,7 +161,11 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 				# Defining additional parameters needed for certain command functions
 				loadedCommand=loadedCommand, # for console and load
 				calledDirectlyByCommand=True, # for nn is loaded
+				history=command_history, # for history
 			)
+
+			# adding executed command to history
+			command_history.append((commandInstance.command, shouldBeKeptOpen is not False))
 
 			# Just making sure that func can only returns bool or None:
 			assert shouldBeKeptOpen is None or type(shouldBeKeptOpen) is bool
@@ -266,7 +274,7 @@ async def interactiveServer(websocket, path, *, initialCommand=None, debugDiscon
 				"! The following EXCEPTION was raised:\n" + traceback.format_exc()
 			# Trying to at least transfer error message to client
 			try:
-				await commandInstance.senddebug(12, errormsg)
+				await commandInstance.senddebug(17, errormsg)
 			except:
 				# No chance, then just print and log it on the server
 				loggingFunctions.printlog(beautifulDebug.B_RED + beautifulDebug.BOLD + errormsg + beautifulDebug.RESET,
