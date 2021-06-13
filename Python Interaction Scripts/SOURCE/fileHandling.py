@@ -31,6 +31,10 @@ def deleteDirectoryContent(path):
 			shutil.rmtree(filepath)
 		except OSError:
 			os.remove(filepath)
+	try:
+		shutil.rmtree(path)
+	except OSError:
+		os.remove(path)
 
 def formatFilesize(data):
 	if type(data) is int:

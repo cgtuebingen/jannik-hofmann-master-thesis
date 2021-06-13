@@ -948,7 +948,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 								)
 								await queueCuboid(connection, position, size, color, processDescription = processDesc)
 							else:
-								await server.sleep(0, processDesc)
+								await server.sleep(0, processDesc + " here")	
 
 		# After looping through all of the kernels
 		if draw and design.kernels.spawnIndividualCuboids and connection:

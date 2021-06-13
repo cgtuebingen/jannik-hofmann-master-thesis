@@ -8,6 +8,7 @@
 # USED LIBRARIES
 import asyncio
 from logging import error
+import logging
 from msgpack.exceptions import FormatError
 import websockets
 import sys
@@ -377,25 +378,38 @@ async def sleep(delay, description, hideInServerInfo = False):
 		yieldingCoroutines.remove((task, description))
 
 # Stops and interrupts all ongoing coroutines
-# Returns a list of descriptions of all the cancelled tasks
+# Returns a list of descriptions of all the cancelled tasks and a list of uncancelled ones
 async def cancelYieldingCoroutines():
 	global yieldingCoroutines
 	if len(yieldingCoroutines) == 0:
-		return []
+		return [], []
 	cancelledCoroutines = set()
-	justTasks = set()
+	justCancelledTasks = set()
 	for (task, description) in yieldingCoroutines:
 		if task.cancel():
 			cancelledCoroutines.add((task, description))
-		justTasks.add(task)
-	await asyncio.wait(justTasks)
+		justCancelledTasks.add(task)
+	await asyncio.wait(justCancelledTasks)
 	yieldingCoroutines -= cancelledCoroutines
-	return [description for (_, description) in cancelledCoroutines]
+	return [description for (_, description) in cancelledCoroutines], \
+		[description for (_, description) in yieldingCoroutines]
 
 # Stops and interrupts all ongoing coroutines
 # Returns a list of descriptions of all the cancelled tasks
 async def stopCoroutines():
-	return await asyncio.create_task(cancelYieldingCoroutines())
+	cancelled, failed = await asyncio.create_task(cancelYieldingCoroutines())
+	counter = 0
+	while len(failed) and counter < setting.SERVER.TIMES_TO_RETRY_STOPPING_COROUTINES:
+		await sleep(0, "Cancelling running coroutines")
+		newly_cancelled, failed = await asyncio.create_task(cancelYieldingCoroutines())
+		cancelled += newly_cancelled
+		counter += 1
+	if len(failed):
+		loggingFunctions.warn('"server stop" command could not cancel all running coroutines!\n' +
+		'The following coroutines could not be terminated:\n' +
+		serverCommands.Request.listCoroutines(None, failed) +
+		'\nIt is recommended to restart the server with "server restart"', 19)
+	return cancelled
 
 
 # Shuts down the server after optionally displaying and sending the specified message

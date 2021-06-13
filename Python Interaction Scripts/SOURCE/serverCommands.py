@@ -755,7 +755,7 @@ class Request:
 					result += '\n      ' + desc
 		return result
 
-	async def serverInfo(self, **kwargs):
+	async def serverInfo(self, *, history, **kwargs):
 		await self.checkParams(0)
 		text = f"You are connected to the python interaction server, " + \
 			f"which is located on {setting.SERVER.IP}:{setting.SERVER.PORT}"
@@ -765,8 +765,16 @@ class Request:
 			text += f'\nCurrently running command coroutines:' + self.listCoroutines()
 		finaloutput = text
 		#await self.sendstatus(-30, text, False)
+		# if len(history) == 0:
+			# # This will never get called, as calling "server info" already is a command from a client
+			# text = f"This server is running and waiting for a client to connect. So far, in " + \
+			# 	"this session, the server has not yet connected to any client or received any " + \
+			# 	"commands. Please start the client and make sure that it connects properly to " + \
+			# 	"the servers websocket connection via network with matching IP and port."
+			# finaloutput += '\n\n' + text
 		if not(ai.tfloaded()):
-			text = f"No neural network has been loaded in this server session yet (or a loaded one has been reset).\n" + \
+			text = f"A client has successfully connected and communicated with this server in the current server session.\n" + \
+				"No neural network has been loaded in this server session yet (or a loaded one has been reset).\n" + \
 				'Use the command "nn load ..." to load a neural network. More info available on typing "help nn load"'
 			finaloutput += '\n\n' + text
 			#await self.sendstatus(1, text, False)
@@ -966,11 +974,9 @@ class Request:
 	commandList["server filecache info"] = commandAlias("server cache info")
 	
 	async def deleteFilecache(self, **kwargs):
-		await self.checkParams(0, 1)
 		if await self.checkParams(warnUser=False): # specific folder
 			folder = await self.getParam()
 			folderlist = fileHandling.getSubdirectories(setting.FILEPATHS.FILECACHE)
-			print(folder)
 			if folder not in folderlist:
 				folder = folder.strip()
 			if folder not in folderlist:
@@ -1364,6 +1370,8 @@ class Request:
 			# make sure other async tasks have a chance to be executed before blocking main
 			# thread for a while (so that the previous status mesage gets send properly)
 			result = ai.preparemodule(path, True)
+		except asyncio.CancelledError:
+			raise asyncio.CancelledError
 		except:
 			await self.sendstatus(15, f'ERROR finding or loading python script at specified location "{path}":\n' +
 				traceback.format_exc())

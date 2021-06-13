@@ -27,8 +27,9 @@ class SERVER:
 
 	# OTHER WEBSOCKET SERVER SETTINGS
 	MAX_MESSAGE_SIZE = 2**24 # in bytes. should not be larger than 2**24 without changing msgpack specs
-	TIMES_TO_RETRY_ESTABLISHING_SERVER = 10 # needs to be at least 1
+	TIMES_TO_RETRY_ESTABLISHING_SERVER = 10 # needs to be at least 1, otherwise the server won't run
 	SECONDS_BETWEEN_TRIES = 1 # should be at least 1
+	TIMES_TO_RETRY_STOPPING_COROUTINES = 40
 
 class FILEPATHS:
 	# Available neural networks that can be loaded via keywords
@@ -173,6 +174,8 @@ def checkSettings():
 			"cannot be started. Setting SERVER.TIMES_TO_RETRY_ESTABLISHING_SERVER to 1."
 		loggingFunctions.warn(msg, 8)
 		SERVER.TIMES_TO_RETRY_ESTABLISHING_SERVER = 1
+
+	assert type(SERVER.TIMES_TO_RETRY_STOPPING_COROUTINES) is int
 
 	assert type(SERVER.SECONDS_BETWEEN_TRIES) is int or \
 		type(SERVER.SECONDS_BETWEEN_TRIES) is float
