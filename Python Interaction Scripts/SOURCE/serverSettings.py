@@ -70,7 +70,10 @@ class COMMANDS:
 	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
 	# To reload these macros you need to execute the command "server reload serverCommands"
 	MACROS = {
-		"fresh": "server reload vis design & tf draw layers & tf draw kernel",
+		"fresh": "server reload setting server vis design & tf draw layers",
+		"recom": "server reload setting & eval setting.COMMANDS.MACROS & server reload serverCommands",
+		"kk": "tf draw kernel",
+		"nowait": "py design.maxDrawWaitTimeout = 0 & eval design.maxDrawWaitTimeout",
 	}
 
 	# Allows the websocket client to execute and evaluate any string with python.

@@ -1541,10 +1541,10 @@ class Request:
 		"that can be read by humans due to capped output")
 
 
-	async def tf_refreshtrainablevars(self, returnShapeDict=False, **kwargs):
+	async def tf_refreshtrainablevars(self, returnShapeDict=False, calledDirectlyByCommand=False, **kwargs):
 		if not await self.assertTf(): return False
-		await self.checkParams(0, 1)
-		printVars = await self.getParam(1, False)
+		await self.checkParams(0, 1, warnUser=calledDirectlyByCommand)
+		printVars = await self.getParam(1, False, warnOnEmptyString=calledDirectlyByCommand)
 		if not hasattr(ai.tfnet, "validstructure") or ai.tfnet.validstructure == False:
 			await self.sendstatus(-10, f"Structure of the network hasn't been retrieved yet. Doing that first...")
 			success = await self.tf_getstructure(False, False)
@@ -1571,9 +1571,12 @@ class Request:
 	async def tf_drawkernel(self, **kwargs):
 		if not await self.assertTf(): return False
 		if not await self.checkParams(0, 2): return False
-		precacheAll = (await self.getParam()).lower() == "all"
-		index = await self.getParam(1, -1)
-		refresh = await self.getParam(2, False)
+		precacheAll = (await self.getParam(warnOnEmptyString=False)).lower() == "all"
+		if precacheAll:
+			index = -1
+		else:
+			index = await self.getParam(1, -1, warnOnEmptyString=False)
+			refresh = await self.getParam(2, False, warnOnEmptyString=False)
 		if index == -1: # just printing out all kernel shapes without drawing anything
 			await self.sendstatus(-10, f"Refreshing trainable variables of the network...")
 			shapeDict = await self.tf_refreshtrainablevars(returnShapeDict=True)

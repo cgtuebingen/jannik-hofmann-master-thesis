@@ -752,12 +752,24 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 			if verbosity < 0: loggingFunctions.printlog(text)
 			else: loggingFunctions.warn(text)
 	
-	filename = f"kernels-layer-{layerIndex}.png"
+	design_k = design.kernels
+	design_tx = design_k.renderTexture
+	filename = f"kernels-layer-{layerIndex}_settings-" + \
+		f"res{design_tx.defaultPixelResolution[0]}-{design_tx.defaultPixelResolution[1]}-" + \
+		f"max{design_tx.maxTextureResolution}-" + \
+		f"space{design_k.spacingBetweenKernels[0]}-{design_k.spacingBetweenKernels[1]}" + \
+		(f'-bright{design_k.brightness}' if not math.isclose(design_k.brightness, 50) else '') + \
+		(f'-contr{design_k.contrast}' if not math.isclose(design_k.contrast, 50) else '') + \
+		(f'-opac{design_tx.opacity}' if not math.isclose(design_tx.opacity, 1) else '') + \
+		('-aa' if design_tx.antiAliasing else '') + \
+		('-singleSp' if not design_k.hideSpacingBetweenSingles else '') + \
+		('-wrap' if design_k.wrapIfDimLeftover else '')
+	filename = filename.replace('.', ',') + ".png"
 	filepath = ai.internalCachePath(filename)
 	canUseCachedFile = canUseCachedFile and os.path.exists(filepath) and \
-		not (draw and connection and design.kernels.spawnIndividualCuboids)
-	renderTexture = not design.kernels.spawnIndividualCuboids or \
-		design.kernels.renderTexture.saveToRendersFolder or \
+		not (draw and connection and design_k.spawnIndividualCuboids)
+	renderTexture = not design_k.spawnIndividualCuboids or \
+		design_tx.saveToRendersFolder or \
 		not connection or not draw
 	
 	if len(Layer.layerList) <= layerIndex:
@@ -795,23 +807,23 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		elif len(kernel.shape) == 4:
 			groups = kernel.shape[2:4]
 	wrapping = False
-	if groups[1] == 1 and design.kernels.wrapIfDimLeftover:
+	if groups[1] == 1 and design_k.wrapIfDimLeftover:
 		wrapping = True
 		newGroupy = math.floor(math.sqrt(groups[0]))
 		groups = (math.ceil(groups[0] / newGroupy), newGroupy)
-	size = Coordinates(design.kernels.defaultPixelDimensions, z = design.kernels.thickness)
+	size = Coordinates(design_k.defaultPixelDimensions, z = design_k.thickness)
 	if size.z <= 1:
 		size.z *= size.x
 	# -- here you could add responsive calculations that adjust the pixel size
 	#    depending on how many there are and how large everything should be.
-	if design.kernels.minPixelDimensions is not None:
-		size.x = max(size.x, design.kernels.minPixelDimensions[0])
-		size.y = max(size.y, design.kernels.minPixelDimensions[1])
-	if design.kernels.maxPixelDimensions is not None:
-		size.x = min(size.x, design.kernels.maxPixelDimensions[0])
-		size.y = min(size.y, design.kernels.maxPixelDimensions[1])
-	spacing = Coordinates(design.kernels.spacingBetweenKernels, z = 0)
-	if design.kernels.hideSpacingBetweenSingles and \
+	if design_k.minPixelDimensions is not None:
+		size.x = max(size.x, design_k.minPixelDimensions[0])
+		size.y = max(size.y, design_k.minPixelDimensions[1])
+	if design_k.maxPixelDimensions is not None:
+		size.x = min(size.x, design_k.maxPixelDimensions[0])
+		size.y = min(size.y, design_k.maxPixelDimensions[1])
+	spacing = Coordinates(design_k.spacingBetweenKernels, z = 0)
+	if design_k.hideSpacingBetweenSingles and \
 		pixelsPerGroup[0] == 1 and pixelsPerGroup[1] == 1:
 			spacing = Coordinates(0)
 	elif spacing.x <= 1 and spacing.y <= 1:
@@ -823,17 +835,24 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 
 	if not canUseCachedFile: # (re)creating the texture file for all of the kernels
 		if renderTexture:
-			resolution = design.kernels.defaultPixelDimensions[0] /	design.kernels.renderTexture.defaultPixelResolution
+			resolution = list(design_tx.defaultPixelResolution)
 			# Applying max resolution to texture size
-			if structureHeight >= structureWidth:
-				if round(structureHeight / resolution) > design.kernels.renderTexture.maxResolution:
-					resolution = structureHeight / design.kernels.renderTexture.maxResolution
-			else:
-				if round(structureWidth / resolution) > design.kernels.renderTexture.maxResolution:
-					resolution = structureWidth / design.kernels.renderTexture.maxResolution
+			resolution[0] = min(resolution[0], design_tx.maxTextureResolution / structureWidth * design_k.defaultPixelDimensions[0])
+			resolution[1] = min(resolution[1], design_tx.maxTextureResolution / structureHeight * design_k.defaultPixelDimensions[1])
 			# Creating render array to be filled with color (and opacity) values
-			render = np.zeros([int(round(structureHeight / resolution)),
-				int(round(structureWidth / resolution)), 4], np.uint8)
+			if not design_tx.antiAliasing:
+				render = np.zeros([int(round(structureHeight * resolution[1] / design_k.defaultPixelDimensions[1])),
+					int(round(structureWidth * resolution[0] / design_k.defaultPixelDimensions[0])), 4], np.uint8)
+			else: # anti Aliasing
+				resolution[0] = max(1, int(round(resolution[0])))
+				resolution[1] = max(1, int(round(resolution[1])))
+				spacingResolution = [0, 0]
+				spacingResolution[0] = int(round(spacing.x / design_k.defaultPixelDimensions[0] * resolution[0]))
+				spacingResolution[1] = int(round(spacing.y / design_k.defaultPixelDimensions[1] * resolution[1]))
+				def renderDim(axis):
+					return groups[axis] * pixelsPerGroup[axis] * resolution[axis] + \
+						(groups[axis]-1) * spacingResolution[axis]
+				render = np.zeros([renderDim(1), renderDim(0), 4], np.uint8)
 
 		# Some subfunctions for color normalization and editing
 		# makeExponent takes a value from 0 to 100 to produce an exponent. value 50 results in exponent 1
@@ -847,10 +866,10 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		def normalizeColors(input):
 			colors = np.copy(input)
 			colors /= max(np.max(kernel), -np.min(kernel))
-			colors = abs(colors) ** makeExponent(design.kernels.contrast)
+			colors = abs(colors) ** makeExponent(design_k.contrast)
 			colors = np.where(input >= 0, colors, -colors)
 			colors = colors / 2 + 0.5
-			colors = colors ** makeExponent(design.kernels.brightness)
+			colors = colors ** makeExponent(design_k.brightness)
 			return np.around(colors * 255).astype(np.uint8)
 		try:
 			# Normalizing the colors in the whole kernel at once
@@ -871,9 +890,9 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 				return colors[tuple(nplocation)]
 		
 		progress = 0
-		updateEvery = 1000
+		updateEvery = 1000 # every how many iterations the progress bar and the coroutine yielding should update
 		totalIterations = groups[1] * groups[0] * pixelsPerGroup[1] * pixelsPerGroup[0]
-		opacity = int(round(design.kernels.renderTexture.opacity * 255))
+		opacity = int(round(design_tx.opacity * 255))
 		with tqdm(total=totalIterations) as pbar:
 			for groupy in range(groups[1]):
 				for groupx in range(groups[0]):
@@ -915,26 +934,38 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 										groupy = math.inf
 								break # breaking out of every loop whose counter was set to math.inf
 							
-							x = groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x
-							y = groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y
+							if not design_tx.antiAliasing or (draw and design_k.spawnIndividualCuboids and connection):
+								x = groupx * pixelsPerGroup[0] * size.x + groupx * spacing.x + pixelx * size.x
+								y = groupy * pixelsPerGroup[1] * size.y + groupy * spacing.y + pixely * size.y
 							progress += 1
 							if progress % updateEvery == 0 or progress > totalIterations - updateEvery:
 								pbar.update(updateEvery)
 							processDesc = f"kernels of layer {layerIndex} at pixel {progress} " + \
 								f"of {totalIterations}"
 							if renderTexture:
-								def treatWithResolution(val):
-									return int(round(val / resolution))
-								render[
-									treatWithResolution(y) : treatWithResolution(y + size.y),
-									treatWithResolution(x) : treatWithResolution(x + size.x)
-								] = color
-							if draw and design.kernels.spawnIndividualCuboids and connection:
+								if not design_tx.antiAliasing:
+									def treatWithResolution(axis, addSize=False):
+										if axis == 0: val = x / size.x
+										else: val = y / size.y
+										if addSize: val += 1
+										return int(round(val * resolution[axis]))
+									render[
+										treatWithResolution(1) : treatWithResolution(1, True),
+										treatWithResolution(0) : treatWithResolution(0, True)
+									] = color
+								else: # anti Aliasing
+									y_aa = groupy * pixelsPerGroup[1] * resolution[1] + groupy * spacingResolution[1] + pixely * resolution[1]
+									x_aa = groupx * pixelsPerGroup[0] * resolution[0] + groupx * spacingResolution[0] + pixelx * resolution[0]
+									render[
+										y_aa : y_aa + resolution[1],
+										x_aa : x_aa + resolution[0]
+									] = color
+							if draw and design_k.spawnIndividualCuboids and connection:
 								position = Coordinates(
 								# x
 									+ thisLayer.position.x
 									- thisLayer.size.x / 2
-									- design.kernels.spacingFromLayer
+									- design_k.spacingFromLayer
 									- structureWidth
 									+ x
 								, # y
@@ -947,15 +978,15 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 									- size.z / 2
 								)
 								await queueCuboid(connection, position, size, color, processDescription = processDesc)
-							else:
-								await server.sleep(0, processDesc + " here")	
+							elif progress % updateEvery:
+								await server.sleep(0, processDesc)	
 
 		# After looping through all of the kernels
-		if draw and design.kernels.spawnIndividualCuboids and connection:
+		if draw and design_k.spawnIndividualCuboids and connection:
 			await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
 		if renderTexture:
 			Image.fromarray(render).save(filepath)
-			if design.kernels.renderTexture.saveToRendersFolder:
+			if design_tx.saveToRendersFolder:
 				externalFilepath = ai.externalImagePath(filename, True)
 				Image.fromarray(render).save(externalFilepath)
 	
@@ -964,12 +995,12 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 	if renderTexture:
 		if connection:
 			await connection.sendfile(filepath)
-			if draw and not design.kernels.spawnIndividualCuboids:
+			if draw and not design_k.spawnIndividualCuboids:
 				position = Coordinates(
 					# x
 						+ thisLayer.position.x
 						- thisLayer.size.x / 2
-						- design.kernels.spacingFromLayer
+						- design_k.spacingFromLayer
 						- structureWidth
 					, # y
 						+ thisLayer.position.y
@@ -990,7 +1021,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 					f"kernel texture of layer {layerIndex}")
 				# TODO: Change filepath to path relative to client
 				# after sendfile command has been implemented client side
-		if not connection or design.kernels.renderTexture.displayTextureImage:
+		if not connection or design_tx.displayTextureImage:
 			os.startfile(filepath)
 
 

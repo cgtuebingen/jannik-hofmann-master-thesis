@@ -63,12 +63,12 @@ class kernels:
 	hideSpacingBetweenSingles = True # When enabled, if each kernel has dims 1 x 1, removes spacing between them
 	class renderTexture:
 		displayTextureImage = False
-		defaultPixelResolution = 100 # determines resolution of each kernel pixel within the final texture image file
-		# Approximates and refers to the kernel width
-		# It helps to calculate that this expression should evaluate to a whole number:
-		# defaultPixelDimensions[0] / spacingBetweenKernels[0] (/ defaultPixelResolution[0] if spacing is absolute)
-		maxResolution = 5000 # int defining the maximum pixel resolution at the longer edge of the texture file
+		defaultPixelResolution = (100, 100) # determines resolution of each kernel pixel within the final texture image file
+		# Basically pixels per one kernel pixel
+		maxTextureResolution = 5000 # int defining the maximum pixel resolution at the longer edge of the texture file
 		# A too small resolution might lead to aliasing patterns in the texture image
+		antiAliasing = True # ensures that every pixel and spacing always has the same image resolution
+		# might change the aspect ratio of the texture slightly or even increase the max resolution for huge kernels
 		saveToRendersFolder = True # will save a copy of the rendered kernel texture to the renders folder
 		opacity = 1
 
