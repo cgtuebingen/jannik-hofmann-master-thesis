@@ -41,6 +41,7 @@ import os
 from visualizationSettings import layouting
 import websocketServer as server
 import aiInteraction as ai
+import fileHandling
 
 class Timer:
 	def __init__(self, name="Timer"):
@@ -420,7 +421,8 @@ class ForceAtlas2:
 				plt.show()
 			else:
 				filepath = 'layouting-animation.gif'
-				filepath = ai.externalImagePath(filepath, True)
+				filepath = ai.externalImagePath(filepath)
+				fileHandling.createFilepath(filepath)
 				anim.save(filepath,
 					writer='imagemagick',
 					fps=layouting.renderGif.framesInAnimation / layouting.renderGif.animationLength,

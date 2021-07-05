@@ -202,9 +202,9 @@ class Request:
 				printText = data
 			if sendAlsoAsDebugMsg:
 				if printText not in (None, False, ""):
-					await self.senddebug(-9, beautifulDebug.removeAnsiEscapeCharacters(printText))
+					await self.senddebug(-9, beautifulDebug.removeAnsiEscapeCharacters(str(printText)))
 				else:
-					await self.senddebug(-9, beautifulDebug.removeAnsiEscapeCharacters(data))
+					await self.senddebug(-9, beautifulDebug.removeAnsiEscapeCharacters(str(data)))
 			await self.websocket.send(packed) # actually send it via websocket
 			if printText not in (None, False, ""):
 				# and print it in the console and debug
@@ -702,9 +702,12 @@ class Request:
 			return False
 		try:
 			result = exec(await self.getParam(), globals())
-			await self.sendstatus(-30, str(result))
+			if result is None:
+				await self.sendstatus(-30, f"Successfully executed code {self.command} in python.")
+			else:
+				await self.sendstatus(-30, str(result))
 		except:
-			await self.sendstatus(13, f"ERROR executing command {self.command} in python:\n" +
+			await self.sendstatus(13, f"ERROR executing code {self.command} in python:\n" +
 				traceback.format_exc())
 			return False
 	commandList["python"] = (python, "Executes the specified string as python code" +
@@ -729,7 +732,7 @@ class Request:
 			result = eval(await self.getParam())
 			await self.sendstatus(-30, str(result))
 		except:
-			await self.sendstatus(13, f"ERROR evaluating command {self.command} in python:\n" +
+			await self.sendstatus(13, f"ERROR evaluating expression {self.command} in python:\n" +
 				traceback.format_exc())
 			return False
 	commandList["eval"] = (pythoneval, "Evaluates the specified string as python expression and " +
@@ -1120,9 +1123,9 @@ class Request:
 		newcommand = await ainput("Enter your desired command here: ")
 		await self.sendstatus(-10, f'Console input received. Continuing with command "{beautifulDebug.underline(newcommand)}"')
 		loadedCommand.append(newcommand)
-		return True
 		# old implementation:
 		#await server.interactiveServer(self.websocket, path, command=newcommand, dontDebugDisconnect=True)
+		return True
 	commandList["console"] = (console, "Prompts on the server console for a command",
 		'This can be used to inject commands into the pipeline that the server then executes. Waits ' +
 		'for the user to type the command while asynchronously processing other incoming commands\n' +
@@ -1133,6 +1136,9 @@ class Request:
 
 
 	async def history(self, *, history, **kwargs):
+		if len(history) == 0:
+			await self.sendstatus(-30, f"No commands have yet been executed during this server session.")
+			return
 		fancyHistory = []
 		for entry in history:
 			if entry[1]:
@@ -1461,8 +1467,13 @@ class Request:
 				return False
 			else:
 				if printStructure:
+					printText = '("TF STRUCTURE",\n'
+					for layer in ai.tfnet.layers:
+						printText += '    ' + str(layer) + ',\n'
+					printText = printText[:-2]
+					printText += ')'
 					# Send the whole structure as array
-					await self.send(("TF STRUCTURE", ai.tfnet.layers), sendAlsoAsDebugMsg=True)
+					await self.send(("TF STRUCTURE", ai.tfnet.layers), sendAlsoAsDebugMsg=True, printText = printText)
 		except:
 			await self.sendstatus(17, f"Couldn't parse tensorflow structure!\n" +
 				traceback.format_exc())
@@ -1622,4 +1633,20 @@ class Request:
 		'data of trainable variables will be refreshed first and kernel will be recalculated.\n' +
 		"§all§ will recalculate and cache all kernel textures that have not been cached yet without drawing")
 	commandList["tf draw kernels"] = commandAlias("tf draw kernel")
+
+	async def tf_drawkernelactivations(self, **kwargs):
+		layerIndex = await self.getParam(1, 0)
+		selection = await self.getParam(2, -1)
+		if selection == -1:
+			selection = None
+		input = await self.getParam(3, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg")
+		await vis.drawKernelActivations(self, layerIndex, selection, input)
+	commandList["tf draw activations"] = (tf_drawkernelactivations, "Draws the activations of a certain kernel",
+		'TODO')
+
+	async def tf_drawinputprediction(self, **kwargs):
+		input = await self.getParam(1, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg")
+		await vis.drawInputPrediction(self, input)
+	commandList["tf draw prediction"] = (tf_drawinputprediction, "Draws the activations of a certain kernel",
+		'TODO')
 

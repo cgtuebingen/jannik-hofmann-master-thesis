@@ -23,12 +23,15 @@ import numpy as np
 from types import SimpleNamespace
 import ast
 import random
+from PIL import Image
+from numpy.lib.function_base import select
 
 # LOCAL IMPORTS
 import serverCommands
 import serverSettings as setting
 import loggingFunctions
 import fileHandling
+import websocketServer as server
 
 # Definitions / initializations
 nnloaded = False
@@ -39,75 +42,82 @@ nn_module = None
 tfnet = SimpleNamespace()
 pytorchnet = SimpleNamespace()
 tf = None
-
-# Structure of tfnet.layers:
-# (layername, ltype, shape, params, connectedTo, trainableVariables)
-# trainableVariables is a (maybe empty) dict:
+# Structure of tfnet.layers: (layername, ltype, shape, params, connectedTo, trainableVariables)
+# trainableVariables is a (maybe empty) dict of lists. Lists have same indices as tfnet.layers:
 # e.g. {'kernel': [ndarrays], 'bias': [ndarrays], 'gamma': [ndarrays], 'beta': [ndarrays]}
 
+
+# MINOR HELPER FUNCTIONS
+
 # Returns the current reference to the model
-def model():
-	return getattr(nn_module, modelvarname)
-
+def model(): return getattr(nn_module, modelvarname)
 # Returns whether a tf network has been loaded and initialized successfully
-def tfloaded():
-	return hasattr(tfnet, 'loaded') and tfnet.loaded
-
+def tfloaded(): return hasattr(tfnet, 'loaded') and tfnet.loaded
 # Adds the verbose model name and optional timestamp to a path
-def addNetworkInfoIntoPath(path, filename="", timestamp=False):
+def addNetworkInfoToPath(path, filenameOrSubfolder="", filename="", timestamp=False):
+	if hasattr(tfnet, 'modelname_verbose'):
+		path += tfnet.modelname_verbose + os.path.sep
+	if filenameOrSubfolder and filename:
+		filenameOrSubfolder += os.sep
+	filename = filenameOrSubfolder + filename
 	if timestamp and '.' in filename:
 		filename = filename.rsplit('.', 1)
 		filename = filename[0] + '_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.' + filename[1]
-	if hasattr(tfnet, 'modelname_verbose'):
-		return path + tfnet.modelname_verbose + os.path.sep + filename
-	else:
-		return path + filename
+	return path + filename
 # Returns the path for caching files
-def internalCachePath(filename="", timestamp=False):
-	return addNetworkInfoIntoPath(setting.FILEPATHS.FILECACHE, filename, timestamp)
+def internalCachePath(filenameOrSubfolder="", filename="", timestamp=False):
+	return addNetworkInfoToPath(setting.FILEPATHS.FILECACHE, filenameOrSubfolder, filename, timestamp)
 # Returns the path for storing renders
-def externalImagePath(filename="", timestamp=False):
-	return addNetworkInfoIntoPath(setting.FILEPATHS.OUTPUT_IMAGES, filename, timestamp)
+def externalImagePath(filenameOrSubfolder="", filename="", timestamp=True):
+	return addNetworkInfoToPath(setting.FILEPATHS.OUTPUT_IMAGES, filenameOrSubfolder, filename, timestamp)
 # Initialize those paths
-def initInternalCachePath():
-	fileHandling.createFilepath(internalCachePath())
-	fileHandling.createFilepath(externalImagePath())
+def initInternalCachePath(): fileHandling.createFilepath([internalCachePath(), externalImagePath()])
 
+
+# MAIN FUNCTIONS FOR AI INTERACTION
 
 # Prepares a python module and execs it.
 # Does not throw errors but returns strings with the error message!
 # Afterwards, if no error was thrown, call importtf for tensorflow networks
 def preparemodule(path, allowPreparingNewModuleOnTop = False):
 	global nn_spec, nn_module, nnprepared, modelvarname
-	# Check if model variable name has been specified
-	# by searching for a ':' in the filename / in the string after the last folder
+
+	# Checking if something already has been loaded and if we're allowed to load on top
+	if not allowPreparingNewModuleOnTop and (nnprepared or nnloaded):
+		return ("The ai interface has already loaded a module in the past and " +
+			"should not load another (or the same) nn script on top. You can override this " +
+			"check by setting the flag by calling preparemodule(path, True)")
+
+	# Check if model variable name has been specified by searching for a ':' in the filename
 	if ':' in fileHandling.separateFilename(path)[1]:
 		path, modelvarname = path.rsplit(':', 1)
 		path = path.strip()
 		modelvarname = modelvarname.strip()
+	elif setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME:
+		modelvarname = setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME
 	else:
-		if setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME is None:
-			return ("No name for the model variable has been defined! Please specify how to acccess the " +
-				"network model by adding the varname after the AI script path, separated by a colon.")
-		else:
-			modelvarname = setting.FILEPATHS.DEFAULT_NN_VARIABLE_NAME
+		return ("No name for the model variable has been defined! Please specify how to acccess the " +
+			"network model by adding the varname after the AI script path, separated by a colon.")
+
+	# Checking to see that the file actually exists
 	if not os.path.exists(path):
 		return (f'File at location "{path}" does not exist! No file could be found at the ' +
 		'specified network script location! Please make sure you typed the path correctly ' +
 		'and that relative paths in the settings are relative to the source folder of the ' +
 		'servers centralController.py')
-	if not allowPreparingNewModuleOnTop and (nnprepared or nnloaded):
-		return ("The ai interface has already loaded a module in the past and " +
-			"should not load another (or the same) nn script on top. You can override this " +
-			"check by setting the flag by calling preparemodule(path, True)")
+
+	# Importing the network python file
 	loggingFunctions.printlog("Loading network from " + path)
 	nn_spec = importlib.util.spec_from_file_location("", path)
 	if nn_spec is None:
 		return (f'Python script at location "{path}" could not be loaded as a module! ' +
 		'Please make sure that the file at this location is a valid python script ' +
 		'that can be imported as a module by python')
+	# Creating a module from that file
 	nn_module = importlib.util.module_from_spec(nn_spec)
+	# And executing its code
 	nn_spec.loader.exec_module(nn_module)
+
 	# Now let's check if the modelvarname exists...
 	try:
 		getattr(nn_module, modelvarname)
@@ -118,6 +128,8 @@ def preparemodule(path, allowPreparingNewModuleOnTop = False):
 			" for the model within the script does not exist!\n" +
 			"Please make sure that you correctly identify the model variable name and " +
 			"append it to the filename of the network python script, separated just by a colon.")
+	
+	# Storing what file name and network model var we're using
 	nnprepared = fileHandling.separateFilename(path)[1].replace('.py', '') + '-' + modelvarname
 	return True
 
@@ -191,22 +203,14 @@ tfStructureTypes = [
 
 # resets the saved structure information of tfnet
 def tfresetstructure():
-	# removes attributes from a class whether they exist or not
-	def remove(attribute):
-		if hasattr(tfnet, attribute):
-			delattr(tfnet, attribute)
-	
+	removeAttributes = ["layers", "modelname", "structureType", "totalparams", "trainableparams",
+		"nontrainableparams", "layerCount", "layoutPositions", "trainableVariables"]
 	global tfnet
 	tfnet.validstructure = False
-	remove("layers")
-	remove("modelname")
-	remove("structureType")
-	remove("totalparams")
-	remove("trainableparams")
-	remove("nontrainableparams")
-	remove("layerCount")
-	remove("layoutPositions")
-	remove("trainableVariables")
+	for attr in removeAttributes:
+		if hasattr(tfnet, attr):
+			delattr(tfnet, attr)
+	
 
 # Parses a given tf model summary string as structure and saves relevant information to tfnet
 # Structure should be in the form of the result of tfmodelsummary()
@@ -379,6 +383,12 @@ def getLayerName(index):
 	assert index >= 0, "index has to be >= 0!"
 	return tfnet.layers[index][0]
 
+def getInputImageSize():
+	target_size = list(tfnet.layers[0][2])
+	while target_size[0] is None or target_size[0] < 2:
+		target_size = target_size[1:]
+	return target_size[:2]
+
 # retrieves all trainable variables relating to this layer
 def tfGetTrainableVars(layerIndexOrName = None):
 	if layerIndexOrName is None:
@@ -403,3 +413,29 @@ def tfRefreshTrainableVars():
 				layerVarDict[name] = [var.numpy()]
 		layer[5] = layerVarDict
 	return shapeDict
+
+def tfKerasPreprocessImage(imagePath):
+	try:
+		image = nn_module.load_img(imagePath, target_size=getInputImageSize())
+		image = nn_module.img_to_array(image)
+	except:
+		image = nn_module.image.load_img(imagePath, target_size=getInputImageSize())
+		image = nn_module.image.img_to_array(image)
+	image = image.reshape((1, image.shape[0], image.shape[1], image.shape[2]))
+	image = nn_module.preprocess_input(image)
+	return image
+
+def tfKerasPredict(inputData):
+	yhat = model().predict(inputData)
+	label = nn_module.decode_predictions(yhat)
+	label = label[0][0]
+	print('%s (%.2f%%)' % (label[1], label[2]*100))
+	return '%s (%.2f%%)' % (label[1], label[2]*100)
+
+def tfKerasGetLayerOutput(layerIndex, inputData):
+	import keras
+	if type(inputData) is str:
+		inputData = tfKerasPreprocessImage(inputData)
+	intermediate_layer_model = keras.Model(inputs=model().input,
+		outputs=model().get_layer(getLayerName(layerIndex)).output)
+	return intermediate_layer_model(inputData)

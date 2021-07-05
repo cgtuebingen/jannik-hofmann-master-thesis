@@ -359,25 +359,45 @@ async def spawnCuboidDirectly(connection, position, size, color, rotator = None,
 
 # Directly spawns an image at the specified coordinates via a client-connection, does not use batch
 async def spawnImage(connection, filepath, position, size, rotator = None,
-	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True):
+	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True, sleepBefore = 0):
 
 	if not connection:
 		os.startfile(filepath)
 		return
-
-	drawResponse = await packImage(filepath, position, size, rotator, positionIsCenterPoint)
 
 	if processDescription is None:
 		processDescription = "Spawning image in the virtual world"
 	else:
 		processDescription = "Spawning image in the virtual world for " + processDescription
 	
+	if sleepBefore > 0:
+		server.sleep(sleepBefore, "Sleeping before " + processDescription)
+
+	drawResponse = await packImage(filepath, position, size, rotator, positionIsCenterPoint)
+
 	await waitUntilReadyToDraw(processDescription)
 
 	await connection.send(drawResponse, sendAlsoAsDebugMsg=design.debugWhenDrawingObject,
 		printText="SPAWN IMAGE from file " + fileHandling.separateFilename(filepath)[1])
 	if waitAfterwardsForServerDrawNext:
 		await waitForServerDrawNext(processDescription)
+
+async def spawnDoubleImagePlaneAlongZ(connection, filepath, position, size,
+	positionIsCenterPoint = False, processDescription = None, waitAfterwardsForServerDrawNext = True, sleepBefore = 0):
+	if type(size) is Coordinates:
+		size = size.copy()
+	else:
+		if len(size) == 2:
+			size = Coordinates(*size, 0)
+		else:
+			size = Coordinates(size)
+	size.switchYZ()
+	rotator = (90, 0, 0)
+	await spawnImage(connection, filepath, position, size, rotator,
+		positionIsCenterPoint, processDescription, waitAfterwardsForServerDrawNext, sleepBefore)
+	rotator = (90, 0, 180)
+	await spawnImage(connection, filepath, position, size, rotator,
+		positionIsCenterPoint, processDescription, waitAfterwardsForServerDrawNext, sleepBefore)
 
 # Sends the whole cuboidQueue as batch or drawing instructions to the client
 async def sendCuboidBatch(connection, processDescription, waitAfterwardsForServerDrawNext=True):
@@ -743,6 +763,28 @@ async def drawstructure(connection = None):
 	# draw layers at the resulting positions
 	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
+# Helps to create uniquely identifiable filename for the cachefiles
+def settingToStr(description, setting, ignoreValue=None):
+	if setting is True: return '-' + description
+	if setting is False: return ""
+	if type(setting) in [tuple, list]:
+		if math.isclose(float(setting[0]), float(setting[1])):
+			setting = setting[0]
+		else:
+			setting = str(setting[0] + '-' + str(setting[1]))
+	if ignoreValue is not None and math.isclose(setting, ignoreValue):
+		return ""
+	return '-' + description + str(setting).replace('.', ',')
+
+def settingsToFilename(prefix="", settings=[], filetype="png"):
+	parameters = ""
+	for setting in settings:
+		parameters += settingToStr(*setting)
+	if filetype[0] != '.':
+		filetype = '.' + filetype
+	return prefix + parameters + filetype.lower()
+
+	
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True, draw=True):
 	async def status(verbosity, text):
@@ -754,31 +796,19 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 	
 	design_k = design.kernels
 	design_tx = design_k.renderTexture
-	# Create uniquely identifiable filename for the kernel cachefile
-	def fileInfo(description, setting, ignoreValue=None):
-		if setting is True: return '-' + description
-		if setting is False: return ""
-		if type(setting) in [tuple, list]:
-			if math.isclose(float(setting[0]), float(setting[1])):
-				setting = setting[0]
-			else:
-				setting = str(setting[0] + '-' + str(setting[1]))
-		if ignoreValue is not None and math.isclose(setting, ignoreValue):
-			return ""
-		setting = str(setting).replace('.', ',')
-		return '-' + description + str(setting)
-	filename = f"kernels-layer-{layerIndex}_settings" + \
-		fileInfo("res", design_tx.defaultPixelResolution) + \
-		fileInfo("max", design_tx.maxTextureResolution) + \
-		fileInfo("space", design_k.spacingBetweenKernels) + \
-		fileInfo("bright", design_k.brightness, 50) + \
-		fileInfo("contr", design_k.contrast, 50) + \
-		fileInfo("opac", design_tx.opacity, 1) + \
-		fileInfo("aa", design_tx.antiAliasing) + \
-		fileInfo("singleSp", not design_k.hideSpacingBetweenSingles) + \
-		fileInfo("wrap", design_k.wrapIfDimLeftover) + \
-		".png"
-	filepath = ai.internalCachePath(filename)
+	filename = settingsToFilename(f"layer-{layerIndex}_settings", [
+		("res", design_tx.defaultPixelResolution),
+		("max", design_tx.maxTextureResolution),
+		("space", design_k.spacingBetweenKernels),
+		("bright", design_k.brightness, 50),
+		("contr", design_k.contrast, 50),
+		("opac", design_tx.opacity, 1),
+		("aa", design_tx.antiAliasing),
+		("singleSp", not design_k.hideSpacingBetweenSingles),
+		("wrap", design_k.wrapIfDimLeftover),
+		("bgr", design.flipRGBtoBGR),
+	])
+	filepath = ai.internalCachePath("kernels", filename)
 	canUseCachedFile = canUseCachedFile and os.path.exists(filepath) and \
 		not (draw and connection and design_k.spawnIndividualCuboids)
 	renderTexture = not design_k.spawnIndividualCuboids or \
@@ -930,7 +960,10 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 										if len(kernel.shape) > 4: nplocation[4] = groupy
 									color = []
 									for nplocation[2] in range(3):
-										color.append(getColor(nplocation))
+										if design.flipRGBtoBGR:
+											color.insert(0, getColor(nplocation))
+										else:
+											color.append(getColor(nplocation))
 								color.append(opacity)
 							except IndexError:
 								# Can't be pixelx or pixely due to groups intialization from kernel.shape
@@ -998,9 +1031,11 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		if draw and design_k.spawnIndividualCuboids and connection:
 			await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
 		if renderTexture:
+			fileHandling.createFilepath(filepath)
 			Image.fromarray(render).save(filepath)
 			if design_tx.saveToRendersFolder:
-				externalFilepath = ai.externalImagePath(filename, True)
+				externalFilepath = ai.externalImagePath("kernels", filename)
+				fileHandling.createFilepath(externalFilepath)
 				Image.fromarray(render).save(externalFilepath)
 	
 	# Sending the cached texture, this gets also executed if we can use the cached file
@@ -1009,33 +1044,122 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		if connection:
 			await connection.sendfile(filepath)
 			if draw and not design_k.spawnIndividualCuboids:
-				position = Coordinates(
-					# x
-						+ thisLayer.position.x
-						- thisLayer.size.x / 2
-						- design_k.spacingFromLayer
-						- structureWidth
-					, # y
-						+ thisLayer.position.y
-						- size.z / 2
-					, # z
-						+ thisLayer.position.z
-						- thisLayer.size.z / 2
-						- structureHeight / 2
-					)
-				size = Coordinates(structureWidth, size.z, structureHeight)
-				await server.sleep(0.2, 'Drawing kernel textures for layer ' + str(layerIndex))
-				rotator = Coordinates(90, 0, 0)
-				await spawnImage(connection, filepath, position, size, rotator, False,
-					f"kernel texture of layer {layerIndex}")
-				await server.sleep(0.2, 'Drawing kernel textures for layer ' + str(layerIndex))
-				rotator = Coordinates(90, 0, 180)
-				await spawnImage(connection, filepath, position, size, rotator, False,
-					f"kernel texture of layer {layerIndex}")
+				position = thisLayer.position.copy()
+				position.x -= thisLayer.size.x / 2 + design_k.spacingFromLayer + structureWidth / 2
+				await spawnDoubleImagePlaneAlongZ(connection, filepath, position, (structureWidth, structureHeight), True,
+					f"kernel texture of layer {layerIndex}", sleepBefore=.2)
 				# TODO: Change filepath to path relative to client
 				# after sendfile command has been implemented client side
 		if not connection or design_tx.displayTextureImage:
 			os.startfile(filepath)
+
+
+async def drawInputPrediction(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg"):
+	layer = Layer.layerList[0]
+	position = layer.position
+	position.z -= layer.size.z / 2 + 1
+	description = 'Drawing input prediction for file ' + inputData
+	await spawnDoubleImagePlaneAlongZ(connection, inputData, position, layer.size, True, description, sleepBefore=.2)
+	
+
+async def drawKernelActivations(connection, layerIndex, selectKernel, inputData, justRenderTextures=False):
+	if type(selectKernel) is int:
+		selectKernel = [selectKernel]
+	def listToStr(l, removeSpaces=False):
+		l = str(l).replace(' ', '') if removeSpaces else str(l)
+		if l.startswith('[') and l.endswith(']'): l = l[1:-1]
+		return l
+
+	out = np.asarray(ai.tfKerasGetLayerOutput(layerIndex, inputData))
+	while out.shape[0] == 1:
+		out = np.reshape(out, out.shape[1:])
+	out = out.copy()
+	if selectKernel is not None:
+		originalOutShape = out.shape
+		for i in selectKernel:
+			if i >= 0:
+				if len(selectKernel) <= len(originalOutShape)-2:
+					out = out[:, :, i]
+				else:
+					out = out[i]
+	colored = (len(out.shape) == 3 and out.shape[2] == 3)
+	if colored or len(out.shape) == 2:
+		out -= np.min(out)
+		out *= 255 / np.max(out)
+		out = np.asarray(np.round(out), dtype=np.uint8)
+		if colored and design.flipRGBtoBGR:
+			out = out[..., ::-1]
+		texture = Image.fromarray(np.asarray(np.round(out), dtype=np.uint8))
+		filename = settingsToFilename(f"layer-{layerIndex}-kernel-{listToStr(selectKernel, True)}", [
+			("bgr", design.flipRGBtoBGR),
+		])
+		filename = ai.internalCachePath("layerOutput", filename)
+		fileHandling.createFilepath(filename)
+		texture.save(filename)
+	else:
+		async def recursivelyBuildAllKernels(selectKernel, shape, originalShape=None):
+			if originalShape is None:
+				originalShape = list(shape)
+			output = []
+			irange = range(shape[0])
+			if len(originalShape) == len(shape):
+				irange = tqdm(irange, f"Kernel activations of layer {layerIndex}")
+			for i in irange:
+				if len(shape) == 1:
+					await server.sleep(0, "Calculating activations for kernel " + listToStr(selectKernel + [i]) + \
+						f" of {listToStr(originalShape)} of layer {layerIndex}")
+					out = await drawKernelActivations(connection, layerIndex, selectKernel + [i], inputData, justRenderTextures=True)
+					output.append(out)
+				else:
+					output.append(await recursivelyBuildAllKernels(selectKernel + [i], shape[1:], originalShape))
+			return output
+		images = await recursivelyBuildAllKernels([], out.shape[2:4]) # images will have shape like last argument
+		# Now let's arrange these images in one large texture:
+		if len(out.shape) == 3 and design.kernels.wrapIfDimLeftover: # wrapping
+			rows = math.floor(math.sqrt(out.shape[2]))
+			columns = math.ceil(out.shape[2] / rows)
+		else:
+			columns = out.shape[2]
+			if len(out.shape) == 3: rows = 1
+			else: rows = out.shape[3]
+		def selectImage(x, y):
+			if len(out.shape) == 3:
+				index = x + y * columns
+				if len(images) > index:
+					return images[index]
+				print(f"No image at {x}, {y}")
+				return None
+			result = images[x, y]
+			while type(result) is list: result = result[0]
+			print(result)
+			return result
+		image = selectImage(0, 0)
+		width = image.size[0]
+		height = image.size[1]
+		texture = Image.new(image.mode, (width * columns, height * columns))
+		for y in range(rows):
+			for x in range(columns):
+				image = selectImage(x, y)
+				if image is None:
+					continue
+				texture.paste(image, (x * width, y * height))
+		filename = settingsToFilename(f"layer-{layerIndex}-all-kernels", [
+			("bgr", design.flipRGBtoBGR),
+		])
+		filename = ai.internalCachePath("layerOutput", filename)
+		fileHandling.createFilepath(filename)
+		texture.save(filename)
+	
+	# Draw the texture image
+	if not justRenderTextures:
+		thisLayer = Layer.layerList[layerIndex]
+		sizex = max(texture.size[0], thisLayer.size.x)
+		sizey = max(texture.size[1], thisLayer.size.y)
+		position = thisLayer.position.copy()
+		position.x += thisLayer.size.x / 2 + design.kernels.spacingFromLayer + sizex / 2
+		await spawnDoubleImagePlaneAlongZ(connection, filename, position, (sizex, sizey), True,
+			f"kernel activations of layer {layerIndex}", sleepBefore=.2)
+	return texture
 
 
 # FOR DEBUGGING, executed if you start this script directly

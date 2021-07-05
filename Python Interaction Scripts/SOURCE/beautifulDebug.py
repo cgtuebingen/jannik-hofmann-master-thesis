@@ -253,10 +253,14 @@ def listToMap(two_dim_list):
 		map[key] = value
 	return map
 
-def mapToText(map, spacing = 3, line_width = None, key_width = .25, splitAtSpaces = True,
+# Also accepts lists instead of map
+def mapToText(map, spacing = 3, line_width = -2, key_width = .25, splitAtSpaces = True,
 	before_key = '', after_key = '', before_value = '', after_value = '',
 	treatKeys = lambda x: x, treatValues = lambda x: x):
 
+	if len(map) == 0:
+		return ""
+	
 	if type(map) is list:
 		map = listToMap(map)
 		def newTreatKeys(key):
@@ -264,8 +268,8 @@ def mapToText(map, spacing = 3, line_width = None, key_width = .25, splitAtSpace
 	else:
 		newTreatKeys = treatKeys
 
-	if line_width is None:
-		line_width = consoleWidth()
+	if line_width < 1:
+		line_width += consoleWidth()
 
 	# treating values
 	map = {key: treatValues(value) for (key, value) in map.items()}

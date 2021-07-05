@@ -85,8 +85,14 @@ def separateFilename(filepath):
 	return ensureFolderEnding(filepath, remove=True)
 
 # Checks that the file path exists and creates the dir structure if not
+# filepath can also be a list of filepaths to create
 def createFilepath(filepath):
-	assert type(filepath) is str
+	if type(filepath) is list:
+		for path in filepath:
+			createFilepath(path)
+		return
+	assert type(filepath) is str, "Parameter for createFilepath function must a string or list " + \
+		"of strings! You passed " + str(filepath) + " of type " + str(type(filepath))
 	if '.' in separateFilename(filepath)[1]:
 		# path ends with a file name, not with a folder
 		filepath = separateFilename(filepath)[0]

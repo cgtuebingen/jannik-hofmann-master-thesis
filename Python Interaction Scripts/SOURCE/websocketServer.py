@@ -312,7 +312,7 @@ def startServer():
 				beautifulDebug.RESET, verbosity = -1)
 			# Set triesLeft to 0 to avoid restarts after server shutdown
 			triesLeft = 0
-
+			
 			# asyncio: listen forever for new websocket client connections to this server
 			asyncio.get_event_loop().run_forever()
 			
