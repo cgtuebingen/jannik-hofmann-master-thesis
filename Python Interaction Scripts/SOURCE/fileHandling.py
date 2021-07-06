@@ -5,6 +5,7 @@
 # USED LIBRARIES
 import os
 import shutil
+import functools
 
 # Counts files in this directory and all subdirectories
 def filecount(path, pathjoin=None):
@@ -84,18 +85,31 @@ def separateFilename(filepath):
 		return ensureFolderEnding(result, remove=True)
 	return ensureFolderEnding(filepath, remove=True)
 
+# Creates a given folderpath if it doesn't exist yet
+# assumes that the parameter is always a str that does not end in a folder separator char
+# Written in a separate function to cache folderpaths separately to all the individual filepaths
+@functools.lru_cache(maxsize=256) # cached for best performance, to avoid too many os calls
+def createFolderpath(folderpath):
+	if not os.path.exists(folderpath):
+		os.makedirs(folderpath)
+	return folderpath
+
 # Checks that the file path exists and creates the dir structure if not
 # filepath can also be a list of filepaths to create
+# Always returns the input value for a more streamlined use in functions
+@functools.lru_cache(maxsize=10) # cached for best performance, to avoid repeated processing
 def createFilepath(filepath):
+	originalFilepath = filepath
 	if type(filepath) is list:
 		for path in filepath:
 			createFilepath(path)
-		return
+		return originalFilepath
 	assert type(filepath) is str, "Parameter for createFilepath function must a string or list " + \
 		"of strings! You passed " + str(filepath) + " of type " + str(type(filepath))
-	if '.' in separateFilename(filepath)[1]:
+	if '.' in filepath and '.' in separateFilename(filepath)[1]: # first part for better performance
 		# path ends with a file name, not with a folder
 		filepath = separateFilename(filepath)[0]
-	filepath = ensureFolderEnding(filepath, remove=True)
-	if not os.path.exists(filepath):
-		os.makedirs(filepath)
+	else:
+		filepath = ensureFolderEnding(filepath, remove=True)
+	createFolderpath(filepath)
+	return originalFilepath

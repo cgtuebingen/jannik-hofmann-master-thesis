@@ -33,6 +33,7 @@ import loggingFunctions
 import fileHandling
 import websocketServer as server
 
+
 # Definitions / initializations
 nnloaded = False
 nnprepared = False
@@ -45,6 +46,15 @@ tf = None
 # Structure of tfnet.layers: (layername, ltype, shape, params, connectedTo, trainableVariables)
 # trainableVariables is a (maybe empty) dict of lists. Lists have same indices as tfnet.layers:
 # e.g. {'kernel': [ndarrays], 'bias': [ndarrays], 'gamma': [ndarrays], 'beta': [ndarrays]}
+
+# Used to store and retrieve module variables before and after module reload.
+# With empty parameter, returns a list of variable values that should be saved.
+# This list can then be used as parameter on the second call to overwrite the freshly initialized vars
+def onModuleReloadVars(vars = None):
+	global nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf
+	if vars is None:
+		return nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf
+	nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf = vars
 
 
 # MINOR HELPER FUNCTIONS
@@ -63,15 +73,13 @@ def addNetworkInfoToPath(path, filenameOrSubfolder="", filename="", timestamp=Fa
 	if timestamp and '.' in filename:
 		filename = filename.rsplit('.', 1)
 		filename = filename[0] + '_' + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + '.' + filename[1]
-	return path + filename
+	return fileHandling.createFilepath(path + filename)
 # Returns the path for caching files
 def internalCachePath(filenameOrSubfolder="", filename="", timestamp=False):
 	return addNetworkInfoToPath(setting.FILEPATHS.FILECACHE, filenameOrSubfolder, filename, timestamp)
 # Returns the path for storing renders
 def externalImagePath(filenameOrSubfolder="", filename="", timestamp=True):
 	return addNetworkInfoToPath(setting.FILEPATHS.OUTPUT_IMAGES, filenameOrSubfolder, filename, timestamp)
-# Initialize those paths
-def initInternalCachePath(): fileHandling.createFilepath([internalCachePath(), externalImagePath()])
 
 
 # MAIN FUNCTIONS FOR AI INTERACTION
@@ -149,7 +157,6 @@ def importtf():
 	tf = tfref
 	tfnet.loaded = True
 	tfnet.modelname_verbose = nnprepared
-	initInternalCachePath()
 	nnloaded = True
 
 # Returns the version of tensorflow
@@ -425,17 +432,33 @@ def tfKerasPreprocessImage(imagePath):
 	image = nn_module.preprocess_input(image)
 	return image
 
+def is_str(inputData):
+	try:
+		return type(inputData) is str
+	except:
+		return False
+
 def tfKerasPredict(inputData):
-	yhat = model().predict(inputData)
-	label = nn_module.decode_predictions(yhat)
-	label = label[0][0]
-	print('%s (%.2f%%)' % (label[1], label[2]*100))
-	return '%s (%.2f%%)' % (label[1], label[2]*100)
+	if is_str(inputData):
+		inputData = tfKerasPreprocessImage(inputData)
+	prediction = model().predict(inputData)
+	prediction = nn_module.decode_predictions(prediction, top=1)
+	#print(prediction)
+	prediction = prediction[0][0]
+	prediction = '%s (%.2f%%)' % (prediction[1], prediction[2]*100)
+	#print(prediction)
+	return prediction
+
+def tfk(inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg"):
+	if is_str(inputData):
+		inputData = tfKerasPreprocessImage(inputData)
+	prediction = model().predict(inputData)
+	return nn_module.decode_predictions(prediction, top=1)
 
 def tfKerasGetLayerOutput(layerIndex, inputData):
 	import keras
-	if type(inputData) is str:
+	if is_str(inputData):
 		inputData = tfKerasPreprocessImage(inputData)
-	intermediate_layer_model = keras.Model(inputs=model().input,
-		outputs=model().get_layer(getLayerName(layerIndex)).output)
-	return intermediate_layer_model(inputData)
+	output = model().get_layer(getLayerName(layerIndex)).output
+	partialModel = keras.Model(inputs=model().input, outputs=output)
+	return partialModel(inputData)

@@ -422,7 +422,6 @@ class ForceAtlas2:
 			else:
 				filepath = 'layouting-animation.gif'
 				filepath = ai.externalImagePath(filepath)
-				fileHandling.createFilepath(filepath)
 				anim.save(filepath,
 					writer='imagemagick',
 					fps=layouting.renderGif.framesInAnimation / layouting.renderGif.animationLength,

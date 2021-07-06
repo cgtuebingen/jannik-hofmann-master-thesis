@@ -868,6 +868,10 @@ class Request:
 		modules = await self.getParam(warnOnEmptyString=False)
 		modules = modules.split(' ')
 		modules = [m.strip() for m in modules if len(m) > 0]
+		keepVars = True
+		if len(modules) > 0 and modules[0] == "vars":
+			keepVars = False
+			modules = modules[1:]
 
 		excludePathFragments = ["\\site-packages\\", "\\lib\\"]
 		globalVarModules = dict()
@@ -877,7 +881,7 @@ class Request:
 				all(exclude not in variable.__file__ for exclude in excludePathFragments):
 					globalVarModules[name] = variable.__file__
 		
-		if len(modules) == 0:
+		if len(modules) == 0: # Display modules available for reload
 			availableModules = globalVarModules
 			pythonFiles = os.listdir(os.path.dirname(os.path.realpath(__file__)))
 			for file in pythonFiles:
@@ -897,27 +901,31 @@ class Request:
 			availableModulesCompact = sorted(availableModulesCompact)
 			await self.senddebug(-5, "The following modules have been found and can be reloaded:\n" +
 				', '.join(availableModulesCompact))
-		else:
-			async def reloadByRef(moduleRef):
+		else: # reload listed modules
+			async def reloadByRef(moduleRef, keepVars):
+				if keepVars and 'onModuleReloadVars' in dir(moduleRef):
+					moduleVars = moduleRef.onModuleReloadVars()
 				importlib.reload(moduleRef)
 				if 'onModuleReload' in dir(moduleRef):
 					moduleRef.onModuleReload()
+				if keepVars and 'onModuleReloadVars' in dir(moduleRef):
+					moduleRef.onModuleReloadVars(moduleVars)
 				await self.sendstatus(-30, f"Successfully reloaded the {module} module.")
 			
 			errorsEncountered = False
 			for module in modules:
 				if module in globalVarModules or importlib.util.find_spec(module) is not None:
 					try: # using import_module to receive a module reference from a string
-						await reloadByRef(importlib.import_module(module))
+						await reloadByRef(importlib.import_module(module), keepVars)
 					except ModuleNotFoundError:
 						try: # Trying again with the eval method...
-							await reloadByRef(eval(module))
+							await reloadByRef(eval(module), keepVars)
 						except ModuleNotFoundError:
 							await self.sendstatus(10, f"Python cannot find any module named {module}! " +
 								'Please type "server reload" to see a list of available modules.')
 							errorsEncountered = True
 					except:
-						await self.sendstatus(11, f"ERROR loading module {module}!\n" +
+						await self.sendstatus(11, f"ERROR reloading module {module}!\n" +
 							traceback.format_exc())
 						errorsEncountered = True
 				else:
@@ -937,6 +945,10 @@ class Request:
 		'It is recommended to completely reinitialize the server with "server reset"\n' +
 		"Due to security reasons, this feature is normally disabled when this server is " +
 		"active on the internet via unencrypted connections (outside of localhost)\n" +
+		"By default, modules define variables which they want to keep while the module is being" +
+		"reloaded. The value of these variables is restored after the reload. " +
+		"(This does not work for the module serverCommands.) " +
+		"Use §vars [modules]§ to force a reset the variables in the reloaded modules.\n" +
 		"This command is currently " + ("ENABLED" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
 
 

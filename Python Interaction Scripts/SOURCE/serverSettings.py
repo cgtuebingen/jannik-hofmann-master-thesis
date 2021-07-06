@@ -11,7 +11,7 @@ from datetime import datetime
 # LOCAL IMPORTS
 import loggingFunctions
 import beautifulDebug
-import fileHandling
+import fileHandling as file
 
 def onModuleReload(): checkSettings()
 
@@ -70,12 +70,11 @@ class COMMANDS:
 	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
 	# To reload these macros you need to execute the command "server reload serverCommands"
 	MACROS = {
-		"fresh": "server reload setting server vis design & almostnowait & tf draw layers",
+		"fresh": "server reload setting server vis design ai & almostnowait & tf draw layers",
 		"recom": "server reload setting & eval setting.COMMANDS.MACROS & server reload serverCommands",
 		"kk": "tf draw kernel",
-		"almostnowait": "py design.maxDrawWaitTimeout = 0.5 & eval design.maxDrawWaitTimeout",
-		"nowait": "py design.maxDrawWaitTimeout = 0 & eval design.maxDrawWaitTimeout",
-		"new": "server reload ai & nn load vgg16 & tf draw layers & nn is loaded",
+		"almostnowait": "py design.maxDrawWaitTimeout = 0.5 & server draw next & server draw next",
+		"nowait": "py design.maxDrawWaitTimeout = 0 & server draw next & server draw next",
 		"shape": "tf get layers & tf draw kernels",
 	}
 
@@ -128,10 +127,8 @@ class FORMAT_OUTPUT:
 
 # Settings checks and warnings. Verifies user settings and gives warnings / recommendations
 # These checks get executed immedaitely while the module is being loaded:
-FILEPATHS.OUTPUT_IMAGES = fileHandling.ensureFolderEnding(fileHandling.addServerScriptPath(FILEPATHS.OUTPUT_IMAGES))
-fileHandling.createFilepath(FILEPATHS.OUTPUT_IMAGES)
-FILEPATHS.FILECACHE = fileHandling.ensureFolderEnding(fileHandling.addServerScriptPath(FILEPATHS.FILECACHE))
-fileHandling.createFilepath(FILEPATHS.FILECACHE)
+FILEPATHS.OUTPUT_IMAGES = file.createFilepath(file.ensureFolderEnding(file.addServerScriptPath(FILEPATHS.OUTPUT_IMAGES)))
+FILEPATHS.FILECACHE = file.createFilepath(file.ensureFolderEnding(file.addServerScriptPath(FILEPATHS.FILECACHE)))
 
 # this gets called manually after all modules are loaded or whenever serverSettings are reloaded
 # WarningFunction is of type warn(string: message, int: verbosityLevel)
@@ -199,14 +196,13 @@ def checkSettings():
 		loggingFunctions.warn(msg, 4)
 	else:
 		assert type(FILEPATHS.LOGFILE) is str
-		FILEPATHS.LOGFILE = fileHandling.addServerScriptPath(FILEPATHS.LOGFILE)
-	fileHandling.createFilepath(FILEPATHS.LOGFILE)
+		FILEPATHS.LOGFILE = file.createFilepath(file.addServerScriptPath(FILEPATHS.LOGFILE))
 	
-	FILEPATHS.AVAILABLE_MODELS = {keyword:fileHandling.addServerScriptPath(path)
+	FILEPATHS.AVAILABLE_MODELS = {keyword:file.addServerScriptPath(path)
 		for (keyword, path) in FILEPATHS.AVAILABLE_MODELS.items()}
 
 	if FILEPATHS.NN_LOAD_DEFAULT_MODEL not in FILEPATHS.AVAILABLE_MODELS.keys():
-		FILEPATHS.NN_LOAD_DEFAULT_MODEL = fileHandling.addServerScriptPath(FILEPATHS.NN_LOAD_DEFAULT_MODEL)
+		FILEPATHS.NN_LOAD_DEFAULT_MODEL = file.addServerScriptPath(FILEPATHS.NN_LOAD_DEFAULT_MODEL)
 	
 	if FORMAT_OUTPUT.PRINT_COLOR_ANSI_CODES:
 		if FORMAT_OUTPUT.ONLY_USE_SIMPLE_ANSI_CODES:

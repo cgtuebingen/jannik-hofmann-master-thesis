@@ -31,6 +31,15 @@ PYTHON_INTERACTION_SCRIPT_VERSION = "0.1.0"
 # signifying if the command was executed successfully
 command_history = []
 
+# Used to store and retrieve module variables before and after module reload.
+# With empty parameter, returns a list of variable values that should be saved.
+# This list can then be used as parameter on the second call to overwrite the freshly initialized vars
+def onModuleReloadVars(vars = None):
+	global command_history
+	if vars is None:
+		return command_history
+	command_history = vars
+
 # WEBSOCKET SERVER THAT INTERACTS WITH COMMANDS
 async def interactiveServer(websocket, path, *, initialCommand=None, debugDisconnect=True):
 	# Create a new command instance for this client connection and store the websocket connection,

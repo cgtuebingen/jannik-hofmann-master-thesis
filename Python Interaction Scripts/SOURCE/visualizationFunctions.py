@@ -371,7 +371,7 @@ async def spawnImage(connection, filepath, position, size, rotator = None,
 		processDescription = "Spawning image in the virtual world for " + processDescription
 	
 	if sleepBefore > 0:
-		server.sleep(sleepBefore, "Sleeping before " + processDescription)
+		await server.sleep(sleepBefore, "Sleeping before " + processDescription)
 
 	drawResponse = await packImage(filepath, position, size, rotator, positionIsCenterPoint)
 
@@ -1031,11 +1031,9 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		if draw and design_k.spawnIndividualCuboids and connection:
 			await sendCuboidBatch(connection, "last kernels of layer " + str(layerIndex), False)
 		if renderTexture:
-			fileHandling.createFilepath(filepath)
 			Image.fromarray(render).save(filepath)
 			if design_tx.saveToRendersFolder:
 				externalFilepath = ai.externalImagePath("kernels", filename)
-				fileHandling.createFilepath(externalFilepath)
 				Image.fromarray(render).save(externalFilepath)
 	
 	# Sending the cached texture, this gets also executed if we can use the cached file
@@ -1055,6 +1053,8 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 
 
 async def drawInputPrediction(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg"):
+	result = ai.tfKerasPredict(inputData)
+	await connection.send("Result of the prediction: " + result, sendAlsoAsDebugMsg=True)
 	layer = Layer.layerList[0]
 	position = layer.position
 	position.z -= layer.size.z / 2 + 1
@@ -1094,7 +1094,6 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 			("bgr", design.flipRGBtoBGR),
 		])
 		filename = ai.internalCachePath("layerOutput", filename)
-		fileHandling.createFilepath(filename)
 		texture.save(filename)
 	else:
 		async def recursivelyBuildAllKernels(selectKernel, shape, originalShape=None):
@@ -1147,7 +1146,6 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 			("bgr", design.flipRGBtoBGR),
 		])
 		filename = ai.internalCachePath("layerOutput", filename)
-		fileHandling.createFilepath(filename)
 		texture.save(filename)
 	
 	# Draw the texture image
