@@ -20,10 +20,10 @@ class DEBUG:
 	USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary when no nn is loaded
 	# This allows the server to draw a precached structure without loading any model
 	DEFAULT_INPUT_IMAGE = (R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow" + '\\' +
-		"dogcat" +
-		# "lion" +
-		# "mug" +
-		# "animals" +
+		#"dogcat" +
+		#"lion" +
+		#"mug" +
+		"animals" +
 	".jpg")
 
 class SERVER:

@@ -947,8 +947,8 @@ class Request:
 		"active on the internet via unencrypted connections (outside of localhost)\n" +
 		"By default, modules define variables which they want to keep while the module is being" +
 		"reloaded. The value of these variables is restored after the reload. " +
-		"(This does not work for the module serverCommands.) " +
-		"Use §vars [modules]§ to force a reset the variables in the reloaded modules.\n" +
+		"(This does not work for the module serverCommands.)\n" +
+		"Use §vars [modules]§ to force a reset of the variables in the reloaded modules.\n" +
 		"This command is currently " + ("ENABLED" if setting.COMMANDS.ALLOW_REMOTE_CODE_EXECUTION else "DISABLED"))
 
 
@@ -1663,8 +1663,8 @@ class Request:
 		'TODO')
 
 	async def tf_drawsaliency(self, **kwargs):
-		await vis.drawSaliency(self)
+		index = await self.getParam(1, "-1")
+		input = await self.getParam(2, setting.DEBUG.DEFAULT_INPUT_IMAGE)
+		await vis.drawSaliency(self, input, index)
 	commandList["tf draw saliency"] = (tf_drawsaliency, "Draws the saliency map of a certain kernel",
 		'TODO')
-
-	

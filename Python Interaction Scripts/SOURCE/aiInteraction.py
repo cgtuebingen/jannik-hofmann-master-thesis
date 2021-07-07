@@ -456,14 +456,29 @@ def tfKerasGetLayerOutput(layerIndex, inputData):
 	partialModel = keras.Model(inputs=model().input, outputs=output)
 	return partialModel(inputData)
 
-def tfKerasGetSaliency(inputData, index=0):
+def tfKerasGetSaliency(inputData, index=-1):
 	if is_str(inputData):
 		inputData = tfKerasPreprocessImage(inputData)
-	prediction = nn_module.decode_predictions(model().predict(inputData), top=1000)[0][index]
+	if not re.fullmatch(R"-?[0-9]+", index):
+		for i, prediction in enumerate(nn_module.decode_predictions(model().predict(inputData), top=tfnet.layers[-1][2][-1])[0]):
+			if index.lower().replace('_', ' ') == prediction[1].lower().replace('_', ' '):
+				index = '-' + str(i+1)
+				break
+		else:
+			print("Found nothing")
+			index = '-1'
 	images = tf.Variable(inputData, dtype=float)
 	with tf.GradientTape() as tape:
 		pred = model()(images, training=False)
-		index = np.argsort(pred.numpy().flatten())[::-1][index]
+		best_labels = np.argsort(pred.numpy().flatten())[::-1]
+		index = int(index)
+		if index < 0:
+			topIndex = -index-1
+			index = best_labels[topIndex]
+		else:
+			topIndex = np.where(best_labels == index)[0][0]
 		loss = pred[0][index]
+	prediction = nn_module.decode_predictions(model().predict(inputData), top=tfnet.layers[-1][2][-1])[0][topIndex]
 	print(f"{prediction[1]} ({prediction[2]*100:.3f}%) [{index}]")
-	return np.max(tf.math.abs(tape.gradient(loss, images)), axis=3)[0]
+	return (np.max(tf.math.abs(tape.gradient(loss, images)), axis=3)[0], f"{index}-{prediction[1]}-{prediction[2]*100:.3f}%")
+	

@@ -1166,8 +1166,8 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 			f"kernel activations of layer {layerIndex}", sleepBefore=.2)
 	return texture
 
-async def drawSaliency(connection, inputData = setting.DEBUG.DEFAULT_INPUT_IMAGE, index=0, justRenderTextures=False):
-	result = ai.tfKerasGetSaliency(inputData, index)
+async def drawSaliency(connection, inputData=setting.DEBUG.DEFAULT_INPUT_IMAGE, index=-1, justRenderTextures=False):
+	result, description = ai.tfKerasGetSaliency(inputData, index)
 	result = gaussian_filter(result, design.saliency.blurRadius)
 	result -= np.min(result)
 	result /= np.max(result) + 1e-18
@@ -1184,7 +1184,7 @@ async def drawSaliency(connection, inputData = setting.DEBUG.DEFAULT_INPUT_IMAGE
 		image = image * opacity + input_image * (1 - opacity) * design.saliency.imageOpacity
 	image = np.clip(image, 0, 255).astype(np.uint8)
 	image = Image.fromarray(image)
-	filename = settingsToFilename(f"predindex-{index}_settings", [
+	filename = settingsToFilename(f"prediction-{description.lower().replace(' ', '-')}_settings", [
 		("cmap-", design.saliency.colormap, "gray"),
 		("bright", design.saliency.brightness, 50),
 		("blur", design.saliency.blurRadius, 0),
