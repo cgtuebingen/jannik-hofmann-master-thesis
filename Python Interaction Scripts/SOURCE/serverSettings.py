@@ -19,6 +19,12 @@ def onModuleReload(): checkSettings()
 class DEBUG:
 	USE_FAKE_STRUCTURE = True # overrides retrieval of tf model summary when no nn is loaded
 	# This allows the server to draw a precached structure without loading any model
+	DEFAULT_INPUT_IMAGE = (R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow" + '\\' +
+		"dogcat" +
+		# "lion" +
+		# "mug" +
+		# "animals" +
+	".jpg")
 
 class SERVER:
 	# WEBSOCKET SERVER ADDRESS
@@ -70,7 +76,7 @@ class COMMANDS:
 	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
 	# To reload these macros you need to execute the command "server reload serverCommands"
 	MACROS = {
-		"init": "py lion = R'E:\\Nextcloud\\Jannik\\Documents\\Studies\\MA\\First tests\\DenseNet Tensorflow\\lion.jpg' & " +
+		"init": R"py lion = R'E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg' & " +
 				"nowait",
 		"fresh": "server reload setting server vis design ai & almostnowait & tf draw layers",
 		"recom": "server reload setting & eval setting.COMMANDS.MACROS & server reload serverCommands",

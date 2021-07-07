@@ -1651,13 +1651,13 @@ class Request:
 		selection = await self.getParam(2, -1)
 		if selection == -1:
 			selection = None
-		input = await self.getParam(3, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg")
+		input = await self.getParam(3, setting.DEBUG.DEFAULT_INPUT_IMAGE)
 		await vis.drawKernelActivations(self, layerIndex, selection, input)
 	commandList["tf draw activations"] = (tf_drawkernelactivations, "Draws the activations of a certain kernel",
 		'TODO')
 
 	async def tf_drawinputprediction(self, **kwargs):
-		input = await self.getParam(1, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg")
+		input = await self.getParam(1, setting.DEBUG.DEFAULT_INPUT_IMAGE)
 		await vis.drawInputPrediction(self, input)
 	commandList["tf draw prediction"] = (tf_drawinputprediction, "Draws the prediction resulting from a given input",
 		'TODO')

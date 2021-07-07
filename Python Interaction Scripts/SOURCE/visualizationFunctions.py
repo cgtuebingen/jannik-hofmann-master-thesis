@@ -1057,7 +1057,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 			os.startfile(filepath)
 
 
-async def drawInputPrediction(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg"):
+async def drawInputPrediction(connection, inputData = setting.DEBUG.DEFAULT_INPUT_IMAGE):
 	result = ai.tfKerasPredict(inputData)
 	await connection.send("Result of the prediction: " + result, sendAlsoAsDebugMsg=True)
 	layer = Layer.layerList[0]
@@ -1166,7 +1166,7 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 			f"kernel activations of layer {layerIndex}", sleepBefore=.2)
 	return texture
 
-async def drawSaliency(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg", index=0):
+async def drawSaliency(connection, inputData = setting.DEBUG.DEFAULT_INPUT_IMAGE, index=0, justRenderTextures=False):
 	result = ai.tfKerasGetSaliency(inputData, index)
 	result = gaussian_filter(result, design.saliency.blurRadius)
 	result -= np.min(result)
@@ -1196,18 +1196,17 @@ async def drawSaliency(connection, inputData = R"E:\Nextcloud\Jannik\Documents\S
 	])
 	filepath = ai.internalCachePath("saliency", filename)
 	image.save(filepath)
-	plt.imshow(image)
-	plt.show()
-	return
-
-	# displaying as overlayed plot
-	plt.title(f"{prediction[1]} ({prediction[2]*100:.3f}%) [{index}]")
-	_img = keras.preprocessing.image.load_img(R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg",target_size=(224,224))
-	plt.imshow(_img)
-	i = plt.imshow(result, cmap="magma", alpha=0.5)
-	plt.colorbar(i)
-	plt.show()
-	return
+	
+	# Draw the texture image
+	if not justRenderTextures:
+		thisLayer = Layer.layerList[0]
+		sizex = thisLayer.size.x
+		sizey = thisLayer.size.y
+		position = thisLayer.position.copy()
+		position.y += thisLayer.size.y / 2 + design.kernels.spacingFromLayer + sizey / 2
+		await spawnDoubleImagePlaneAlongZ(connection, filepath, position, (sizex, sizey), True,
+			f"saliency map of index {index}", sleepBefore=.2)
+	return image
 
 
 # FOR DEBUGGING, executed if you start this script directly
