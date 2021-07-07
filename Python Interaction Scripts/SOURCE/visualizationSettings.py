@@ -76,6 +76,20 @@ class kernels:
 		saveToRendersFolder = True # will save a copy of the rendered kernel texture to the renders folder
 		opacity = 1
 
+class saliency:
+	colormap = "magma" # see https://matplotlib.org/stable/gallery/color/colormap_reference.html
+	brightness = 70 # default 50, lower colors 0, higher colors 100, changes the colormaps ramp up for saliency
+	blurRadius = 1.5 # gaussian blur radius of the saliency map, 0 to disable
+	opacityMinimum = 0 # opacity of the saliency map when saliency is at minimum
+	opacityMaximum = 1 # opacity of the saliency map when saliency is at maximum. recommended to always be 1
+	opacityBrightness = 50 # default 50, changes the ramp up of opacity for the saliency map
+	# note: when calculating the saliency overlays' opacity, the brightness specified above is already included
+	imageOpacity = 0.5 # 0 to deactivate showing the input image. resulting texture will not have any transparency,
+	# but will just have more of a black background
+	additiveMixing = False # whether the saliency map on top of the input image should be mixed additively
+	# instead of classically with opacity mixing
+
+
 class layouting:
 	# Dimensions as single numbers or tuples: one value = uniform scaling,
 	# two values = (xz axes, y axis), three values (x, z, y) in unreal

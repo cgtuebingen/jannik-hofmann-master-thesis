@@ -70,6 +70,8 @@ class COMMANDS:
 	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
 	# To reload these macros you need to execute the command "server reload serverCommands"
 	MACROS = {
+		"init": "py lion = R'E:\\Nextcloud\\Jannik\\Documents\\Studies\\MA\\First tests\\DenseNet Tensorflow\\lion.jpg' & " +
+				"nowait",
 		"fresh": "server reload setting server vis design ai & almostnowait & tf draw layers",
 		"recom": "server reload setting & eval setting.COMMANDS.MACROS & server reload serverCommands",
 		"kk": "tf draw kernel",

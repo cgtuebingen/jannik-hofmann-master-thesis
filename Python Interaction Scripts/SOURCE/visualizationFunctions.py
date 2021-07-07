@@ -21,10 +21,12 @@ from types import SimpleNamespace
 import ast
 import random
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import itertools
 import functools
 import networkx as nx
 from PIL import Image
+from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
 
 # LOCAL IMPORTS
@@ -772,8 +774,11 @@ def settingToStr(description, setting, ignoreValue=None):
 			setting = setting[0]
 		else:
 			setting = str(setting[0] + '-' + str(setting[1]))
-	if ignoreValue is not None and math.isclose(setting, ignoreValue):
-		return ""
+	if ignoreValue is not None:
+		if type(ignoreValue) is str and setting == ignoreValue:
+			return ""
+		if type(ignoreValue) in [int, float] and math.isclose(setting, ignoreValue):
+			return ""
 	return '-' + description + str(setting).replace('.', ',')
 
 def settingsToFilename(prefix="", settings=[], filetype="png"):
@@ -784,7 +789,14 @@ def settingsToFilename(prefix="", settings=[], filetype="png"):
 		filetype = '.' + filetype
 	return prefix + parameters + filetype.lower()
 
-	
+# Some subfunctions for color normalization and editing
+# makeExponent takes a value from 0 to 100 to produce an exponent. value 50 results in exponent 1
+@functools.lru_cache(maxsize=4)
+def makeExponent(value):
+	if math.isclose(value, 50): return 1
+	if value < 50: return 1 - (value - 50) / 50
+	else: return 1 / makeExponent(100 - value)
+
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True, draw=True):
 	async def status(verbosity, text):
@@ -897,13 +909,6 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 						(groups[axis]-1) * spacingResolution[axis]
 				render = np.zeros([renderDim(1), renderDim(0), 4], np.uint8)
 
-		# Some subfunctions for color normalization and editing
-		# makeExponent takes a value from 0 to 100 to produce an exponent. value 50 results in exponent 1
-		@functools.lru_cache(maxsize=4)
-		def makeExponent(value):
-			if math.isclose(value, 50): return 1
-			if value < 50: return 1 - (value - 50) / 50
-			else: return 1 / makeExponent(100 - value)
 		# Normalizes the color values of the whole input array, using contrast, brightness settings.
 		# Returns a uint8-array of the same shape with values between 0 and 255
 		def normalizeColors(input):
@@ -1052,7 +1057,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 			os.startfile(filepath)
 
 
-async def drawInputPrediction(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg"):
+async def drawInputPrediction(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg"):
 	result = ai.tfKerasPredict(inputData)
 	await connection.send("Result of the prediction: " + result, sendAlsoAsDebugMsg=True)
 	layer = Layer.layerList[0]
@@ -1062,7 +1067,7 @@ async def drawInputPrediction(connection, inputData = R"E:\Nextcloud\Jannik\Docu
 	await spawnDoubleImagePlaneAlongZ(connection, inputData, position, layer.size, True, description, sleepBefore=.2)
 	
 
-async def drawKernelActivations(connection, layerIndex, selectKernel, inputData, justRenderTextures=False):
+async def drawKernelActivations(connection, layerIndex, selectKernel, inputData, justRenderTextures=False, returnInsteadOfSave=False):
 	if type(selectKernel) is int:
 		selectKernel = [selectKernel]
 	def listToStr(l, removeSpaces=False):
@@ -1089,7 +1094,9 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 		out = np.asarray(np.round(out), dtype=np.uint8)
 		if colored and design.flipRGBtoBGR:
 			out = out[..., ::-1]
-		texture = Image.fromarray(np.asarray(np.round(out), dtype=np.uint8))
+		if returnInsteadOfSave:
+			return out
+		texture = Image.fromarray(out)
 		filename = settingsToFilename(f"layer-{layerIndex}-kernel-{listToStr(selectKernel, True)}", [
 			("bgr", design.flipRGBtoBGR),
 		])
@@ -1158,6 +1165,49 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 		await spawnDoubleImagePlaneAlongZ(connection, filename, position, (sizex, sizey), True,
 			f"kernel activations of layer {layerIndex}", sleepBefore=.2)
 	return texture
+
+async def drawSaliency(connection, inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg", index=0):
+	result = ai.tfKerasGetSaliency(inputData, index)
+	result = gaussian_filter(result, design.saliency.blurRadius)
+	result -= np.min(result)
+	result /= np.max(result) + 1e-18
+	result = result ** makeExponent(design.saliency.brightness)
+	image = np.uint8(getattr(cm, design.saliency.colormap, "gray")(result)*255)
+	image = image[..., :3].astype(np.uint64)
+	opacity = (result * design.saliency.opacityMaximum + (1 - result) * design.saliency.opacityMinimum) ** makeExponent(design.saliency.opacityBrightness)
+	opacity = np.expand_dims(opacity, -1)
+	input_image = await drawKernelActivations(connection, 0, None, inputData, returnInsteadOfSave=True)
+	input_image = input_image.astype(np.uint64)
+	if design.saliency.additiveMixing:
+		image = input_image * design.saliency.imageOpacity + image * opacity
+	else:
+		image = image * opacity + input_image * (1 - opacity) * design.saliency.imageOpacity
+	image = np.clip(image, 0, 255).astype(np.uint8)
+	image = Image.fromarray(image)
+	filename = settingsToFilename(f"predindex-{index}_settings", [
+		("cmap-", design.saliency.colormap, "gray"),
+		("bright", design.saliency.brightness, 50),
+		("blur", design.saliency.blurRadius, 0),
+		("opMin", design.saliency.opacityMinimum, 0),
+		("opMax", design.saliency.opacityMaximum, 1),
+		("opBright", design.saliency.opacityBrightness, 50),
+		("additive", design.saliency.additiveMixing),
+		("imgOp", design.saliency.imageOpacity),
+	])
+	filepath = ai.internalCachePath("saliency", filename)
+	image.save(filepath)
+	plt.imshow(image)
+	plt.show()
+	return
+
+	# displaying as overlayed plot
+	plt.title(f"{prediction[1]} ({prediction[2]*100:.3f}%) [{index}]")
+	_img = keras.preprocessing.image.load_img(R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg",target_size=(224,224))
+	plt.imshow(_img)
+	i = plt.imshow(result, cmap="magma", alpha=0.5)
+	plt.colorbar(i)
+	plt.show()
+	return
 
 
 # FOR DEBUGGING, executed if you start this script directly

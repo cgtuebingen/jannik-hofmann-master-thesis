@@ -439,21 +439,14 @@ def is_str(inputData):
 		return False
 
 def tfKerasPredict(inputData):
+	NUMBER_OF_RELEVANT_PREDICTIONS = 10
 	if is_str(inputData):
 		inputData = tfKerasPreprocessImage(inputData)
-	prediction = model().predict(inputData)
-	prediction = nn_module.decode_predictions(prediction, top=1)
-	#print(prediction)
-	prediction = prediction[0][0]
-	prediction = '%s (%.2f%%)' % (prediction[1], prediction[2]*100)
-	#print(prediction)
-	return prediction
-
-def tfk(inputData = R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg"):
-	if is_str(inputData):
-		inputData = tfKerasPreprocessImage(inputData)
-	prediction = model().predict(inputData)
-	return nn_module.decode_predictions(prediction, top=1)
+	prediction = nn_module.decode_predictions(model().predict(inputData), top=NUMBER_OF_RELEVANT_PREDICTIONS)[0]
+	indices = np.argsort(model()(inputData, training=False).numpy().flatten())[::-1][0:NUMBER_OF_RELEVANT_PREDICTIONS]
+	result = [f"{label[1]} ({label[2]*100:.3f}%) [{index}]"
+		for index, label in zip(indices, prediction)]
+	return '\n'.join(result)
 
 def tfKerasGetLayerOutput(layerIndex, inputData):
 	import keras
@@ -462,3 +455,15 @@ def tfKerasGetLayerOutput(layerIndex, inputData):
 	output = model().get_layer(getLayerName(layerIndex)).output
 	partialModel = keras.Model(inputs=model().input, outputs=output)
 	return partialModel(inputData)
+
+def tfKerasGetSaliency(inputData, index=0):
+	if is_str(inputData):
+		inputData = tfKerasPreprocessImage(inputData)
+	prediction = nn_module.decode_predictions(model().predict(inputData), top=1000)[0][index]
+	images = tf.Variable(inputData, dtype=float)
+	with tf.GradientTape() as tape:
+		pred = model()(images, training=False)
+		index = np.argsort(pred.numpy().flatten())[::-1][index]
+		loss = pred[0][index]
+	print(f"{prediction[1]} ({prediction[2]*100:.3f}%) [{index}]")
+	return np.max(tf.math.abs(tape.gradient(loss, images)), axis=3)[0]

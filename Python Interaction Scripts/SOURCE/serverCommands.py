@@ -1651,14 +1651,20 @@ class Request:
 		selection = await self.getParam(2, -1)
 		if selection == -1:
 			selection = None
-		input = await self.getParam(3, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg")
+		input = await self.getParam(3, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg")
 		await vis.drawKernelActivations(self, layerIndex, selection, input)
 	commandList["tf draw activations"] = (tf_drawkernelactivations, "Draws the activations of a certain kernel",
 		'TODO')
 
 	async def tf_drawinputprediction(self, **kwargs):
-		input = await self.getParam(1, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg")
+		input = await self.getParam(1, R"E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\dogcat.jpg")
 		await vis.drawInputPrediction(self, input)
-	commandList["tf draw prediction"] = (tf_drawinputprediction, "Draws the activations of a certain kernel",
+	commandList["tf draw prediction"] = (tf_drawinputprediction, "Draws the prediction resulting from a given input",
 		'TODO')
 
+	async def tf_drawsaliency(self, **kwargs):
+		await vis.drawSaliency(self)
+	commandList["tf draw saliency"] = (tf_drawsaliency, "Draws the saliency map of a certain kernel",
+		'TODO')
+
+	
