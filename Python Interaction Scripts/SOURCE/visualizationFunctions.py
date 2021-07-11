@@ -27,6 +27,8 @@ import functools
 import networkx as nx
 from PIL import Image
 from scipy.ndimage import gaussian_filter
+from tensorflow.python.eager.context import LogicalDeviceConfiguration
+from tensorflow.python.ops.array_ops import NEW_AXIS
 from tqdm import tqdm
 
 # LOCAL IMPORTS
@@ -35,6 +37,7 @@ import websocketServer as server
 import aiInteraction as ai
 import serverCommands
 import loggingFunctions
+import beautifulDebug
 import serverSettings as setting
 import debugAndTesting
 from forceatlas2 import ForceAtlas2
@@ -766,25 +769,28 @@ async def drawstructure(connection = None):
 	return await drawLayout(connection, ai.tfnet.layoutPositions)
 
 # Helps to create uniquely identifiable filename for the cachefiles
-def settingToStr(description, setting, ignoreValue=None):
-	if setting is True: return '-' + description
+def settingToStr(description, setting, ignoreValue=None, separator='_'):
+	if setting is True: return separator + description
 	if setting is False: return ""
 	if type(setting) in [tuple, list]:
 		if math.isclose(float(setting[0]), float(setting[1])):
 			setting = setting[0]
 		else:
-			setting = str(setting[0] + '-' + str(setting[1]))
+			setting = beautifulDebug.floatToShortStr(setting[0]) + '-' + \
+				beautifulDebug.floatToShortStr(setting[1])
 	if ignoreValue is not None:
 		if type(ignoreValue) is str and setting == ignoreValue:
 			return ""
-		if type(ignoreValue) in [int, float] and math.isclose(setting, ignoreValue):
+		if type(ignoreValue) in [int, float, np.float64, np.float32] and math.isclose(setting, ignoreValue):
 			return ""
-	return '-' + description + str(setting).replace('.', ',')
+	if type(setting) in [int, float, np.float64, np.float32]:
+		setting = beautifulDebug.floatToShortStr(setting)
+	return separator + description + str(setting).replace('.', ',')
 
-def settingsToFilename(prefix="", settings=[], filetype="png"):
+def settingsToFilename(prefix="", settings=[], filetype="png", separator='_'):
 	parameters = ""
 	for setting in settings:
-		parameters += settingToStr(*setting)
+		parameters += settingToStr(*setting, separator=separator)
 	if filetype[0] != '.':
 		filetype = '.' + filetype
 	return prefix + parameters + filetype.lower()
@@ -796,6 +802,9 @@ def makeExponent(value):
 	if math.isclose(value, 50): return 1
 	if value < 50: return 1 - (value - 50) / 50
 	else: return 1 / makeExponent(100 - value)
+
+def applyBrightness(image, brightness):
+	return np.sign(image) * np.absolute(image) ** makeExponent(brightness)
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True, draw=True):
@@ -914,10 +923,11 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 		def normalizeColors(input):
 			colors = np.copy(input)
 			colors /= max(np.max(kernel), -np.min(kernel))
-			colors = abs(colors) ** makeExponent(design_k.contrast)
-			colors = np.where(input >= 0, colors, -colors)
-			colors = colors / 2 + 0.5
-			colors = colors ** makeExponent(design_k.brightness)
+			# applying contrast by applying brightness around 0
+			colors = abs(colors)
+			colors = applyBrightness(colors, design_k.contrast)
+			colors = np.sign(input) * colors / 2 + 0.5
+			colors = applyBrightness(colors, design_k.brightness)
 			return np.around(colors * 255).astype(np.uint8)
 		try:
 			# Normalizing the colors in the whole kernel at once
@@ -1166,25 +1176,38 @@ async def drawKernelActivations(connection, layerIndex, selectKernel, inputData,
 			f"kernel activations of layer {layerIndex}", sleepBefore=.2)
 	return texture
 
+def applyColormap(image, colormap, invertHue=False):
+	result = getattr(cm, colormap, "gray")(np.clip(image, 0, 1))[..., :3]
+	if invertHue:
+		gray = np.mean(result, axis=-1)[..., np.newaxis]
+		result = 2*gray - result
+	return result
+
 async def drawSaliency(connection, inputData=setting.DEBUG.DEFAULT_INPUT_IMAGE, index=-1, justRenderTextures=False):
 	result, description = ai.tfKerasGetSaliency(inputData, index)
 	result = gaussian_filter(result, design.saliency.blurRadius)
-	result -= np.min(result)
-	result /= np.max(result) + 1e-18
-	result = result ** makeExponent(design.saliency.brightness)
-	image = np.uint8(getattr(cm, design.saliency.colormap, "gray")(result)*255)
-	image = image[..., :3].astype(np.uint64)
-	opacity = (result * design.saliency.opacityMaximum + (1 - result) * design.saliency.opacityMinimum) ** makeExponent(design.saliency.opacityBrightness)
+	#result -= np.min(result)
+	norm_factor = np.max(result)
+	if design.saliency.normalizationFactor is not None:
+		norm_factor = max(norm_factor, design.saliency.normalizationFactor)
+	result /= norm_factor
+	result = applyBrightness(result, design.saliency.brightness)
+	opacity = result.copy()
+	result = applyColormap(result, design.saliency.colormap)
+	image = np.uint64(result*255)
+	opacity = applyBrightness(opacity, design.saliency.opacityBrightness)
+	opacity = opacity * design.saliency.opacityMaximum + (1 - opacity) * design.saliency.opacityMinimum
 	opacity = np.expand_dims(opacity, -1)
 	input_image = await drawKernelActivations(connection, 0, None, inputData, returnInsteadOfSave=True)
 	input_image = input_image.astype(np.uint64)
 	if design.saliency.additiveMixing:
-		image = input_image * design.saliency.imageOpacity + image * opacity
+		image = image * opacity + input_image * design.saliency.imageOpacity
 	else:
 		image = image * opacity + input_image * (1 - opacity) * design.saliency.imageOpacity
 	image = np.clip(image, 0, 255).astype(np.uint8)
 	image = Image.fromarray(image)
 	filename = settingsToFilename(f"prediction-{description.lower().replace(' ', '-')}_settings", [
+		("norm", norm_factor),
 		("cmap-", design.saliency.colormap, "gray"),
 		("bright", design.saliency.brightness, 50),
 		("blur", design.saliency.blurRadius, 0),
@@ -1200,10 +1223,99 @@ async def drawSaliency(connection, inputData=setting.DEBUG.DEFAULT_INPUT_IMAGE, 
 	# Draw the texture image
 	if not justRenderTextures:
 		thisLayer = Layer.layerList[0]
+		sizex = max(image.size[0], thisLayer.size.x)
+		sizey = max(image.size[1], thisLayer.size.y)
+		position = thisLayer.position.copy()
+		position.x += thisLayer.size.x / 2 + design.kernels.spacingFromLayer + sizex / 2
+		await spawnDoubleImagePlaneAlongZ(connection, filename, position, (sizex, sizey), True,
+			f"saliency map", sleepBefore=.2)
+	return image
+
+def tmp(result):
+	dig = design.integratedGradients
+	#result = ai.tfKerasGetGradients(inputData, index, seed="123")
+	result /= max(-np.min(result), np.max(result))
+	if dig.negativeColos == "continuous":
+		result = result/2 + 0.5
+	plt.imshow(result, aspect="auto")
+	plt.show()
+
+async def drawGradients(connection, inputData=setting.DEBUG.DEFAULT_INPUT_IMAGE, index=-1, justRenderTextures=False):
+	dig = design.integratedGradients
+	result, description = ai.tfKerasGetGradients(inputData, index)
+	result = gaussian_filter(result, dig.blurRadius)
+	norm_factor = max(-np.min(result), np.max(result))
+	if dig.normalizationFactor is not None:
+		norm_factor = max(norm_factor, dig.normalizationFactor)
+	result /= norm_factor
+	result = applyBrightness(result, dig.brightness)
+	if dig.leaveColored:
+		opacity = np.abs(np.mean(result, axis=-1))
+		result = result/2 + 0.5
+		image = np.uint8(result*255)
+	else: # apply colormap
+		result = np.mean(result, axis=-1) # grayscale
+		opacity = np.abs(result)
+		if dig.negativeColors == "continuous":
+			result = result/2 + 0.5
+			result = applyColormap(result, dig.colormap)
+		else: # non continuous
+			if dig.colormap == "invert":
+				posimg = applyColormap(result, dig.negativeColors, invertHue=True)
+			else:
+				posimg = applyColormap(result, dig.colormap)
+			
+			if dig.negativeColors == "invert":
+				negimg = applyColormap(-result, dig.colormap, invertHue=True)
+			else:
+				negimg = applyColormap(-result, dig.negativeColors)
+			if dig.fuseColormaps == "additive":
+				result = posimg + negimg
+			else:
+				if dig.opacityNeutral == 0 or dig.fuseColormaps == 0: # or False
+					fuse = np.clip(np.sign(result), 0, 1) # just selecting one or the other
+				else: # fusing the colormaps
+					fuse = np.clip(result, -dig.fuseColormaps, dig.fuseColormaps)
+					fuse = fuse / dig.fuseColormaps / 2 + 0.5
+				fuse = fuse[..., np.newaxis]
+				result = fuse * posimg + (1 - fuse) * negimg
+	# Calculating opacity and fusing it with the input image
+	opacity = applyBrightness(opacity, dig.opacityBrightness)
+	opacity = opacity * dig.opacityStrongest + (1 - opacity) * dig.opacityNeutral
+	opacity = np.expand_dims(opacity, -1)
+	input_image = await drawKernelActivations(connection, 0, None, inputData, returnInsteadOfSave=True) / 255
+	if dig.additiveMixing:
+		image = result * opacity + input_image * dig.imageOpacity
+	else:
+		image = result * opacity + input_image * (1 - opacity) * dig.imageOpacity
+	image = np.clip(image, 0, 1)
+	image = np.uint8(image*255)
+	image = Image.fromarray(image)
+	
+	filename = settingsToFilename(f"ig-prediction-{description.lower().replace(' ', '-')}_settings", [
+		("norm", norm_factor),
+		("leaveColored", dig.leaveColored),
+		("cmap-", dig.colormap, "gray"),
+		("neg-", dig.negativeColors, "gray"),
+		("fuse", dig.fuseColormaps, 0),
+		("bright", dig.brightness, 50),
+		("blur", dig.blurRadius, 0),
+		("opN", dig.opacityNeutral, 0),
+		("opS", dig.opacityStrongest, 1),
+		("opBright", dig.opacityBrightness, 50),
+		("additive", dig.additiveMixing),
+		("imgOp", dig.imageOpacity),
+	])
+	filepath = ai.internalCachePath("integrated_gradients", filename)
+	image.save(filepath)
+	
+	# Draw the texture image
+	if not justRenderTextures:
+		thisLayer = Layer.layerList[0]
 		sizex = thisLayer.size.x
 		sizey = thisLayer.size.y
 		position = thisLayer.position.copy()
-		position.y += thisLayer.size.y / 2 + design.kernels.spacingFromLayer + sizey / 2
+		position.y -= thisLayer.size.y / 2 + design.kernels.spacingFromLayer + sizey / 2
 		await spawnDoubleImagePlaneAlongZ(connection, filepath, position, (sizex, sizey), True,
 			f"saliency map of index {index}", sleepBefore=.2)
 	return image

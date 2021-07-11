@@ -671,6 +671,16 @@ class Request:
 	commandList["clear"] = commandAlias("cls")
 
 
+	async def space(self, **kwargs):
+		await self.checkParams(0, 1)
+		lines = await self.getParam(1, 8)
+		loggingFunctions.printlog('\n' * lines, allowSmartLineBreaks=False)
+	commandList["space"] = (space, "Prints out empty lines in server console and log",
+		'This can be used to visually separate output between commands for easier reading.\n' +
+		'Does not respond to the client in any way.\n' +
+		'Single parameter specifies how many empty lines should be printed (default 8).')
+
+
 	async def echo(self, **kwargs):
 		await self.sendstatus(-30, await self.getParam(-1, "echo"))
 	commandList["test echo"] = (echo, "Echos back text",
@@ -1375,7 +1385,7 @@ class Request:
 		if not await self.checkParams(warnUser=False):
 			path = setting.FILEPATHS.NN_LOAD_DEFAULT_MODEL
 			await self.senddebug(5, f"No custom path for the neural network was specified. " +
-			"Using default path specified in python server script:\n" + path)
+			"Using default path specified in python server script: " + path)
 		else:
 			path = await self.getParam()
 		# Try to match with a predefined path from server settings
@@ -1666,5 +1676,12 @@ class Request:
 		index = await self.getParam(1, "-1")
 		input = await self.getParam(2, setting.DEBUG.DEFAULT_INPUT_IMAGE)
 		await vis.drawSaliency(self, input, index)
-	commandList["tf draw saliency"] = (tf_drawsaliency, "Draws the saliency map of a certain kernel",
+	commandList["tf draw saliency"] = (tf_drawsaliency, "Draws the saliency map for a certain output",
+		'TODO')
+
+	async def tf_drawgradients(self, **kwargs):
+		index = await self.getParam(1, "-1")
+		input = await self.getParam(2, setting.DEBUG.DEFAULT_INPUT_IMAGE)
+		await vis.drawGradients(self, input, index)
+	commandList["tf draw gradients"] = (tf_drawgradients, "Draws the integrated gradients for a certain output",
 		'TODO')

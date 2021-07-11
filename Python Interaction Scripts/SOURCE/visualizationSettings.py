@@ -58,7 +58,7 @@ class kernels:
 	wrapIfDimLeftover = True # when there are dimensions left over, the algorithm can wrap the kernel groups
 	# instead of displaying them in one huge line
 	brightness = 45 # default 50, black 0, white 100, changes the color brightness of kernels
-	contrast = 70 # default 50, grey 0, black/white 100, changes kernel contrast and saturation at the same time
+	contrast = 70 # default 50, gray 0, black/white 100, changes kernel contrast and saturation at the same time
 	spawnIndividualCuboids = False # otherwise spawns a plane with a rendered texture image of all the kernels.
 	# Should be set to False
 	useAlreadyCachedTextures = False # whether to use the already saved textures when they have been cached.
@@ -77,6 +77,9 @@ class kernels:
 		opacity = 1
 
 class saliency:
+	normalizationFactor = None # normally saliency is always scaled to the max value.
+	# Use this factor to specify a maximum number for the saliency scale. If anything
+	# higher is encountered, the values will be fitted automatically anyways. None for auto scaling
 	colormap = "magma" # see https://matplotlib.org/stable/gallery/color/colormap_reference.html
 	brightness = 70 # default 50, lower colors 0, higher colors 100, changes the colormaps ramp up for saliency
 	blurRadius = 1.5 # gaussian blur radius of the saliency map, 0 to disable
@@ -88,6 +91,41 @@ class saliency:
 	# but will just have more of a black background
 	additiveMixing = False # whether the saliency map on top of the input image should be mixed additively
 	# instead of classically with opacity mixing
+
+class integratedGradients:
+	normalizationFactor = None # normally gradients are always scaled to the max value.
+	# Use this factor to specify a maximum number for the gradient scale. If anything
+	# higher is encountered, the values will be fitted automatically anyways. None for auto scaling
+	leaveColored = False # when True, gray (128 on all channels with opacityNeutral) will be used
+	# for default and RGB channels become dark or bright depending on the integrated gradient on
+	# that specific RGB channel. When set to False, all RGB channels are averaged before applying
+	# the colormap and negativeColors defined below
+	colormap = "invert" # can also be "invert" if negativeColors is a valid colormap
+	negativeColors = "magma" # how to handle negative values. Can be another colormap, "invert" to
+	# use the positive colormap with inverted hues or "continuous" to use the main colormap with
+	# lowest color = negative gradient, middle color = neutral, highest color = positive gradient
+	fuseColormaps = 0.2 # only relevant if opacityNeutral is larger than 0
+	# set a float between 0 and 1 to define the area of fusing between color maps, recommended 0.1
+	# set to 0 or False for a hard cutoff, do so if both colormaps start with the same color
+	# set to "additive" if you want to add up both colormaps with additive color mixing
+	brightness = 80 # default 50, lower colors 0, higher colors 100, changes the colormaps ramp up
+	blurRadius = 1 # gaussian blur radius of the saliency map, 0 to disable
+	# Might lead to undesired results with negativeColor = "continuous" as it shifts neutral middle color
+	opacityNeutral = 0 # opacity of the integrated gradient when gradient is at neutral value
+	opacityStrongest = 1 # opacity of the integrated gradient at strongest gradient. recommended to always be 1
+	opacityBrightness = 50 # default 50, changes the ramp up of opacity for the saliency map
+	# note: when calculating the saliency overlays' opacity, the brightness specified above is already included
+	imageOpacity = 0.5 # 0 to deactivate showing the input image. resulting texture will not have any transparency,
+	# but will just have more of a black background
+	additiveMixing = False # whether the saliency map on top of the input image should be mixed additively
+	# instead of classically with opacity mixing
+	calculateDirectlyOnCpu = True # skips trying to calculate the gradients on GPU with cuda first
+	cacheCalculationResults = True # enable if you keep changing the visualization settings and are
+	# using the "server reload" command to apply the changes to a running server, to avoid waiting
+	# for recalculation of the integrated gradients everytime. In that case you can use the command
+	# "python ai.gradientCache = dict()" to empty the cache
+	# disable if you are changing the source code of integrated gradient calculations or are loading
+	# different NNs or weight configurations on top of each other. recommended to be False if unsure
 
 
 class layouting:

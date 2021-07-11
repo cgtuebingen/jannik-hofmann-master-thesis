@@ -293,3 +293,35 @@ def mapToText(map, spacing = 3, line_width = -2, key_width = .25, splitAtSpaces 
 			spaces = ' ' * (spacing + key_width - len(key_line))
 			output += key_line + spaces + value_line + '\n'
 	return output[:-1] # removing last '\n'
+
+def roundNonZeroDigits(number, relevantDigits):
+	assert type(number) in [int, float, np.float64, np.float32]
+	assert relevantDigits > 0
+	return eval(f"%.{relevantDigits-1}e" % number)
+
+def floatToShortStr(number, significantDigits=4):
+	def noend(result):
+		result = str(result)
+		return result[:-2] if result.endswith(".0") else result
+	if len(noend(number)) <= significantDigits:
+		result = noend(number)
+	else:
+		order = int(("%e" % number).replace('-','+-').split('+')[1]) + 1
+		if -4 < order <= significantDigits + 4:
+			digits = significantDigits
+			result = noend(roundNonZeroDigits(number, digits))
+			while len(noend(roundNonZeroDigits(number, digits+1))) <= len(result) and not math.isclose(eval(result), number):
+				digits += 1
+				result = noend(roundNonZeroDigits(number, digits))
+		else:
+			result = f"%.{significantDigits-1}e" % number
+	if 'e' not in result and '.' in result:
+		while result.endswith("0"): result = result[:-1]
+		if result.endswith("."): result = result[:-1]
+	result = result.replace("e+0", "e+").replace("e-0", "e-").replace(".e", "e")
+	if len(result) > significantDigits:
+		while '.' in result and "0e" in result: result = result.replace("0e", "e")
+		result = result.replace(".e", "e")
+	if len(result) > significantDigits:
+		if result.startswith("0."): result = result[1:]
+	return result

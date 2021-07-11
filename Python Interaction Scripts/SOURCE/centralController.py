@@ -33,6 +33,7 @@ import beautifulDebug
 import serverSettings as setting
 import loggingFunctions
 import websocketServer as server
+import visualizationFunctions as vis
 import visualizationSettings as design
 
 

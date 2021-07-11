@@ -21,17 +21,21 @@ import re
 import importlib.util
 import numpy as np
 from types import SimpleNamespace
+import functools
 import ast
 import random
 from PIL import Image
 from numpy.lib.function_base import select
 
+
 # LOCAL IMPORTS
 import serverCommands
 import serverSettings as setting
 import loggingFunctions
+import beautifulDebug
 import fileHandling
 import websocketServer as server
+import visualizationSettings as design
 
 
 # Definitions / initializations
@@ -43,6 +47,7 @@ nn_module = None
 tfnet = SimpleNamespace()
 pytorchnet = SimpleNamespace()
 tf = None
+gradientCache = dict()
 # Structure of tfnet.layers: (layername, ltype, shape, params, connectedTo, trainableVariables)
 # trainableVariables is a (maybe empty) dict of lists. Lists have same indices as tfnet.layers:
 # e.g. {'kernel': [ndarrays], 'bias': [ndarrays], 'gamma': [ndarrays], 'beta': [ndarrays]}
@@ -51,10 +56,10 @@ tf = None
 # With empty parameter, returns a list of variable values that should be saved.
 # This list can then be used as parameter on the second call to overwrite the freshly initialized vars
 def onModuleReloadVars(vars = None):
-	global nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf
+	global nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf, gradientCache
 	if vars is None:
-		return nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf
-	nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf = vars
+		return nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf, gradientCache
+	nnloaded, nnprepared, modelvarname, nn_spec, nn_module, tfnet, pytorchnet, tf, gradientCache = vars
 
 
 # MINOR HELPER FUNCTIONS
@@ -459,7 +464,44 @@ def tfKerasGetLayerOutput(layerIndex, inputData):
 def tfKerasGetSaliency(inputData, index=-1):
 	if is_str(inputData):
 		inputData = tfKerasPreprocessImage(inputData)
-	if not re.fullmatch(R"-?[0-9]+", index):
+	if not re.fullmatch(R"-?[0-9]+", index): # get label by name
+		for i, prediction in enumerate(nn_module.decode_predictions(model().predict(inputData), top=tfnet.layers[-1][2][-1])[0]):
+			if index.lower().replace('_', ' ') == prediction[1].lower().replace('_', ' '):
+				index = '-' + str(i+1)
+				break
+		else:
+			print("Found nothing")
+			index = '-1'
+	images = tf.Variable(inputData, dtype=float)
+	with tf.GradientTape() as tape:
+		pred = model()(images, training=False)
+		best_labels = np.argsort(pred.numpy().flatten())[::-1]
+		index = int(index)
+		if index < 0:
+			topIndex = -index-1
+			index = best_labels[topIndex]
+		else:
+			topIndex = np.where(best_labels == index)[0][0]
+		loss = pred[0][index]
+	
+	prediction = nn_module.decode_predictions(model().predict(inputData), top=tfnet.layers[-1][2][-1])[0][topIndex]
+	result = np.max(tf.math.abs(tape.gradient(loss, images)), axis=3)[0]
+	print(f"{prediction[1]} ({beautifulDebug.floatToShortStr(prediction[2]*100)}%) [{index}]")
+	return (result, f"{index}-{prediction[1]}-{beautifulDebug.floatToShortStr(prediction[2]*100)}%")
+
+@functools.lru_cache(maxsize=256)
+def tfKerasGetGradients(inputData, index=-1):
+	if design.integratedGradients.cacheCalculationResults:
+		seed = str(inputData) + '\n' + str(index)
+		if seed in gradientCache:
+			return (gradientCache[seed][0].copy(), gradientCache[seed][1])
+	
+	from alibi.explainers import IntegratedGradients
+	
+	if is_str(inputData):
+		inputData = tfKerasPreprocessImage(inputData)
+
+	if not re.fullmatch(R"-?[0-9]+", index): # get label by name
 		for i, prediction in enumerate(nn_module.decode_predictions(model().predict(inputData), top=tfnet.layers[-1][2][-1])[0]):
 			if index.lower().replace('_', ' ') == prediction[1].lower().replace('_', ' '):
 				index = '-' + str(i+1)
@@ -479,6 +521,27 @@ def tfKerasGetSaliency(inputData, index=-1):
 			topIndex = np.where(best_labels == index)[0][0]
 		loss = pred[0][index]
 	prediction = nn_module.decode_predictions(model().predict(inputData), top=tfnet.layers[-1][2][-1])[0][topIndex]
-	print(f"{prediction[1]} ({prediction[2]*100:.3f}%) [{index}]")
-	return (np.max(tf.math.abs(tape.gradient(loss, images)), axis=3)[0], f"{index}-{prediction[1]}-{prediction[2]*100:.3f}%")
 	
+	def calculate_attributions():
+		ig = IntegratedGradients(model(), layer=None, method="gausslegendre", n_steps=50, internal_batch_size=100)
+		return ig.explain(inputData, baselines=None, target=[np.int64(index)]).attributions
+	
+	attributions = None
+	if not design.integratedGradients.calculateDirectlyOnCpu:
+		try:
+			attributions = calculate_attributions()
+		except tf.errors.ResourceExhaustedError:
+			attributions = None
+			print("Resources exhausted. Trying again on CPU")
+	if attributions is None:
+		with tf.device("/cpu:0"):
+			attributions = calculate_attributions()
+	
+	result = np.asarray(attributions).squeeze()
+	print(f"{prediction[1]} ({beautifulDebug.floatToShortStr(prediction[2]*100)}%) [{index}]")
+	result = (result, f"{index}-{prediction[1]}-{beautifulDebug.floatToShortStr(prediction[2]*100)}%")
+
+	if design.integratedGradients.cacheCalculationResults:
+		gradientCache[seed] = result
+	
+	return result

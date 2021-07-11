@@ -91,7 +91,8 @@ def warn(text, verbosity = 5):
 
 
 # Prints and logs a specified text, optionally according to specified verbosity preferences
-def printlog(text, verbosity = None):
+# allowSmartLineBreaks only works if setting.FORMAT_OUTPUT.SMART_LINE_BREAKS is also enabled
+def printlog(text, verbosity = None, allowSmartLineBreaks=True):
 	if verbosity is not None:
 		if verbosity < setting.FORMAT_OUTPUT.DESIRED_VERBOSITY:
 			# Not important enough for the user, discard
@@ -100,7 +101,7 @@ def printlog(text, verbosity = None):
 	# Reverse any formatting if the user doesn't want it
 	if not setting.FORMAT_OUTPUT.PRINT_COLOR_ANSI_CODES:
 		text = beautifulDebug.removeAnsiEscapeCharacters(text)
-	if setting.FORMAT_OUTPUT.SMART_LINE_BREAKS:
+	if setting.FORMAT_OUTPUT.SMART_LINE_BREAKS and allowSmartLineBreaks:
 		beautifulDebug.printWithLinebreaks(text, setting.FORMAT_OUTPUT.SMART_LINE_BREAKS)
 	else:
 		print(text)

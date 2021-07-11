@@ -23,7 +23,8 @@ class DEBUG:
 		#"dogcat" +
 		#"lion" +
 		#"mug" +
-		"animals" +
+		#"animals" +
+		"fireboat" +
 	".jpg")
 
 class SERVER:
@@ -75,15 +76,19 @@ class COMMANDS:
 	# Use these to define more complicated behaviour or make routines quickly available
 	# Recommended to be used with AMPERSAND_CHAINS_COMMANDS enabled
 	# To reload these macros you need to execute the command "server reload serverCommands"
+	# Due to interpretation limitations, macros cannot have another macro as first command.
+	# To execute a macro as the first command of another macro, please prepend "space 0 & " before
 	MACROS = {
 		"init": R"py lion = R'E:\Nextcloud\Jannik\Documents\Studies\MA\First tests\DenseNet Tensorflow\lion.jpg' & " +
 				"nowait",
-		"fresh": "server reload setting server vis design ai & almostnowait & tf draw layers",
+		"fresh": "server reload setting server visualizationFunctions design ai beautifulDebug & almostnowait & tf draw layers",
 		"recom": "server reload setting & eval setting.COMMANDS.MACROS & server reload serverCommands",
 		"kk": "tf draw kernel",
 		"almostnowait": "py design.maxDrawWaitTimeout = 0.5 & server draw next & server draw next",
 		"nowait": "py design.maxDrawWaitTimeout = 0 & server draw next & server draw next",
 		"shape": "tf get layers & tf draw kernels",
+		"gg": "space 0 & fresh & nowait & space & tfdrawgradients",
+		"clear": "python ai.gradientCache = dict()",
 	}
 
 	# Allows the websocket client to execute and evaluate any string with python.
