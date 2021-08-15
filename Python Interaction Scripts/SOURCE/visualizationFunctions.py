@@ -731,7 +731,7 @@ async def drawstructure(connection = None):
 			positions[index] = [positioning, 0]
 			# Keep aligning all layers with horizontal spacing for initilization
 			positioning += newSize.z/2
-			positioning += design.layouting.horizontalSpaceBetweenLayers * 5
+			positioning += design.layouting.horizontalSpaceBetweenLayers * 3 + design.layouting.bufferZone * 2
 			# storing size
 			sizes.append((newSize.z, newSize.y))
 			# Find all parents of the current layer
@@ -745,7 +745,7 @@ async def drawstructure(connection = None):
 			# Behavior alternatives
 			outboundAttractionDistribution = True, # Dissuade hubs
 			edgeWeightInfluence = 1.0,
-			groupLinearlyConnectedNodes = True, # only available with networkx layout
+			groupLinearlyConnectedNodes = design.layouting.groupLinearlyConnectedLayers, # only available with networkx layout
 			orderconnectedQuadsOnXaxis = True, # orders connected nodes by their index on x axis
 			# spacing between the nodes:
 			desiredHorizontalSpacing = design.layouting.horizontalSpaceBetweenLayers,

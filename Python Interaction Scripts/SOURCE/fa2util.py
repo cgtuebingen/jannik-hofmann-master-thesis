@@ -77,6 +77,10 @@ def sign(x):
         return -1
     return 0
 
+import math
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
 # Repulsion function.  `n1` and `n2` should be nodes with sizes.
 # coefficient specifies the strength of this effect.
 # xspacing, yspacing and added bufferZone specifies
@@ -97,9 +101,6 @@ def linOverlapRepulsion(n1, n2, coefficient=0, xspacing=0, yspacing=0, bufferZon
     yDist = sign(yDist) * bigyspacing - yDist
 
     factor = coefficient * n1.mass * n2.mass #* abs(xDist) * abs(yDist)
-    import math
-    def sigmoid(x):
-        return 1 / (1 + math.exp(-x))
     factor *= sigmoid(min(xDist, yDist)/bufferZone/6+1)
     
     #if xDist < yDist:
@@ -192,14 +193,13 @@ def linAttractionSides(n1, n2, e, distributedAttraction, coefficient=0, xspacing
     # else:
     #     yDist += yspacing + nleft.height/2 + nright.height/2
     # commented out because we actually want strong attraction. otherwise they stop when just the diagonals are touching which would be too soon
-    if not distributedAttraction:
-        factor = -coefficient * e
-    else:
-        factor = -coefficient * e / nleft.mass
-    nleft.dx -= xDist * factor
-    nleft.dy -= yDist * factor
-    nright.dx += xDist * factor
-    nright.dy += yDist * factor
+    factor = coefficient * e
+    if distributedAttraction:
+        factor /= nleft.mass
+    nleft.dx += xDist * factor
+    nleft.dy += yDist * factor
+    nright.dx -= xDist * factor
+    nright.dy -= yDist * factor
 
 
 # The following functions iterate through the nodes or edges and apply
@@ -317,8 +317,7 @@ def apply_overlap_repulsion_fast(nodes, coefficient, xspacing=0, yspacing=0, buf
     applyto = np.transpose(np.nonzero(inrange)).tolist()
 
     for pair in applyto:
-        linOverlapRepulsion(nodes[pair[0]], nodes[pair[1]],
-            coefficient, xspacing, yspacing, bufferZone)
+        linOverlapRepulsion(nodes[pair[0]], nodes[pair[1]], coefficient, xspacing, yspacing, bufferZone)
 
 
 def apply_gravity(nodes, gravity, scalingRatio, useStrongGravity=False):
@@ -331,6 +330,7 @@ def apply_gravity(nodes, gravity, scalingRatio, useStrongGravity=False):
 
 
 def apply_attraction(nodes, edges, distributedAttraction, coefficient, edgeWeightInfluence):
+    coefficient *= 100
     # Optimization, since usually edgeWeightInfluence is 0 or 1, and pow is slow
     if edgeWeightInfluence == 0:
         for edge in edges:
@@ -344,6 +344,7 @@ def apply_attraction(nodes, edges, distributedAttraction, coefficient, edgeWeigh
                           distributedAttraction, coefficient)
 
 def apply_attraction_to_sides(nodes, edges, distributedAttraction, coefficient, edgeWeightInfluence, desiredHorizontalSpacing, bufferZone):
+    coefficient *= 100
     # Optimization, since usually edgeWeightInfluence is 0 or 1, and pow is slow
     if edgeWeightInfluence == 0:
         for edge in edges:
@@ -357,6 +358,7 @@ def apply_attraction_to_sides(nodes, edges, distributedAttraction, coefficient, 
                           distributedAttraction, coefficient, xspacing=desiredHorizontalSpacing, bufferZone=bufferZone)
 
 def apply_directional_attraction(nodes, edges, distributedAttraction, coefficient, edgeWeightInfluence, desiredHorizontalSpacing):
+    coefficient *= 100
     # Optimization, since usually edgeWeightInfluence is 0 or 1, and pow is slow
     if edgeWeightInfluence == 0:
         for edge in edges:

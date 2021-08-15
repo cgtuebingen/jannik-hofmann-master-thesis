@@ -93,7 +93,7 @@ class saliency:
 	# instead of classically with opacity mixing
 
 class integratedGradients:
-	normalizationFactor = None # normally gradients are always scaled to the max value.
+	normalizationFactor = .02 # normally gradients are always scaled to the max value.
 	# Use this factor to specify a maximum number for the gradient scale. If anything
 	# higher is encountered, the values will be fitted automatically anyways. None for auto scaling
 	leaveColored = False # when True, gray (128 on all channels with opacityNeutral) will be used
@@ -137,6 +137,7 @@ class layouting:
 	# hard size cutoffs after scaling and adding
 	minLayerDimensions = None
 	maxLayerDimensions = None
+	groupLinearlyConnectedLayers = True
 	# specify desired spacing. buffer zone gets added to space between ungrouped layers
 	horizontalSpaceBetweenGroupedLayers = 100
 	bufferZone = 500
@@ -167,12 +168,12 @@ class layouting:
 		importance = 'decreasing'
 		exponentialCurveFactor = 1
 	class connectedAttraction:
-		strength = 100
+		strength = 1
 		withinIterations = (0, 0.9)
 		importance = 'decreasing'
 		exponentialCurveFactor = 1
 	class shiftOnAxisToOrderByIndex:
-		strength = 140
+		strength = 1.4
 		#withinIterations = (0, 0.9)
 		importance = 'increasing'
 		#importance = 'midway'
@@ -185,14 +186,14 @@ class layouting:
 	# withinIterations can be a single number or a tuple defining a range ([inclusive start,] exclusive end[, steps])
 	#     Also accepts floats, which will automatically multiply with iterations
 	# importance can be
-	#     'constant' (default, always 1),
-	#     'increasing' (0 to 1, factor positive = curved downward, factor negative = curved upward),
-	#     'decreasing' (1 to 0, factor positive = curved downward, factor negative = curved upward),
-	#     'midway' (mirrored, 0 at start and end, 1 in the middle, recommended with negative factor,
+	#     'constant' (default, always strength),
+	#     'increasing' (0 to strength, factor positive = curved downward, factor negative = curved upward),
+	#     'decreasing' (strength to 0, factor positive = curved downward, factor negative = curved upward),
+	#     'midway' (mirrored, 0 at start and end, strength in the middle, recommended with negative factor,
 	#         factor = 0: /\, factor higher = strong peak _/\_, negative factor = round, convex shape /°°\)
-	#     'outsides' (mirrored exactly opposite to midway, 1 at start and end, 0 in the middle,
-	#         factor = 0: \/, factor higher = \__/ round in the middle with strong peaks outside,
-	#         negative factor = °\/° strong downward peak in the middle)
+	#     'outsides' (mirrored exactly opposite to midway, strength at start and end, 0 in the middle,
+	#         recommended with positive factor, factor = 0: \/, factor higher = \__/ round in the middle
+	#         with strong peaks outside, negative factor = °\/° strong downward peak in the middle)
 	# exponentialCurveFactor 0 = linear, 1 = slight curve, 5 = really strong curve
 	#     example with factor 5: https://www.wolframalpha.com/input/?i=%28e%5E%28+++++5+++++*x%29%2Fe-1%2Fe%29%2F%28e%5E%28+++++5+++++%29%2Fe-1%2Fe%29+in+x%3D%5B0%2C1%5D
 	# Use importance = 'disabled', strength = 0 or withinIterations = None to disable a rule
