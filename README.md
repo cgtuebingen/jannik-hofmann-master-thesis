@@ -12,6 +12,8 @@ Its python server runs on the same machine that hosts the neural network; it is 
 The client contains a custom UE4 C++ plugin for WebSocket interactions, Unreal Engine blueprints to interpret responses, cache data and spawn objects, and the Unreal Engine 4 game environment that renders these visualizations in an interactive world, to be freely explored by the user.
 Among other advantages, this allows for a separation between a server interacting with the neural network and an Unreal Engine 4 client that renders the visualization for the user to explore freely.
 
+This project is published under the GNU GPLv3 license.
+
 # Jannik Hofmann master thesis
 
 NeuralVisUAL was developed by Jannik Hofmann as part of his master thesis for the university of Tübingen (Eberhard-Karls-Universität Tübingen).
