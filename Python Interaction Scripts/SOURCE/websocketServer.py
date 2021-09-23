@@ -1,5 +1,22 @@
 #!/usr/bin/env python
 
+"""
+ This file websocketServer.py is part of NeuralVisUAL.
+ 
+ NeuralVisUAL is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ NeuralVisUAL is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with NeuralVisUAL.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 # This module defines the behaviour of the websocket server itself. It contains functions to
 # start the server or shut it down, and controls the looped asyncio interface that asynchronously
 # waits and listens for new commands by a client. It will find functions from the serverCommands.py

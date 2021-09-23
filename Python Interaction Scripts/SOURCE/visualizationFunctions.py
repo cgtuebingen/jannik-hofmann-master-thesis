@@ -1,5 +1,22 @@
 #!/usr/bin/env python
 
+"""
+ This file visualizationFunctions.py is part of NeuralVisUAL.
+ 
+ NeuralVisUAL is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ NeuralVisUAL is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with NeuralVisUAL.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 # This module contains all of the functions and calculations for visualizing the neural networks
 # in 3D space. It uses the visualizationSettings.py to achieve this task.
 # Furthermore, it defines the rules for interaction of the UE4 player with the 3D environment
@@ -1040,7 +1057,7 @@ async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCach
 								)
 								await queueCuboid(connection, position, size, color, processDescription = processDesc)
 							elif progress % updateEvery:
-								await server.sleep(0, processDesc)	
+								await server.sleep(0, processDesc)
 
 		# After looping through all of the kernels
 		if draw and design_k.spawnIndividualCuboids and connection:

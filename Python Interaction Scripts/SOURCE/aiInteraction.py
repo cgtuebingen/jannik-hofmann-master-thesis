@@ -1,5 +1,22 @@
 #!/usr/bin/env python
 
+"""
+ This file aiInteraction.py is part of NeuralVisUAL.
+ 
+ NeuralVisUAL is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+ 
+ NeuralVisUAL is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+ 
+ You should have received a copy of the GNU General Public License
+ along with NeuralVisUAL.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 # This module contains the interaction of the server with the imported tensorflow and
 # pytorch neural networks. It takes care of loading them, calculating predictions, as well as
 # retrieving weight data and meta information about the architectures.
