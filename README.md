@@ -17,3 +17,17 @@ Among other advantages, this allows for a separation between a server interactin
 NeuralVisUAL was developed by Jannik Hofmann as part of his master thesis for the university of Tübingen (Eberhard-Karls-Universität Tübingen).
 
 The theoretical background of this project as well as more detailed information about the implementation can be found in the pdf-file of the thesis itself.
+
+# Setup
+
+Due to the huge size of UE4 (Unreal Engine 4) projects, only part of the project structure has been uploaded to this repo.
+
+To recreate the NeuralVisUAL project, please create a new UE4 project on your own, then overwrite the *Content*, *Plugins*, and *Source* folders of that project with the ones found in the *NeuralVisUE* folder of this repo.
+This UE4 project can then be run to start the NeuralVisUAL client.
+
+For the server, simply execute the *Python Interaction Scripts/centralController.py* file in python.
+If python throws errors due to missing libraries, please install the relevant libraries to your python environment.
+
+Any configuration for the server or visualization settings can be made in *serverSettings.py* and *visualizationSettings.py*. To disable features, please set the variables to 0 or False instead of removing or commenting out code lines in the settings.
+
+For further information on how to use the python server, please refer to the thesis pdf or type the commands *help* or *server status* in the console of the running UE4 client.
