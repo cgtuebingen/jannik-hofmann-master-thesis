@@ -2,6 +2,13 @@
 /*
 !/.gitignore
 
+# Including licenses
+!LICENSE
+!/**/LICENSE
+!/Python Interaction Scripts/SOURCE/LICENSE
+!/Python Interaction Scripts/forceatlas2/LICENSE
+!/NeuralVisUE/Source/LICENSE
+
 # Include python interaction scripts
 !/Python Interaction Scripts
 /Python Interaction Scripts/backups - archive
