@@ -24,12 +24,15 @@ The theoretical background of this project as well as more detailed information 
 
 Due to the huge size of UE4 (Unreal Engine 4) projects, only part of the project structure has been uploaded to this repo.
 
+## UE4 Client
 To recreate the NeuralVisUAL project, please create a new UE4 project on your own, then overwrite the *Content*, *Plugins*, and *Source* folders of that project with the ones found in the *NeuralVisUE* folder of this repo.
-Afterwards, please navigate to NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty and create a folder BoostLibrary, containing boost_1_75_0 with the boost library source code, [downloaded and unpacked from boost.org](https://www.boost.org/users/history/version_1_75_0.html)
-You also need to prepare to use a boost library binary, as described in step 5 of the getting started-guide for [Windows](https://www.boost.org/doc/libs/1_75_0/more/getting_started/windows.html) or [Unix](https://www.boost.org/doc/libs/1_75_0/more/getting_started/unix-variants.html)
-Please verify that the following path exists: NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/BoostLibrary/boost_1_75_0/boost/beast/websocket
-The complete UE4 project can then be run to start the NeuralVisUAL client.
 
+Then, please navigate to NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty and create a folder BoostLibrary, containing [the boost_1_75_0 folder with the library from boost.org](https://www.boost.org/users/history/version_1_75_0.html).
+NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/BoostLibrary/boost_1_75_0 should now contain files such as boost.png, README.md and folders boost, doc, more, among others.
+You also need to "prepare to use a boost library binary", as described in step 5 of the guide for [Windows](https://www.boost.org/doc/libs/1_75_0/more/getting_started/windows.html) or [Unix](https://www.boost.org/doc/libs/1_75_0/more/getting_started/unix-variants.html).
+The complete UE4 project can now be run to start the NeuralVisUAL client.
+
+## Server
 For the server, simply execute the *Python Interaction Scripts/centralController.py* file in python.
 If python throws errors due to missing libraries, please install the relevant libraries to your python environment.
 
