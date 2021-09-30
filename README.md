@@ -12,6 +12,8 @@ Its python server runs on the same machine that hosts the neural network; it is 
 The client contains a custom UE4 C++ plugin for WebSocket interactions, Unreal Engine blueprints to interpret responses, cache data and spawn objects, and the Unreal Engine 4 game environment that renders these visualizations in an interactive world, to be freely explored by the user.
 Among other advantages, this allows for a separation between a server interacting with the neural network and an Unreal Engine 4 client that renders the visualization for the user to explore freely.
 
+This project is published under the GNU GPLv3 license.
+
 # Jannik Hofmann master thesis
 
 NeuralVisUAL was developed by Jannik Hofmann as part of his master thesis for the university of Tübingen (Eberhard-Karls-Universität Tübingen).
@@ -22,9 +24,15 @@ The theoretical background of this project as well as more detailed information 
 
 Due to the huge size of UE4 (Unreal Engine 4) projects, only part of the project structure has been uploaded to this repo.
 
+## UE4 Client
 To recreate the NeuralVisUAL project, please create a new UE4 project on your own, then overwrite the *Content*, *Plugins*, and *Source* folders of that project with the ones found in the *NeuralVisUE* folder of this repo.
-This UE4 project can then be run to start the NeuralVisUAL client.
 
+Then, please navigate to NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty and create a folder BoostLibrary, containing [the boost_1_75_0 folder with the library from boost.org](https://www.boost.org/users/history/version_1_75_0.html).
+NeuralVisUE/Plugins/NeuralInteractionClient/Source/ThirdParty/BoostLibrary/boost_1_75_0 should now contain files such as boost.png, README.md and folders boost, doc, more, among others.
+You also need to "prepare to use a boost library binary", as described in step 5 of the guide for [Windows](https://www.boost.org/doc/libs/1_75_0/more/getting_started/windows.html) or [Unix](https://www.boost.org/doc/libs/1_75_0/more/getting_started/unix-variants.html).
+The complete UE4 project can now be run to start the NeuralVisUAL client.
+
+## Server
 For the server, simply execute the *Python Interaction Scripts/centralController.py* file in python.
 If python throws errors due to missing libraries, please install the relevant libraries to your python environment.
 
