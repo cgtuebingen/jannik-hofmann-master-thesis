@@ -63,7 +63,7 @@ def log(text, tryToCreateNewFile = True):
 			# Nothing was written yet in the logfile this session. Let's start with something nice:
 			file.write("Logfile created on " + dateTimeObj.strftime("%Y-%m-%d at %H:%M:%S") + "\n" +
 				"Current server script location is " +
-				centralController.SCRIPT_PATH() + "\nVerbosity level set to" +
+				centralController.SCRIPT_PATH() + "\nVerbosity level set to " +
 				str(setting.FORMAT_OUTPUT.DESIRED_VERBOSITY) + "\n\n")
 		# If there is a lastlogwrite value, check if it older than specified in the settings file
 		elif time.time() - lastlogwrite >= setting.FORMAT_OUTPUT.LOG_TIMESTAMP_AFTER_SECONDS:

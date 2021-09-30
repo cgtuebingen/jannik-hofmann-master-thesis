@@ -118,7 +118,7 @@ def linOverlapRepulsion(n1, n2, coefficient=0, xspacing=0, yspacing=0, bufferZon
     yDist = sign(yDist) * bigyspacing - yDist
 
     factor = coefficient * n1.mass * n2.mass #* abs(xDist) * abs(yDist)
-    factor *= sigmoid(min(xDist, yDist)/bufferZone/6+1)
+    factor *= sigmoid(max(xDist, yDist)/bufferZone/6+1)
     
     #if xDist < yDist:
     #    n1.dx += xDist * xDist * factor

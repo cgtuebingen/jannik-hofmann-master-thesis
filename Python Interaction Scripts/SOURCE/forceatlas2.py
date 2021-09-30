@@ -250,8 +250,9 @@ class ForceAtlas2:
 		def exponentialCurve(x, exponentialCurveFactor):
 			if exponentialCurveFactor == 0:
 				return x
-			return (math.e**(exponentialCurveFactor*x) / math.e - 1/math.e) / \
-				(math.e**exponentialCurveFactor / math.e - 1/math.e)
+			return (math.e**(exponentialCurveFactor*x) - 1)/(math.e**exponentialCurveFactor - 1)
+			#return (math.e**(exponentialCurveFactor*x) / math.e - 1/math.e) / \
+			#	(math.e**exponentialCurveFactor / math.e - 1/math.e)
 
 		@functools.lru_cache(maxsize=25)
 		def interpretExponentialCurve(i, rule):
@@ -470,7 +471,7 @@ class ForceAtlas2:
 			for g, group in enumerate(groups):
 				for l, layer in enumerate(group):
 					layerposition[layer] = (nodes[g].x + individualPosOffset[g][l][0], nodes[g].y)
-			return [layerposition[i] for i in range(len(individualSizes))]        
+			return [layerposition[i] for i in range(len(individualSizes))]		
 		else:
 			return [(n.x, n.y) for n in nodes]
 

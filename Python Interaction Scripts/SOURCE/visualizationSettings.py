@@ -40,7 +40,7 @@ flipRGBtoBGR = True # Use this if the first activation layer has weird colors to
 # Also accepting strings containing hex code
 layerColors = {
 	"input layer": (0, .5, .6), # ocean blue
-	"zero padding": (.3, .3, .4), # dark gray with a bit of violet
+	"zero padding": (.3, .3, .4), # dark gray with a bit of blue
 
 	"conv": (.8, .3, 0), # bright orange
 	"batch normalization": (.4, 0, .9), # violet
@@ -66,8 +66,8 @@ class connections:
 # therefore new kernel textures will need to be recalculated when drawing them.
 # With a few exceptions, this rule applies to a huge majority of the kernel settings.
 class kernels:
-	defaultPixelDimensions = (50, 50)
-	minPixelDimensions = None
+	defaultPixelDimensions = (100, 100)
+	minPixelDimensions = (50, 50)
 	maxPixelDimensions = None
 	spacingBetweenKernels = (.5, .5) # if values <= 1, interpreted as percentage of pixel dimensions
 	spacingFromLayer = 50 # scalar, horizontal spacing as kernels are to the side of layers
@@ -233,8 +233,17 @@ def checkSettings():
 			rule.withinIterations = [round(rule.withinIterations * layouting.iterations, 0)]
 		if type(rule.withinIterations) is tuple:
 			if any(type(value) is float for value in rule.withinIterations):
-				rule.withinIterations = tuple(int(round(value * layouting.iterations, 0)) for value in rule.withinIterations)
-			if len(rule.withinIterations) == 1:
+				if len(rule.withinIterations) == 1:
+					rule.withinIterations = [int(round(rule.withinIterations[0] * layouting.iterations, 0))]
+				else:
+					rule.withinIterations = range(
+						int(round(rule.withinIterations[0] * layouting.iterations, 0)) if rule.withinIterations[0] < 1
+							else int(round(rule.withinIterations[0], 0)),
+						int(round(rule.withinIterations[1] * layouting.iterations, 0)) if rule.withinIterations[1] <= 1
+							else int(round(rule.withinIterations[1], 0)),
+						rule.withinIterations[2] if len(rule.withinIterations) > 2 else 1
+					)
+			elif len(rule.withinIterations) == 1:
 				rule.withinIterations = [rule.withinIterations[0]]
 			elif len(rule.withinIterations) == 2:
 				rule.withinIterations = range(rule.withinIterations[0], rule.withinIterations[1])

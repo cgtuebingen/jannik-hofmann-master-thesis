@@ -815,13 +815,13 @@ def settingsToFilename(prefix="", settings=[], filetype="png", separator='_'):
 # Some subfunctions for color normalization and editing
 # makeExponent takes a value from 0 to 100 to produce an exponent. value 50 results in exponent 1
 @functools.lru_cache(maxsize=4)
-def makeExponent(value):
-	if math.isclose(value, 50): return 1
-	if value < 50: return 1 - (value - 50) / 50
-	else: return 1 / makeExponent(100 - value)
-
 def applyBrightness(image, brightness):
-	return np.sign(image) * np.absolute(image) ** makeExponent(brightness)
+	if image < 0: return -applyBrightness(-image, brightness)
+	if math.isclose(brightness, 50): return image
+	if value > 50:
+		return image ** ((100 - brightness) / 50)
+	else:
+		return 1 - (1 - image) ** (brightness / 50)
 
 # Will draw all kernels for the selected layer as defined in trainable var "{layername}/kernel:0"
 async def drawKernels(connection, layerIndex, refreshTrainVars=False, canUseCachedFile=True, draw=True):
