@@ -177,12 +177,13 @@ class layouting:
 	iterations = 1200 # starting at 0, ending one below
 
 	class classicRepulsion:
+		importance = 'disabled' # 'constant
 		strength = 1
 		withinIterations = (0, 0.9)
 	class gravity:
 		strength = 1
 		withinIterations = (0, 0.9)
-		importance = 'decreasing'
+		importance = 'disabled' # 'decreasing'
 		exponentialCurveFactor = 1
 	class connectedAttraction:
 		strength = 1
