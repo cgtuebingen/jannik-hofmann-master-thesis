@@ -19,6 +19,7 @@ This project is published under the GNU GPLv3 license.
 NeuralVisUAL was developed by Jannik Hofmann as part of his master thesis for the university of Tübingen (Eberhard-Karls-Universität Tübingen).
 
 The theoretical background of this project as well as more detailed information about the implementation can be found in the pdf-file of the thesis itself.
+A compressed version of this pdf file is available in this repository. The full [high-quality version of the thesis is here](https://drive.google.com/file/d/1lViMtYSkV5p2BQoxMivBG5NKNootr9Fz/view?usp=sharing).
 
 # Setup
 
